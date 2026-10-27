@@ -21473,9 +21473,11 @@ setInterval(pwaBox,2000);
 /* ---- r14: 99_zzzzz_rel29.js ---- */
 /* REV 29 · release notes: the old names are gone, PWA, Life Areas per application */
 putFaq('Do old links, backups and saved data that use the old name still work?','Yes. Data saved in this browser under the old storage names is moved to the new names the first time Polaris One opens (nothing is lost; it is copied, checked, then removed). A backup file made before the rename still imports. The database function that reports the schema revision answers under both the old and the new name. The link functions that already run in your Supabase project (vt-sync, the vt_* database functions, contract altair-vega/1) keep their names on purpose, because renaming them would break the running link.','What does the name Polaris One mean?');
+putFaq('How do I find an item in a long option box?','Open the box and type. The list shows only the items that contain what you typed (several words all have to match). Press Enter to take the first one, use the arrow keys to move, or tap an item. Esc closes the box without changing anything.');
 RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
  {t:'New',items:[
   ['Install as an app (PWA)','Polaris One can be installed on a phone or computer and opens offline. Use “Install app” under the menu when your browser offers it.'],
+  ['Search in every option box','Open any option box and start typing: the list narrows to what matches, so you do not have to scroll. Use the arrow keys and Enter, or tap an item. Esc closes it.'],
   ['Life Areas per application','Altair Project Management receives all Life Areas, Altair Auto only Automotive, Altair Aero Engineering only Work and Freelance. Only items you switch on are shared.']]},
  {t:'Changed',items:[
   ['The old names are fully replaced','Downloads start with “polaris-one”. Browser data moves to the new names automatically, and older backups, links and event types keep working.'],
@@ -21483,6 +21485,128 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
  {t:'For the admin',items:[
   ['Run schema.sql once, and the new hub.sql','schema.sql adds the function polaris_schema_rev (the old tuntas_schema_rev stays). hub.sql replaces hub_area_ok with a version per application. api-proxy and the running link (vt-sync, vt_* functions, altair-vega/1) are unchanged on purpose. Old file names are listed in LEGACY-NAMES.md.',null,null,null,1]]}
 ]});
+
+/* ---- r14: 99_zzzzzz_pick.js ---- */
+/* REV 29 · searchable option box. Every <select> in the app opens a small box with a search field: type to filter, no scrolling.
+   The real <select> stays in the page and keeps its value; choosing sets it and fires input + change, so every existing handler works unchanged. */
+(function(){
+  if(window.__pick)return;window.__pick={};
+  const st=document.createElement('style');st.textContent=`
+.pk-back{position:fixed;inset:0;z-index:290;background:transparent}
+.pk{position:fixed;z-index:300;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,27,45,.22);display:flex;flex-direction:column;overflow:hidden;min-width:200px}
+.pk-q{border:0;border-bottom:1px solid var(--line);padding:10px 12px;font:inherit;font-size:14px;outline:0;width:100%;background:#fff;color:var(--ink)}
+.pk-q:focus{box-shadow:inset 0 -2px 0 var(--brand)}
+.pk-l{list-style:none;margin:0;padding:4px;overflow:auto;flex:1;overscroll-behavior:contain}
+.pk-o{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1.35;display:flex;gap:8px;align-items:center}
+.pk-o[aria-selected=true]{font-weight:600}
+.pk-o[aria-selected=true]::after{content:"✓";margin-left:auto;color:var(--brand)}
+.pk-o.on{background:var(--brandsoft)}
+.pk-g{padding:8px 10px 2px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.pk-e{padding:12px;color:var(--mut);font-size:13px}
+.pk.sheet{left:8px!important;right:8px!important;top:auto!important;bottom:8px!important;width:auto!important;max-height:70vh!important}
+@media(prefers-reduced-motion:no-preference){.pk{animation:pkin .08s ease-out}@keyframes pkin{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}}
+`;document.head.appendChild(st);
+  const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  const eligible=s=>s&&s.tagName==='SELECT'&&!s.disabled&&!s.multiple&&!(s.size>1)&&!s.hasAttribute('data-nopick');
+  /* the Market Analysis pages live in a shadow root: events are retargeted there, so look at the composed path */
+  const selOf=e=>{const p=e.composedPath?e.composedPath():[];for(let i=0;i<p.length;i++)if(p[i]&&p[i].tagName==='SELECT')return p[i];return e.target&&e.target.closest?e.target.closest('select'):null};
+  let cur=null,seq=0;
+  function items(sel){
+    const out=[];let grp=null;
+    [...sel.children].forEach(ch=>{
+      if(ch.tagName==='OPTGROUP'){[...ch.children].forEach(o=>out.push({o,g:ch.label||''}));}
+      else if(ch.tagName==='OPTION')out.push({o:ch,g:''});
+    });
+    return out.map((x,i)=>({i,o:x.o,g:x.g,label:(x.o.textContent||'').replace(/\s+/g,' ').trim(),key:norm(x.o.textContent)+' '+norm(x.g)}));
+  }
+  function close(refocus){
+    if(!cur)return;const c=cur;cur=null;clearInterval(c.iv);
+    document.removeEventListener('scroll',c.onscroll,true);window.removeEventListener('resize',c.onresize);
+    c.back.remove();c.box.remove();
+    if(refocus&&c.sel.isConnected)try{c.sel.focus({preventScroll:true})}catch(e){}
+  }
+  function choose(c,it){
+    const sel=c.sel;if(!it||it.o.disabled){return}
+    const changed=sel.selectedIndex!==it.o.index;
+    sel.selectedIndex=it.o.index;close(true);
+    if(changed&&sel.isConnected){sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}))}
+  }
+  function open(sel,first){
+    if(cur){const same=cur.sel===sel;close(false);if(same)return}
+    if(!eligible(sel))return;
+    const all=items(sel),id='pk'+(++seq);
+    const back=document.createElement('div');back.className='pk-back';
+    const box=document.createElement('div');box.className='pk';
+    const q=document.createElement('input');q.type='search';q.className='pk-q';q.autocomplete='off';q.spellcheck=false;
+    q.placeholder='Type to search…';q.setAttribute('role','combobox');q.setAttribute('aria-expanded','true');q.setAttribute('aria-controls',id);q.setAttribute('aria-autocomplete','list');
+    const lab=sel.getAttribute('aria-label')||(sel.labels&&sel.labels[0]&&sel.labels[0].textContent.trim())||'option';q.setAttribute('aria-label','Search '+lab);
+    const ul=document.createElement('ul');ul.className='pk-l';ul.id=id;ul.setAttribute('role','listbox');ul.setAttribute('aria-label',lab);
+    box.append(q,ul);document.body.append(back,box);
+    const c=cur={sel,box,back,q,ul,all,shown:[],act:-1};
+    const r=sel.getBoundingClientRect(),vw=window.innerWidth,vh=window.innerHeight,sheet=vw<600||(matchMedia&&matchMedia('(pointer:coarse)').matches&&vw<800);
+    if(sheet)box.classList.add('sheet');
+    else{
+      const w=Math.min(Math.max(r.width,260),vw-16);box.style.width=w+'px';
+      let left=Math.min(Math.max(8,r.left),vw-w-8);box.style.left=left+'px';
+      const below=vh-r.bottom-8,above=r.top-8,mh=Math.min(360,Math.max(below>=180||below>=above?below:above,140));
+      box.style.maxHeight=mh+'px';
+      if(below>=180||below>=above)box.style.top=(r.bottom+4)+'px';else box.style.bottom=(vh-r.top+4)+'px';
+    }
+    function render(){
+      const t=norm(q.value).split(/\s+/).filter(Boolean);
+      let list=all.filter(x=>t.every(w=>x.key.indexOf(w)>=0));
+      if(t.length){const ph=norm(q.value).trim().replace(/\s+/g,' ');list=list.map(x=>{const l=norm(x.label);return {x,s:l.indexOf(ph)===0?0:l.indexOf(ph)>0?1:2}}).sort((a,b)=>a.s-b.s||a.x.i-b.x.i).map(z=>z.x)}
+      c.shown=list;ul.textContent='';let lastG=null;
+      if(!list.length){const e=document.createElement('li');e.className='pk-e';e.setAttribute('role','presentation');e.textContent='No match';ul.append(e);c.act=-1;q.removeAttribute('aria-activedescendant');return}
+      list.forEach((x,k)=>{
+        if(x.g&&x.g!==lastG&&!t.length){const g=document.createElement('li');g.className='pk-g';g.setAttribute('role','presentation');g.textContent=x.g;ul.append(g);lastG=x.g}
+        const li=document.createElement('li');li.className='pk-o';li.id=id+'-'+k;li.setAttribute('role','option');li.dataset.k=k;
+        li.setAttribute('aria-selected',x.o.index===sel.selectedIndex?'true':'false');if(x.o.disabled)li.setAttribute('aria-disabled','true'),li.style.opacity='.5';
+        li.textContent=x.label||'(empty)';ul.append(li)});
+      let a=t.length?0:list.findIndex(x=>x.o.index===sel.selectedIndex);if(a<0)a=0;setAct(a,true);
+    }
+    function setAct(k,scroll){
+      const lis=ul.querySelectorAll('.pk-o');if(!lis.length)return;k=Math.max(0,Math.min(lis.length-1,k));
+      lis.forEach(l=>l.classList.remove('on'));const li=lis[k];li.classList.add('on');c.act=k;q.setAttribute('aria-activedescendant',li.id);
+      if(scroll!==false)li.scrollIntoView({block:'nearest'});
+    }
+    q.addEventListener('input',render);
+    box.addEventListener('keydown',e=>{
+      e.stopPropagation();
+      if(e.key==='Escape'){e.preventDefault();close(true)}
+      else if(e.key==='ArrowDown'){e.preventDefault();setAct(c.act+1)}
+      else if(e.key==='ArrowUp'){e.preventDefault();setAct(c.act-1)}
+      else if(e.key==='Home'){e.preventDefault();setAct(0)}
+      else if(e.key==='End'){e.preventDefault();setAct(1e9)}
+      else if(e.key==='PageDown'){e.preventDefault();setAct(c.act+8)}
+      else if(e.key==='PageUp'){e.preventDefault();setAct(c.act-8)}
+      else if(e.key==='Enter'){e.preventDefault();choose(c,c.shown[c.act])}
+      else if(e.key==='Tab'){e.preventDefault();choose(c,c.shown[c.act])}
+    });
+    ul.addEventListener('mousemove',e=>{const li=e.target.closest('.pk-o');if(li)setAct(+li.dataset.k,false)});
+    ul.addEventListener('mousedown',e=>e.preventDefault());
+    ul.addEventListener('click',e=>{const li=e.target.closest('.pk-o');if(li)choose(c,c.shown[+li.dataset.k])});
+    back.addEventListener('mousedown',e=>{e.preventDefault();close(true)});
+    back.addEventListener('touchstart',e=>{e.preventDefault();close(true)},{passive:false});
+    c.onscroll=e=>{if(box.contains(e.target))return;const n=sel.getBoundingClientRect();if(Math.abs(n.top-r.top)>2||Math.abs(n.left-r.left)>2)close(false)};c.onresize=()=>close(false);
+    document.addEventListener('scroll',c.onscroll,true);window.addEventListener('resize',c.onresize);
+    c.iv=setInterval(()=>{if(!sel.isConnected||sel.disabled)close(false)},300);
+    if(first){q.value=first}
+    render();
+    if(!sheet||all.length>8||first)q.focus({preventScroll:true});
+    else{ul.setAttribute('tabindex','-1')}
+  }
+  window.__pick.open=open;
+  let lastTouch=0;
+  document.addEventListener('mousedown',e=>{if(Date.now()-lastTouch<700){const s=selOf(e);if(eligible(s))e.preventDefault();return}
+    const s=selOf(e);if(!eligible(s)||e.button!==0)return;e.preventDefault();s.focus({preventScroll:true});open(s)},true);
+  document.addEventListener('touchend',e=>{const s=selOf(e);if(!eligible(s))return;lastTouch=Date.now();if(e.cancelable)e.preventDefault();open(s)},{capture:true,passive:false});
+  document.addEventListener('keydown',e=>{
+    const s=(e.composedPath&&e.composedPath()[0])||e.target;if(!eligible(s)||cur)return;if(e.ctrlKey||e.metaKey||e.altKey)return;
+    if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();open(s)}
+    else if(e.key.length===1){e.preventDefault();open(s,e.key)}
+  },true);
+})();
 
 
 /* =====================================================================

@@ -3,8 +3,8 @@
    - Only same-origin GET requests are handled. Supabase, Notion proxy, fonts and any other
      cross-origin call go straight to the network and are NEVER cached (no personal data in the cache).
    - Change VERSION on every delivery so users get the new app. */
-const VERSION = 'po-29-pwa1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
+const VERSION = 'po-29-pwa2';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => null)))));
