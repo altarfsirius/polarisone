@@ -64,7 +64,7 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .top .ver:hover{color:var(--brand,var(--ink));text-decoration:underline dotted}
 .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;position:relative}
 .iconbtn:hover{background:var(--soft)}
-.iconbtn .dot{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:10px;border-radius:9px;min-width:16px;height:16px;display:grid;place-items:center;padding:0 4px}
+.iconbtn .dot{position:absolute;top:-4px;right:-4px;background:#BE2F2F;color:#fff;font-size:10px;border-radius:9px;min-width:16px;height:16px;display:grid;place-items:center;padding:0 4px}
 .subtabs{display:flex;gap:2px;overflow-x:auto;padding:0 20px;border-bottom:1px solid var(--line);position:sticky;top:var(--topH);z-index:25;background:#fff;scrollbar-width:none}
 .subtabs::-webkit-scrollbar{display:none}
 .subtabs button{border:0;background:none;padding:10px 14px;color:var(--ink2);font-weight:600;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -353,7 +353,7 @@ tr[data-act]:focus-visible{outline-offset:-2px}
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='1.0',APP_REV='29',APP_DATE='2026-10-26';
+const APP_VERSION='1.0',APP_REV='30',APP_DATE='2026-10-29';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -1551,6 +1551,12 @@ let MID=0;
 function openModal(title,body,foot,cls){title=String(title==null?'':title).replace(/<(?=[a-zA-Z\/!?])/g,'&lt;');const id='mt'+(++MID),prev=document.activeElement,d=document.createElement('div');d._prev=prev;d.className='mback';d.innerHTML=`<div class="modal ${cls||''}" role="dialog" aria-modal="true" aria-labelledby="${id}"><div class="mh"><h3 id="${id}">${title}</h3><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('x')}</button></div><div class="mb">${body}</div>${foot?`<div class="mf">${foot}</div>`:''}</div>`;$('#layer').appendChild(d);a11yPass(d);const f=$('input:not([type=hidden]),select,textarea',d)||$('.mf .btn.p,.mf .btn',d)||$('.iconbtn',d);if(f&&!/Mobi|Android/i.test(navigator.userAgent))f.focus();return d}
 function restoreFocus(el){if(el&&el._prev&&document.contains(el._prev)&&typeof el._prev.focus==='function'){try{el._prev.focus()}catch(e){}}}
 function closeModal(all){const l=$('#layer'),els=[...l.children];if(all){l.innerHTML=''}else if(l.lastElementChild)l.lastElementChild.remove();restoreFocus(all?els[0]:els[els.length-1])}
+/* Rev 30 · RETURN TO ORIGIN. A form or detail opened from another pop-up is stacked on top of it. Saving, deleting or closing it
+   takes you back to the pop-up you came from (rebuilt with fresh data), or to the page, exactly where you were. */
+function finishModal(){const l=$('#layer'),top=l.lastElementChild;if(top)top.remove();const p=l.lastElementChild;
+  if(p){if(p._form)S.form=p._form;if(typeof p._re==='function'){const re=p._re;p.remove();try{re()}catch(e){console.warn(e)}}}
+  restoreFocus(top);return !!l.lastElementChild}
+function refreshTop(){const l=$('#layer'),p=l.lastElementChild;if(p&&typeof p._re==='function'){const re=p._re;p.remove();re()}}
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 document.addEventListener('keydown',e=>{
   if(e.key!=='Tab')return;const l=$('#layer'),top=l&&l.lastElementChild;if(!top)return;
@@ -1603,7 +1609,7 @@ function renderNav(){
 function quickItems(){return [['activities','New activity','bolt'],['daily_actions','New daily action','clock'],['meetings','New meeting','users'],['evidence','Add evidence','clip'],['problems','Log a problem','flask'],['risks','Log a risk','alert'],['reviews','Write a review','check']]}
 function quickAllowed(){return quickItems().filter(q=>typeof canDo!=='function'||canDo(q[0],'create')!=='deny')}
 function quickPop(){return `<div class="pop" style="width:240px">${quickAllowed().map(q=>`<div class="it" data-act="quick" data-k="${q[0]}">${ic(q[2])}<span>${q[1]}</span></div>`).join('')}</div>`}
-function bellPop(){const a=alerts();return `<div class="pop">${a.length?a.slice(0,30).map(x=>`<div class="it" data-act="alertgo" ${x.k?`data-k="${x.k}" data-id="${x.id}"`:`data-p="${x.go[0]}" data-s="${x.go[1]}"`}><span class="badge b-${x.tone}" style="align-self:flex-start">${esc(x.t)}</span><span class="sm" style="flex:1">${esc(trunc(x.m,70))}</span></div>`).join(''):'<div class="empty-mini">You are all caught up.</div>'}</div>`}
+function bellPop(){const a=alerts();return `<div class="pop">${a.length?a.slice(0,30).map(x=>`<div class="it" data-act="alertgo" ${x.fn?`data-fn="${x.fn}"`:''} ${x.k?`data-k="${x.k}" data-id="${x.id}"`:`data-p="${x.go[0]}" data-s="${x.go[1]}"`}><span class="badge b-${x.tone}" style="align-self:flex-start">${esc(x.t)}</span><span class="sm" style="flex:1">${esc(trunc(x.m,70))}</span></div>`).join(''):'<div class="empty-mini">You are all caught up.</div>'}</div>`}
 function renderTop(){
   const n=navP(S.route.p),al=alerts().length;
   $('#top').innerHTML=`<button class="iconbtn menu" data-act="toggleNav" aria-label="Menu">${ic('menu')}</button><div class="ttl"><h1>${n.label}</h1><button type="button" class="ver" data-act="whatsnew" title="${APP_NAME} version ${APP_VERSION}, revision ${APP_REV} (${fmtD(APP_DATE)}) — see what is new"><span aria-hidden="true">v${APP_VERSION} · Rev ${APP_REV}</span><span class="sr">Version ${APP_VERSION}, revision ${APP_REV}. What is new</span></button></div><span class="sp"></span>
@@ -1728,7 +1734,7 @@ function openForm(key,id,defaults){
   const vals={__hasSecret:!!(old&&(old.auth_value||getSecretSafe(old.id)))};m.fields.forEach(f=>{let v=old?old[f.k]:undefined;if(v===undefined){v=f.def;if(v==='@today')v=todayS()}if(!old&&defaults&&defaults[f.k]!==undefined)v=defaults[f.k];vals[f.k]=v==null?'':v});
   if(!old&&m.t==='goals'&&!vals.start_date)vals.start_date=`${new Date().getFullYear()}-01-01`;
   const body=`<form id="form" onsubmit="return false" autocomplete="off"><div class="fgrid">${m.fields.map(f=>fieldHtml(f,vals[f.k],vals)).join('')}</div></form><p class="help" style="margin-top:12px"><span class="req">*</span> required. You can write in Bahasa Indonesia or English.</p>`;
-  openModal(`${old?'Edit':'New'} ${esc(m.one.toLowerCase())}`,body,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="save">${ic('check')} Save</button>`);
+  const fm=openModal(`${old?'Edit':'New'} ${esc(m.one.toLowerCase())}`,body,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="save">${ic('check')} Save</button>`);fm._form={key,id};
   applyWhen();
 }
 const getSecretSafe=id=>typeof getSecret==='function'?getSecret(id):'';
@@ -1768,14 +1774,14 @@ ACT.save=async el=>{
     const fi=form.elements['__file'];
     if(fi&&fi.files&&fi.files[0]){const file=fi.files[0];d.file_name=file.name;const path=await DB.upload(file);if(path)d.file_path=path;else toast('Demo mode keeps only the file name. Connect Supabase to store files.')}
     if(key==='evidence'&&!d.link_id){d.link_type=d.link_type||null}
-    const row=await saveRow(key,d,id);closeModal(true);toast(`${m.one} saved`);render();
+    const row=await saveRow(key,d,id);finishModal();toast(`${m.one} saved`);render();
   }catch(e){if(e&&e.pending){closeModal(true);toast(e.message);render();return}console.error(e);toast(e.message||'Could not save',1);el.disabled=false}
 };
 ACT.new=el=>{let add={};try{add=JSON.parse(el.dataset.add||'{}')}catch(e){}openForm(el.dataset.k,null,add)};
-ACT.edit=el=>{closeModal(true);openForm(el.dataset.k,el.dataset.id)};
-ACT.del=async el=>{const m=MOD[el.dataset.k];if(await ask('Delete '+m.one.toLowerCase()+'?','This cannot be undone. Linked items keep existing but lose this link.','Delete',true)){try{await removeRow(el.dataset.k,el.dataset.id);closeModal(true);toast('Deleted');render()}catch(e){if(e&&e.pending)closeModal(true);toast(e.message,e&&e.pending?0:1)}}};
+ACT.edit=el=>{openForm(el.dataset.k,el.dataset.id)};
+ACT.del=async el=>{const m=MOD[el.dataset.k];if(await ask('Delete '+m.one.toLowerCase()+'?','This cannot be undone. Linked items keep existing but lose this link.','Delete',true)){try{await removeRow(el.dataset.k,el.dataset.id);finishModal();toast('Deleted');render()}catch(e){if(e&&e.pending)finishModal();toast(e.message,e&&e.pending?0:1)}}};
 ACT.closeModal=()=>closeModal();
-ACT.addev=el=>{closeModal(true);openForm('evidence',null,{link_type:el.dataset.k,link_id:el.dataset.id})};
+ACT.addev=el=>{openForm('evidence',null,{link_type:el.dataset.k,link_id:el.dataset.id})};
 ACT.openev=async el=>{const r=byId('evidence',el.dataset.id);if(!r)return;let u=r.url;try{if(!u&&r.file_path)u=await DB.fileUrl(r.file_path)}catch(e){return toast(e.message,1)}if(!u)return;if(safeUrl(u)==='#')return toast('Blocked: only http(s) links can be opened.',1);window.open(safeUrl(u),'_blank','noopener,noreferrer')};
 
 /* ---------- detail modal ---------- */
@@ -1798,7 +1804,7 @@ function openDetail(key,id){
   const body=`${head}${EXTRA[key+'_top']?EXTRA[key+'_top'](r):''}<dl class="kv">${shown.map(f=>{let v=r[f.k];if(f.k==='link_id')return `<dt>${esc(f.l)}</dt><dd>${fmtField(f,v,r)}</dd>`;return `<dt>${esc(f.l)}</dt><dd>${fmtField(f,v,r)}</dd>`}).join('')}</dl>${EXTRA[key]?EXTRA[key](r):''}${LINKS.some(x=>x[0]===key)?evidenceBlock(key,id):''}`;
   const lvD=typeof canDo==='function'?canDo(m.t,'delete'):'allow',lvE=typeof canDo==='function'?canDo(m.t,'edit'):'allow';
   const foot=`${lvD==='deny'?'':`<button class="btn d" data-act="del" data-k="${key}" data-id="${id}">${ic('trash',15)} Delete${lvD==='ask'?' (needs approval)':''}</button>`}<span class="sp"></span>${BTNS[key]&&lvE!=='deny'?BTNS[key](r):''}${lvE==='deny'?'':`<button class="btn p" data-act="edit" data-k="${key}" data-id="${id}">${ic('edit',15)} Edit${lvE==='ask'?' (needs approval)':''}</button>`}`;
-  openModal(esc(trunc(labelOf(m.t,r),60)),body,foot,'wide');
+  const dm=openModal(esc(trunc(labelOf(m.t,r),60)),body,foot,'wide');dm._re=()=>{if(byId(m.t,id))openDetail(key,id)};
 }
 ACT.open=el=>openDetail(el.dataset.k,el.dataset.id);
 
@@ -1809,7 +1815,7 @@ ACT.toggleNav=()=>document.body.classList.toggle('nav');
 ACT.bell=()=>{S.pop=S.pop==='bell'?null:'bell';renderTop()};
 ACT.quickmenu=()=>{S.pop=S.pop==='quick'?null:'quick';renderTop()};
 ACT.quick=el=>{S.pop=null;renderTop();openForm(el.dataset.k,null,el.dataset.k==='daily_actions'?{action_date:S.ui.day}:{})};
-ACT.alertgo=el=>{S.pop=null;renderTop();if(el.dataset.k)openDetail(el.dataset.k,el.dataset.id);else go(el.dataset.p,el.dataset.s)};
+ACT.alertgo=el=>{S.pop=null;renderTop();if(el.dataset.fn&&ACT[el.dataset.fn])return ACT[el.dataset.fn](el);if(el.dataset.k)openDetail(el.dataset.k,el.dataset.id);else go(el.dataset.p,el.dataset.s)};
 ACT.hidehelp=async el=>{const hh=Object.assign({},prefs().hh||{});hh[el.dataset.key]=1;await setPrefs({hh});renderView()};
 ACT.logout=async()=>{await DB.signOut();S.profile=null;S.data={};showLogin()};
 ACT.go=el=>go(el.dataset.p,el.dataset.s);
@@ -1939,7 +1945,7 @@ VIEWS['plan/goals']=()=>{
    (roots.length?`<div class="card tree">${roots.map(g=>goalNode(g,0)).join('')}</div><p class="sm mut" style="margin-top:8px">Vision → Mission → Goal → Objective. Open an item and choose “Add child” to go one level down.</p>`:`<div class="card"><div class="empty"><b>No goals yet</b>Start with a Vision (where you want to be), then add a Mission and yearly Goals.<br><button class="btn p" data-act="new" data-k="goals" data-add='{"type":"Vision"}'>${ic('plus')} Add your vision</button></div></div>`);
 };
 const NEXTG={Vision:'Mission',Mission:'Goal',Goal:'Objective',Objective:'Objective'};
-ACT.newchild=el=>{const g=byId('goals',el.dataset.id);closeModal(true);openForm('goals',null,{parent_id:g.id,type:NEXTG[g.type],portfolio_id:g.portfolio_id,end_date:g.end_date})};
+ACT.newchild=el=>{const g=byId('goals',el.dataset.id);openForm('goals',null,{parent_id:g.id,type:NEXTG[g.type],portfolio_id:g.portfolio_id,end_date:g.end_date})};
 function goalChain(g){const out=[];let c=g,n=0;while(c&&n++<8){out.unshift(c);c=byId('goals',c.parent_id)}return out}
 EXTRA.goals=g=>{const acts=(D().activities||[]).filter(a=>a.goal_id===g.id),kids=(D().goals||[]).filter(x=>x.parent_id===g.id);
   return `<div class="chain" style="margin:14px 0 6px">${goalChain(g).map(x=>`<span>${esc(x.type)}: ${esc(trunc(x.title,36))}</span>`).join('<span style="border:0;background:none">→</span>')}</div>
@@ -1951,7 +1957,7 @@ ACT.newact=el=>{const f=el.dataset.f,id=el.dataset.id,add={};add[f]=id;
   if(f==='project_id'){const p=byId('projects',id);add.portfolio_id=p.portfolio_id;add.goal_id=p.goal_id}
   if(f==='goal_id'){const g=byId('goals',id);add.portfolio_id=g.portfolio_id}
   if(f==='plan_id'){const p=byId('plans',id);add.portfolio_id=p.portfolio_id;add.goal_id=p.goal_id;add.planned_start=p.start_date;add.planned_finish=p.end_date}
-  closeModal(true);openForm('activities',null,add)};
+  openForm('activities',null,add)};
 
 const HZ_OUT={'Annual':'Annual goal + KPI','Semi-Annual':'H1 / H2 performance','Quarterly':'Quarterly objective','Monthly':'Monthly target','Weekly':'Weekly activity plan'};
 const HZ_NEXT={'Annual':'Semi-Annual','Semi-Annual':'Quarterly','Quarterly':'Monthly','Monthly':'Weekly','Weekly':'Weekly'};
@@ -1969,7 +1975,7 @@ EXTRA.plans=p=>{const acts=(D().activities||[]).filter(a=>a.plan_id===p.id),kids
   ${kids.length?`<div class="ch" style="margin-top:14px"><h3>Child plans (${kids.length})</h3></div><div class="list">${kids.map(k=>`<div class="item" data-act="open" data-k="plans" data-id="${k.id}">${badge(k.horizon,'blue')}<span class="t" style="flex:1">${esc(k.title)}</span><span style="width:100px">${pbar(planProgress(k))}</span></div>`).join('')}</div>`:''}
   <div class="ch" style="margin-top:14px"><h3>Activities in this plan (${acts.length})</h3></div>${acts.length?`<div class="list">${acts.map(a=>`<div class="item" data-act="open" data-k="activities" data-id="${a.id}"><span class="t" style="flex:1;min-width:0">${esc(a.name)}</span>${flagHtml(a)}${badge(a.status)}</div>`).join('')}</div>`:'<p class="sm mut">No activities yet. Add the activities that deliver the outcomes above.</p>'}`};
 BTNS.plans=p=>`<button class="btn" data-act="newchildplan" data-id="${p.id}">${ic('plus',15)} Child plan</button><button class="btn" data-act="newact" data-f="plan_id" data-id="${p.id}">${ic('bolt',15)} Add activity</button>`;
-ACT.newchildplan=el=>{const p=byId('plans',el.dataset.id);closeModal(true);openForm('plans',null,{parent_id:p.id,horizon:HZ_NEXT[p.horizon],goal_id:p.goal_id,portfolio_id:p.portfolio_id,start_date:p.start_date,end_date:p.end_date})};
+ACT.newchildplan=el=>{const p=byId('plans',el.dataset.id);openForm('plans',null,{parent_id:p.id,horizon:HZ_NEXT[p.horizon],goal_id:p.goal_id,portfolio_id:p.portfolio_id,start_date:p.start_date,end_date:p.end_date})};
 
 VIEWS['plan/projects']=()=>crud('projects');
 EXTRA.projects=p=>{const acts=(D().activities||[]).filter(a=>a.project_id===p.id).sort((a,b)=>String(a.planned_start).localeCompare(String(b.planned_start))),ms=(D().milestones||[]).filter(m=>m.project_id===p.id).sort((a,b)=>a.due_date.localeCompare(b.due_date));
@@ -1980,7 +1986,7 @@ EXTRA.projects=p=>{const acts=(D().activities||[]).filter(a=>a.project_id===p.id
   ${g.length?`<div class="ch" style="margin-top:16px"><h3>Schedule</h3></div>${gantt(g,from,addD(to,2))}`:''}
   <div class="ch" style="margin-top:16px"><h3>Milestones (${ms.length})</h3></div>${ms.length?`<div class="list">${ms.map(m=>`<div class="item" data-act="open" data-k="milestones" data-id="${m.id}">${ic('flag',16)}<span class="t" style="flex:1">${esc(m.name)}</span><span class="sm mut">${fmtS(m.due_date)}</span>${badge(m.status)}</div>`).join('')}</div>`:'<p class="sm mut">No milestones yet.</p>'}`};
 BTNS.projects=p=>`<button class="btn" data-act="newms" data-id="${p.id}">${ic('flag',15)} Add milestone</button><button class="btn" data-act="newact" data-f="project_id" data-id="${p.id}">${ic('bolt',15)} Add activity</button>`;
-ACT.newms=el=>{closeModal(true);openForm('milestones',null,{project_id:el.dataset.id})};
+ACT.newms=el=>{openForm('milestones',null,{project_id:el.dataset.id})};
 VIEWS['plan/milestones']=()=>crud('milestones');
 
 /* =====================================================================
@@ -2014,7 +2020,7 @@ CHG.pkfilter=t=>{const w=t.closest('[data-pk-wrap]');if(!w)return;
 EXTRA.activities=a=>{const da=(D().daily_actions||[]).filter(x=>x.activity_id===a.id).sort((x,y)=>String(y.action_date).localeCompare(String(x.action_date)));return `<div class="ch" style="margin-top:14px"><h3>Daily actions (${da.length})</h3></div>${da.length?scrollPick('da'+a.id,'daily actions',da.map(x=>({open:!isClosed(x),html:`<div class="item" data-act="open" data-k="daily_actions" data-id="${x.id}"${pkAttr(x.title+' '+fmtS(x.action_date)+' '+x.action_date+' '+x.status,!isClosed(x))}><span class="t" style="flex:1">${esc(x.title)}</span><span class="sm mut">${fmtS(x.action_date)}</span>${badge(x.status)}</div>`})),true):'<p class="sm mut">Nothing scheduled yet. Break this activity into daily actions.</p>'}`};
 BTNS.activities=a=>`${a.status!=='Completed'?`<button class="btn" data-act="complete" data-id="${a.id}">${ic('check',15)} Mark completed</button>`:''}<button class="btn" data-act="newda" data-id="${a.id}">${ic('clock',15)} Plan today</button>`;
 ACT.complete=async el=>{await patchRow('activities',el.dataset.id,{status:'Completed'});closeModal(true);toast('Marked as completed');render()};
-ACT.newda=el=>{const a=byId('activities',el.dataset.id);closeModal(true);openForm('daily_actions',null,{activity_id:a.id,title:a.name,action_date:todayS(),priority:a.priority})};
+ACT.newda=el=>{const a=byId('activities',el.dataset.id);openForm('daily_actions',null,{activity_id:a.id,title:a.name,action_date:todayS(),priority:a.priority})};
 function addMonths(s,n){const d=pd(s);d.setMonth(d.getMonth()+n);return ymd(d)}
 async function offerNext(r){if(!await ask('Create the next occurrence?',`“${esc(r.name)}” repeats ${r.recurrence.toLowerCase()}. Create the next one now?`,'Create next'))return;
   const sh=s=>!s?null:r.recurrence==='Daily'?addD(s,1):r.recurrence==='Weekly'?addD(s,7):addMonths(s,1);
@@ -2169,7 +2175,7 @@ VIEWS['meetings/actions']=()=>crud('meeting_actions');
 EXTRA.meetings=m=>{const as=(D().meeting_actions||[]).filter(a=>a.meeting_id===m.id);
   return `<div class="ch" style="margin-top:16px"><h3>Action items (${as.length})</h3><span class="sp"></span><button class="btn s" data-act="newmact" data-id="${m.id}">${ic('plus',14)} Add action item</button></div>${as.length?`<div class="list">${as.map(a=>`<div class="item" data-act="open" data-k="meeting_actions" data-id="${a.id}"><span class="t" style="flex:1;min-width:0">${esc(a.action)}</span><span class="sm mut">${esc(a.pic||'')} ${a.due_date?'· '+fmtS(a.due_date):''}</span>${badge(a.status)}</div>`).join('')}</div>`:'<p class="sm mut">No follow-ups yet. Write what must be done, by whom and by when.</p>'}`};
 BTNS.meetings=m=>`<button class="btn" data-act="newmact" data-id="${m.id}">${ic('plus',15)} Action item</button>`;
-ACT.newmact=el=>{closeModal(true);openForm('meeting_actions',null,{meeting_id:el.dataset.id})};
+ACT.newmact=el=>{openForm('meeting_actions',null,{meeting_id:el.dataset.id})};
 EXTRA.meeting_actions=a=>{const m=byId('meetings',a.meeting_id);return m?`<p class="sm" style="margin-top:12px">From meeting: <a href="#" data-act="open" data-k="meetings" data-id="${m.id}">${esc(labelOf('meetings',m))}</a></p>`:''};
 
 /* =====================================================================
@@ -4881,7 +4887,7 @@ VIEWS['execute/timelog']=()=>{
   return crud('time_logs',{head,addLabel:'Log time',emptyMsg:'Log a session of work, or link daily actions to activities and their minutes appear here automatically.'})};
 
 /* ---------- actions ---------- */
-ACT.logtime=el=>{closeModal(true);openForm('time_logs',null,{activity_id:el.dataset.id,log_date:todayS()})};
+ACT.logtime=el=>{openForm('time_logs',null,{activity_id:el.dataset.id,log_date:todayS()})};
 ACT.reopen=async el=>{
   const k=el.dataset.k,id=el.dataset.id,before=byId(MOD[k].t,id);if(!before)return;
   await patchRow(k,id,{status:k==='activities'?'In Progress':'In Progress'});closeModal(true);
@@ -6473,7 +6479,7 @@ function miSection(m){
    (items.length?[...by.entries()].map(([pid,list])=>`<div style="margin-top:8px"><div class="row" style="margin:6px 0 4px"><b>${pid?esc(refLabel('projects',pid)):'No project'}</b><span class="sm mut">${list.length} item${list.length>1?'s':''}</span></div><div class="list">${list.map(miRow).join('')}</div></div>`).join(''):`<p class="sm mut">One meeting can cover several projects. Add an item for every project and subject that was discussed, each with its decision and who follows up.</p>`)}
 const _extraMeet=EXTRA.meetings;EXTRA.meetings=m=>miSection(m)+(_extraMeet?_extraMeet(m):'');
 const _btnMeet=BTNS.meetings;BTNS.meetings=m=>(miCan()?`<button class="btn" data-act="newmitem" data-id="${m.id}">${ic('plus',15)} Discussion item</button><button class="btn" data-act="mibatch" data-id="${m.id}">${ic('plus',15)} Several items</button>`:'')+(_btnMeet?_btnMeet(m):'');
-ACT.newmitem=el=>{const m=byId('meetings',el.dataset.id);closeModal(true);openForm('meeting_items',null,{meeting_id:el.dataset.id,project_id:m&&m.project_id||''})};
+ACT.newmitem=el=>{const m=byId('meetings',el.dataset.id);openForm('meeting_items',null,{meeting_id:el.dataset.id,project_id:m&&m.project_id||''})};
 
 /* ---------- add several at once ---------- */
 const MI_MAX=12;
@@ -6521,7 +6527,7 @@ EXTRA.meeting_items=i=>{
   return `<p class="sm" style="margin-top:12px">${m?`From meeting: <a href="#" data-act="open" data-k="meetings" data-id="${m.id}">${esc(labelOf('meetings',m))}</a>`:''}${p?` · Project: <a href="#" data-act="open" data-k="projects" data-id="${p.id}">${esc(p.name)}</a>`:''}</p>
   <div class="ch" style="margin-top:12px"><h3>Follow-up actions (${acts.length})</h3></div>${acts.length?`<div class="list">${acts.map(a=>`<div class="item" data-act="open" data-k="meeting_actions" data-id="${a.id}"><span class="t" style="flex:1;min-width:0">${esc(a.action)}</span><span class="sm mut">${esc(a.pic||'')}${a.due_date?' · '+esc(fmtS(a.due_date)):''}</span>${badge(a.status)}</div>`).join('')}</div>`:'<p class="sm mut">None yet.</p>'}`};
 BTNS.meeting_items=i=>`<button class="btn" data-act="mifollow" data-id="${i.id}">${ic('plus',15)} Follow-up action</button>`;
-ACT.mifollow=el=>{const i=byId('meeting_items',el.dataset.id);if(!i)return;closeModal(true);openForm('meeting_actions',null,{meeting_id:i.meeting_id,item_id:i.id,action:'Follow up: '+trunc(i.topic,120),pic:i.pic||'',due_date:i.due_date||''})};
+ACT.mifollow=el=>{const i=byId('meeting_items',el.dataset.id);if(!i)return;openForm('meeting_actions',null,{meeting_id:i.meeting_id,item_id:i.id,action:'Follow up: '+trunc(i.topic,120),pic:i.pic||'',due_date:i.due_date||''})};
 const _extraMA=EXTRA.meeting_actions;
 EXTRA.meeting_actions=a=>(_extraMA?_extraMA(a):'')+(a.item_id&&byId('meeting_items',a.item_id)?`<p class="sm" style="margin-top:6px">Follows from: <a href="#" data-act="open" data-k="meeting_items" data-id="${a.item_id}">${esc(trunc(byId('meeting_items',a.item_id).topic,80))}</a></p>`:'');
 
@@ -6604,8 +6610,15 @@ async function seedSample(){
   DA(t,'Review test procedure draft','13:00','14:00','Work','Not Started',{priority:'Medium'});
   DA(t,'Client mockup v2','16:00','17:00','Work','Not Started',{activity_id:a8,is_top3:true,priority:'High'});
   DA(t,'Family time','19:30','21:00','Family','Not Started',{});
+  add('cv_entries',{section:'profile',title:S.profile.full_name||'Data diri',sort_order:0,data:{full_name:S.profile.full_name||'Demo User',headline:'Design assurance engineer',city:'Jakarta',email:S.profile.email||'',summary:'Engineer penerbangan dengan fokus pada kepatuhan desain dan manajemen proyek. Senang belajar hal baru dan membimbing tim.'}});
+  add('cv_entries',{section:'language',title:'Indonesia',level:'Fasih atau bahasa ibu',sort_order:1});
+  add('cv_entries',{section:'language',title:'Inggris',level:'Lancar',detail:'Membaca dokumen teknis setiap hari',sort_order:2});
+  add('cv_entries',{section:'value',title:'Jujur dan bertanggung jawab',sort_order:1});
+  add('cv_entries',{section:'hobby',title:'Bersepeda',sort_order:1});
+  const CMOOD=[0,4,2,5,3,4,2],CBODY=[0,4,3,5,3,4,2],CMIND=[0,4,2,5,3,4,3],CSTR=[0,2,4,1,3,2,5];
   for(let i=1;i<=6;i++){const dd=d(-i);
-    DA(dd,'Deep work block','08:30','10:00','Work','Completed',{energy:5,is_top3:true,priority:'High',result:'Main task moved forward',lesson_learned:i===1?'Phone on silent doubled my output':null});
+    add('health_records',{section:'condition',kind:'Check-in kondisi',title:condTitle({time:'07:45',mood:CMOOD[i],body:CBODY[i],mind:CMIND[i],stress:CSTR[i]}),rec_date:dd,value:CMOOD[i],unit:'skor',provenance:'Saya catat sendiri',cond_time:'07:45',cond_mood:CMOOD[i],cond_body:CBODY[i],cond_mind:CMIND[i],cond_stress:CSTR[i]});
+    DA(dd,'Deep work block','08:30','10:00','Work','Completed',{energy:Math.max(1,Math.min(5,CMIND[i]+1)),pomodoros:CMIND[i]>=4?3:CMIND[i]===3?2:1,is_top3:true,priority:'High',result:'Main task moved forward',lesson_learned:i===1?'Phone on silent doubled my output':null});
     DA(dd,'Meetings & email','13:30','14:30','Work','Completed',{energy:2,blocker:i===1?'Back-to-back meetings':null});
     DA(dd,'Admin tasks','16:00','17:00','Work','Completed',{energy:3});
     DA(dd,'Family dinner & time','19:30','21:00','Family','Completed',{energy:4});
@@ -7108,8 +7121,8 @@ async function noteSave(el){
     d.images=imgs;
     const row=await saveRow('notes',d,id);
     if(DB.mode==='supabase'&&S.noteDraft.removed.length){try{await DB.sb.storage.from('evidence').remove(S.noteDraft.removed)}catch(x){console.warn(x)}}
-    const back=S.noteBack;S.noteDraft=null;S.noteBack=null;closeModal(true);toast('Note saved');await render();
-    const tgt=back||(row&&row.link_type&&row.link_id?{k:row.link_type,id:row.link_id}:null);if(tgt&&byId(tgt.k,tgt.id))openDetail(tgt.k,tgt.id)}
+    const back=S.noteBack;S.noteDraft=null;S.noteBack=null;const kept=finishModal();toast('Note saved');await render();
+    const tgt=kept?null:back||(row&&row.link_type&&row.link_id?{k:row.link_type,id:row.link_id}:null);if(tgt&&byId(tgt.k,tgt.id))openDetail(tgt.k,tgt.id)}
   catch(e){if(e&&e.pending){S.noteDraft=null;closeModal(true);toast(e.message);render();return}console.error(e);toast(e.message||'Could not save',1);el.disabled=false}}
 MOD.notes.afterDelete=async old=>{if(DB.mode!=='supabase')return;const ps=noteImgs(old).map(i=>i.path).filter(Boolean);if(ps.length)try{await DB.sb.storage.from('evidence').remove(ps)}catch(e){console.warn(e)}};
 
@@ -7163,7 +7176,7 @@ function notesBlock(key,id){
   const ns=(D().notes||[]).filter(n=>n.link_type===key&&n.link_id===id).sort((a,b)=>(!!b.pinned-!!a.pinned)||String(b.created_at).localeCompare(String(a.created_at)));
   return `<div class="ch" style="margin-top:18px"><h3>Notes (${ns.length})</h3><span class="sp"></span>${canDo('notes','create')==='deny'?'':`<button class="btn s" data-act="addnote" data-k="${key}" data-id="${id}">${ic('plus',14)} Add note</button>`}</div>${ns.length?`<div class="list">${ns.slice(0,6).map(n=>`<div class="item" data-act="open" data-k="notes" data-id="${n.id}"><div style="flex:1;min-width:0"><div class="t">${n.pinned?ic('star',12)+' ':''}${esc(trunc(n.title,70))}</div><div class="sm mut" style="white-space:normal">${esc(trunc(noteTxt(n),110))}</div></div>${noteImgs(n).length?`<span class="badge b-slate" title="Pictures">${noteImgs(n).length} pic</span>`:''}${badge(n.kind||'Note','slate')}</div>`).join('')}</div>${ns.length>6?`<p class="sm mut">${ns.length-6} more in Execute → Notes.</p>`:''}`:'<p class="sm mut">No notes yet. Use a note to brainstorm, with text and pictures.</p>'}`}
 ['activities','daily_actions','problems','improvements','projects'].forEach(k=>{const x=EXTRA[k];EXTRA[k]=r=>(x?x(r):'')+notesBlock(k,r.id)});
-ACT.addnote=el=>{S.noteBack={k:el.dataset.k,id:el.dataset.id};closeModal(true);openForm('notes',null,{link_type:el.dataset.k,link_id:el.dataset.id,kind:'Brainstorm'})};
+ACT.addnote=el=>{S.noteBack={k:el.dataset.k,id:el.dataset.id};openForm('notes',null,{link_type:el.dataset.k,link_id:el.dataset.id,kind:'Brainstorm'})};
 MOD.notes.before=function(d){if(!d.link_id||!d.link_type){d.link_id=null;d.link_type=null}if(d.pinned==null)d.pinned=false};
 
 /* ---- r14: 40_analysis_actions.js ---- */
@@ -9665,7 +9678,7 @@ FAQ.push(['Who can see my Outlook calendar and mail?','Only you. Each person con
      - the Overview says which of the three parts (app, schema.sql, api-proxy) is out of date.
    ===================================================================== */
 const PROXY_MIN=(String(PROXY_TS).match(/const VERSION = "([^"]+)"/)||[])[1]||'0';
-const SCHEMA_REV=25;
+const SCHEMA_REV=26;
 function hubSQL(){return `
 -- =====================================================================
 -- API HUB: lets the app see that this script was run after an update
@@ -14898,6 +14911,9 @@ ACT.bdgo=el=>{
 const HC_NOTE='Informasi umum, belum ditinjau profesional. Bukan diagnosis dan bukan pengganti dokter atau tenaga kesehatan.';
 const HC_EMERGENCY='Darurat? Hubungi layanan darurat di tempatmu sekarang (Indonesia: 112 untuk darurat umum, 119 untuk layanan gawat darurat medis; periksa kembali nomor yang berlaku di daerahmu) atau minta orang terdekat membawamu ke IGD.';
 const HC_SECTIONS=[
+ {id:'condition',label:'Kondisi Harian',icon:'🌤️',kinds:['Check-in kondisi'],unit:0,emergency:1,mood:1,custom:1,
+  intro:'Catat suasana hati, perasaan, kondisi fisik, kejernihan pikiran, stres dan beban multitasking dalam satu pop-up singkat. Boleh beberapa kali sehari. Datanya dihubungkan dengan energi dan sesi fokus di Daily Actions, supaya kamu melihat pola pribadimu sendiri.',
+  tips:['Cukup 20 detik: pilih angka 1–5, tidak perlu mengisi semuanya.','Catat pada jam yang sama (misalnya pagi dan sore) agar polanya mudah dibaca.','Polanya baru terlihat setelah sekitar dua minggu. Ini gambaran dari datamu, bukan sebab-akibat dan bukan diagnosis.','Jika perasaan berat berlangsung lama, bicarakan dengan orang yang kamu percaya atau tenaga profesional.']},
  {id:'profile',label:'Profil Kesehatan',icon:'🧾',kinds:['Golongan darah','Alergi','Kondisi yang saya miliki','Obat atau suplemen yang saya pakai','Pengukuran','Dokter atau fasilitas kesehatan','Kontak darurat'],unit:1,
   intro:'Satu tempat untuk data dasarmu, supaya mudah dibuka saat berobat.',
   tips:['Tulis obat persis seperti di resep atau label. Aplikasi ini tidak memberi saran dosis.','Isi kontak darurat dan alergi lebih dulu: itu yang paling berguna saat genting.','Tulis angka pengukuran apa adanya dengan tanggalnya. Aplikasi tidak menilai angka itu normal atau tidak.']},
@@ -14950,8 +14966,17 @@ MOD.health_records={t:'health_records',one:'Catatan kesehatan',many:'Catatan kes
   F('relation','Hubungan keluarga','hidden','',{sql:'text'}),
   F('age_dx','Usia saat didiagnosis','hidden','',{sql:'int'}),
   F('status','Status','hidden','',{sql:'text'}),
+  F('cond_mood','Suasana hati','hidden','',{sql:'int'}),
+  F('cond_body','Kondisi fisik','hidden','',{sql:'int'}),
+  F('cond_mind','Mental','hidden','',{sql:'int'}),
+  F('cond_stress','Stres','hidden','',{sql:'int'}),
+  F('cond_multi','Multitasking','hidden','',{sql:'int'}),
+  F('cond_time','Jam','hidden','',{sql:'text'}),
+  F('cond_feel','Perasaan','hidden','',{sql:'text'}),
+  F('cond_ache','Keluhan fisik','hidden','',{sql:'text'}),
   F('notes','Catatan','textarea','Isi catatan.',{wide:1,rows:3})],cols:['rec_date','kind','title']};
 ORDER.push('health_records');NEWER_TABLES.push('health_records');
+COL_NEWER.health_records=['cond_multi','cond_mood','cond_body','cond_mind','cond_stress','cond_time','cond_feel','cond_ache'];
 NAV.splice(NAV.findIndex(n=>n.id==='finance'),0,{id:'health',label:'Healthcare',ic:'heart',subs:[['summary','Ringkasan'],...HC_SECTIONS.map(s=>[s.id,s.label])]});
 if(!IC.heart)IC.heart='<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>';
 
@@ -15009,8 +15034,8 @@ function hcForm(sec,rec){
    <label class="sm b" for="hc_notes" style="display:block;margin-top:10px">Catatan</label><textarea class="in" id="hc_notes" rows="3" style="width:100%">${esc(r.notes||'')}</textarea>
    <p class="xs mut" style="margin-top:8px">${esc(HC_NOTE)}</p></div>`;
   openModal((rec?'Ubah ':'Tambah ')+'catatan · '+s.label,body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="hcsave" data-sec="${sec}" data-id="${rec?rec.id:''}">Simpan</button>`)}
-ACT.hcadd=el=>{S.hc.bad='';hcForm(el.dataset.sec)};
-ACT.hcedit=el=>{const r=byId('health_records',el.dataset.id);if(r){S.hc.bad='';hcForm(r.section,r)}};
+ACT.hcadd=el=>{S.hc.bad='';if(el.dataset.sec==='condition'&&typeof condForm==='function')return condForm();hcForm(el.dataset.sec)};
+ACT.hcedit=el=>{const r=byId('health_records',el.dataset.id);if(r){S.hc.bad='';if(r.section==='condition'&&typeof condForm==='function')return condForm(r);hcForm(r.section,r)}};
 ACT.hcshow=()=>{S.hc.show=!S.hc.show;renderView()};
 ACT.hcsave=async el=>{
   const g=id=>{const e=document.getElementById(id);return e?e.value:''};
@@ -15019,23 +15044,23 @@ ACT.hcsave=async el=>{
   const s=hcSec(el.dataset.sec);if(s.unit){d.value=g('hc_value')===''?null:+g('hc_value');d.unit=g('hc_unit').trim()||null}
   if(!d.title||!d.rec_date){const b=$('[data-hc-form]');S.hc.bad='Isi judul dan tanggal.';const h=$('[data-hc-bad]');if(!h&&b)b.insertAdjacentHTML('afterbegin',`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${S.hc.bad}</div></div>`);return}
   el.disabled=true;
-  try{const r=await saveRow('health_records',d,el.dataset.id||undefined);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');S.hc.bad='';closeModal(true);toast('Catatan tersimpan');renderView()}
+  try{const r=await saveRow('health_records',d,el.dataset.id||undefined);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');S.hc.bad='';finishModal();toast('Catatan tersimpan');renderView()}
   catch(e){el.disabled=false;S.hc.bad=(e&&e.message)||String(e);const b=$('[data-hc-form]');const h=$('[data-hc-bad]');const html=`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${esc(S.hc.bad)} Isianmu masih ada; tekan Simpan untuk mencoba lagi.</div></div>`;if(h)h.outerHTML=html;else if(b)b.insertAdjacentHTML('afterbegin',html)}};
 ACT.hcdel=async el=>{
   if(!confirm('Hapus catatan ini? Tindakan ini tidak dapat dibatalkan.'))return;
-  try{await removeRow('health_records',el.dataset.id);closeModal(true);toast('Catatan dihapus');renderView()}
+  try{await removeRow('health_records',el.dataset.id);finishModal();toast('Catatan dihapus');renderView()}
   catch(e){toast('Belum terhapus: '+((e&&e.message)||e),1)}};
 
 /* ---------- screens ---------- */
 function hcMoodNote(){
-  const L=hcRows('mental').filter(r=>/Suasana hati/.test(r.kind)&&r.value!=null).slice(0,7);
+  const L=hcRows().filter(r=>((r.section==='mental'&&/Suasana hati/.test(r.kind))||r.section==='condition')&&r.value!=null).slice(0,7);
   if(L.length<4)return '';
   const avg=sum(L.map(r=>num(r.value)))/L.length;
   return avg<=2?`<div class="callout" role="note" data-hc-mood>${ic('info')}<div><b>Beberapa hari terakhir terasa berat.</b> Ini bukan diagnosis. Jika perasaan ini berlangsung lama atau mengganggu hidupmu, pertimbangkan bicara dengan orang yang kamu percaya atau tenaga profesional.</div></div>`:''}
 function hcSectionView(id){
   const s=hcSec(id),rows=hcRows(id),hide=!S.hc.show;
   if(S.missingTables&&S.missingTables.includes('health_records'))return missingCard('Healthcare');
-  return `${hcBanner()}${s.emergency?hcEmerg():''}${id==='mental'?hcMoodNote():''}
+  return `${hcBanner()}${s.emergency?hcEmerg():''}${id==='mental'||id==='condition'?hcMoodNote():''}
   <div class="card" style="margin-top:12px"><div class="ch"><h3>${s.icon} ${esc(s.label)}</h3><span class="sp"></span>${hcToggle()}<button class="btn p" data-act="hcadd" data-sec="${id}">${ic('plus',15)} Tambah catatan</button></div>
    <p class="sm">${esc(s.intro)}</p><ul class="sm" style="margin:6px 0 0 18px" data-hc-tips>${s.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
   <div class="card" style="margin-top:12px"><div class="ch"><h3>Catatanmu (${rows.length})</h3></div>${rows.length?`<div class="tw"><table class="tbl stack" data-hc-list><thead><tr><th>Tanggal</th><th>Jenis</th><th>Judul</th>${s.unit?'<th class="r">Angka</th>':''}<th><span class="sr">Aksi</span></th></tr></thead><tbody>${rows.map(r=>`<tr><td data-l="Tanggal">${esc(fmtD(r.rec_date))}</td><td data-l="Jenis">${esc(r.kind||'')}</td><td data-l="Judul">${hcMask(r.title,hide)}${!hide?`<div class="xs mut" data-hc-meta>${esc([r.provenance||HC_PROV[0],r.relation,r.age_dx!=null?'didiagnosis usia '+r.age_dx:'',r.status].filter(Boolean).join(' · '))}</div>`:''}${!hide&&r.notes?`<div class="sm mut">${esc(r.notes)}</div>`:''}</td>${s.unit?`<td data-l="Angka" class="r">${r.value==null?'—':hcMask(fmtN(r.value,2)+' '+(r.unit||''),hide)}</td>`:''}<td class="r"><button class="btn s" data-act="hcedit" data-id="${r.id}" aria-label="Ubah catatan">Ubah</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Belum dicatat</b>Tekan “Tambah catatan” untuk mulai. Isi seperlunya saja.</div>`}</div>${id==='active'?hcHobby():''}${hcSources()}`}
@@ -15049,7 +15074,7 @@ function hcSources(){
    <ul class="sm" style="margin:0 0 0 18px">${HC_SOURCES.map(x=>`<li>${esc(x[0])} · <span class="mut">${esc(x[1])}</span> · ${esc(x[2])}</li>`).join('')}</ul></div>`}
 /* export and delete: your own records only, delete needs a typed confirmation */
 ACT.hcexport=()=>{
-  const rows=hcRows().map(r=>({bagian:r.section,jenis:r.kind,judul:r.title,tanggal:r.rec_date,angka:r.value,satuan:r.unit,sumber_data:r.provenance,hubungan:r.relation,usia_diagnosis:r.age_dx,status:r.status,catatan:r.notes}));
+  const rows=hcRows().map(r=>({bagian:r.section,jenis:r.kind,judul:r.title,tanggal:r.rec_date,angka:r.value,satuan:r.unit,sumber_data:r.provenance,hubungan:r.relation,usia_diagnosis:r.age_dx,status:r.status,catatan:r.notes,jam:r.cond_time,suasana_hati:r.cond_mood,kondisi_fisik:r.cond_body,mental:r.cond_mind,stres:r.cond_stress,multitasking:r.cond_multi,perasaan:r.cond_feel,keluhan_fisik:r.cond_ache}));
   if(!rows.length){toast('Belum ada catatan untuk diekspor');return}
   download('catatan-kesehatan-'+todayS()+'.json',JSON.stringify({dibuat:todayS(),catatan:rows},null,2),'application/json');toast('Ekspor dibuat. Simpan file ini di tempat yang aman.')};
 ACT.hcwipe=()=>openModal('Hapus semua catatan kesehatan?',`<p class="sm">Ini menghapus <b>${hcRows().length}</b> catatan Healthcare milikmu secara permanen dan tidak dapat dibatalkan. Ekspor dulu bila ingin menyimpannya.</p><label class="sm b" for="hc_wipe">Ketik HAPUS untuk melanjutkan</label><input class="in" id="hc_wipe" autocomplete="off" style="width:100%">`,`<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn d" data-act="hcwipego">Hapus semua</button>`);
@@ -15180,14 +15205,14 @@ EXTRA.activities=a=>{
    <h4 style="margin:14px 0 4px">Needed by (successors)</h4>
    ${su.length?su.map(p=>`<div class="item"><span class="t" style="flex:1"><a href="#" data-act="open" data-k="activities" data-id="${p.a.id}">${esc(p.a.name)}</a></span>${badge(p.a.status)}</div>`).join(''):'<p class="sm mut">Nothing waits for this activity.</p>'}</div>`;
   return h+(_adEx?_adEx(a):'')};
-ACT.adaddsub=el=>{closeModal(true);openForm('activities',null,{parent_id:el.dataset.id})};
+ACT.adaddsub=el=>{openForm('activities',null,{parent_id:el.dataset.id})};
 ACT.addepadd=async el=>{
   const sel=$('#ad_pred');if(!sel||!sel.value)return;
   try{await adAddDep(sel.value,el.dataset.id);S.ad.bad='';toast('Dependency added')}catch(e){S.ad.bad=(e&&e.message)||String(e)}
-  const a=byId('activities',el.dataset.id);if(a){closeModal(true);openDetail('activities',a.id)}};
+  const a=byId('activities',el.dataset.id);if(a)refreshTop()};
 ACT.addepdel=async el=>{
   try{await removeRow('activity_deps',el.dataset.id);S.ad.bad=''}catch(e){S.ad.bad=(e&&e.message)||String(e)}
-  const a=byId('activities',el.dataset.aid);if(a){closeModal(true);openDetail('activities',a.id)}};
+  const a=byId('activities',el.dataset.aid);if(a)refreshTop()};
 
 /* ---------- Altair Project Management mapping (pure) ---------- */
 const GW_KIND={1:'Activity (parent)',2:'Activity (sub-item)',3:'Daily Action'};
@@ -21679,6 +21704,493 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
     else if(e.key.length===1){e.preventDefault();open(s,e.key)}
   },true);
 })();
+
+/* ---- r14: 99_zzzzzzz_cond.js ---- */
+/* =====================================================================
+   REV 30 · KONDISI HARIAN (daily condition check-in), linked to Daily Actions
+   • A pop-up (not a page): mood, feelings, body, mind, stress, multitasking load, physical complaints, note. Opens over wherever you are and
+     closes back to it.
+   • Stored in health_records (section "condition"): only the owner can read it, exactly like the rest of Healthcare.
+   • It is LINKED, never copied: Daily Actions read the check-in closest before an action's start time. Nothing is written onto the action,
+     nothing is sent to Notion, the AI, an API or analytics.
+   • It shows YOUR pattern (energy, focus sessions, completion; and multitasking → mood/stress/body). It is not a diagnosis and not cause and effect.
+   ===================================================================== */
+const CND_DIM=[
+ {id:'mood',k:'cond_mood',t:'Suasana hati',lab:['Sangat buruk','Kurang baik','Biasa','Baik','Sangat baik'],em:['😞','🙁','😐','🙂','😄'],short:'Hati'},
+ {id:'body',k:'cond_body',t:'Kondisi fisik',lab:['Lemas','Kurang fit','Cukup','Fit','Prima'],short:'Fisik'},
+ {id:'mind',k:'cond_mind',t:'Mental dan kejernihan pikiran',lab:['Keruh','Berkabut','Cukup jernih','Jernih','Sangat jernih'],short:'Mental'},
+ {id:'stress',k:'cond_stress',t:'Tingkat stres',lab:['Tenang','Ringan','Sedang','Tinggi','Sangat tinggi'],short:'Stres'},
+ {id:'multi',k:'cond_multi',t:'Beban multitasking',lab:['Satu per satu','Sedikit','Sedang','Banyak','Terus berpindah'],short:'Multitasking'}];
+const CND_FEEL=['Tenang','Senang','Bersyukur','Termotivasi','Cemas','Sedih','Marah','Kesepian','Kewalahan','Lelah'];
+const CND_ACHE=['Sakit kepala','Pegal atau nyeri otot','Mengantuk','Mual','Perut tidak nyaman','Pusing','Kurang tidur semalam','Mata lelah'];
+const cndMissing=()=>!!(S.missingTables&&S.missingTables.includes('health_records'));
+function condTitle(o){const p=[];CND_DIM.forEach(d=>{if(o[d.id]!=null&&o[d.id]!=='')p.push(d.short+' '+o[d.id])});return (o.time?o.time+' · ':'')+(p.join(' · ')||'Check-in kondisi')}
+/* the columns may not exist yet (schema.sql not run): the title carries the numbers, so nothing is lost */
+function condParse(r){const o={time:r.cond_time||(/^(\d\d:\d\d)/.exec(r.title||'')||[])[1]||''};
+  CND_DIM.forEach(d=>{let v=r[d.k];if(v==null){const m=new RegExp(d.short+' (\\d)').exec(r.title||'');v=m?+m[1]:null}o[d.id]=v==null?null:+v});return o}
+const condDay=r=>String(r.rec_date).slice(0,10);
+function condRows(day){return (D().health_records||[]).filter(r=>r.section==='condition'&&(!day||condDay(r)===day)).sort((a,b)=>condDay(a).localeCompare(condDay(b))||condParse(a).time.localeCompare(condParse(b).time))}
+/* the check-in that applies to a moment: the latest one before the start time; before the first one, or with no time, the first of the day */
+function condAt(day,time){const L=condRows(day);if(!L.length)return null;const t=time?tm(time):'';let pick=null;if(t)for(const r of L){const ct=condParse(r).time||'00:00';if(ct<=t)pick=r}return pick||L[0]}
+const condNow=()=>{const n=new Date();return pad(n.getHours())+':'+pad(n.getMinutes())};
+
+/* ---------- the pop-up ---------- */
+function condForm(rec,opt){
+  if(cndMissing()){toast('Healthcare belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  opt=opt||{};const r=rec||{},v=rec?condParse(rec):{},sel=c=>new Set(String(c||'').split('|').filter(Boolean));
+  const feel=sel(r.cond_feel),ache=sel(r.cond_ache);
+  const grp=d=>`<fieldset class="cnd-g"><legend>${esc(d.t)}</legend><div class="cnd-r" role="radiogroup">${[1,2,3,4,5].map(n=>`<label class="cnd-o"><input type="radio" name="c_${d.id}" value="${n}" ${v[d.id]===n?'checked':''} data-change="cndnote"><span><b>${d.em?d.em[n-1]:n}</b><small>${esc(d.lab[n-1])}</small></span></label>`).join('')}</div><button type="button" class="cnd-clr" data-act="cndclr" data-id="${d.id}">kosongkan</button></fieldset>`;
+  const chips=(name,list,set)=>`<div class="cnd-ch">${list.map(x=>`<label class="cnd-c"><input type="checkbox" name="${name}" value="${esc(x)}" ${set.has(x)?'checked':''}><span>${esc(x)}</span></label>`).join('')}</div>`;
+  const day=r.rec_date?condDay(r):(opt.date||todayS());
+  const auto=condAutoLoad(day);
+  const body=`<div data-cnd-form>
+   <p class="sm ink2">Pilih seperlunya, tidak semua harus diisi. Datanya privat dan hanya terlihat olehmu. ${esc(HC_NOTE)}</p>
+   <div class="row" style="gap:12px;margin:8px 0;flex-wrap:wrap"><label class="sm b">Tanggal<input class="in" id="c_date" type="date" value="${esc(day)}" style="display:block;width:170px"></label><label class="sm b">Jam<input class="in" id="c_time" type="time" value="${esc(v.time||condNow())}" style="display:block;width:130px"></label></div>
+   ${CND_DIM.map(grp).join('')}
+   ${auto?`<p class="xs mut cnd-auto" data-cnd-auto>${esc(auto)}</p>`:''}
+   <div id="cnd_note"></div>
+   <div class="sm b" style="margin-top:12px">Perasaan</div>${chips('c_feel',CND_FEEL,feel)}
+   <div class="sm b" style="margin-top:12px">Keluhan fisik (bila ada)</div>${chips('c_ache',CND_ACHE,ache)}
+   <label class="sm b" for="c_notes" style="display:block;margin-top:12px">Catatan</label><textarea class="in" id="c_notes" rows="2" style="width:100%" placeholder="Misalnya: banyak rapat, harus berpindah tugas terus">${esc(r.notes||'')}</textarea>
+   <p class="xs mut" style="margin-top:8px">Berbeda dari “4 energi” di Toolkit: catatan ini tersimpan privat di Healthcare dan dihubungkan ke Daily Actions hanya untuk dibaca.</p></div>`;
+  const d0=openModal(rec?'Ubah kondisi':'Kondisi saya sekarang',body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cndsave" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Simpan</button>`,'wide');
+  CHG.cndnote();return d0}
+/* what the day looked like from the actions: overlapping blocks and different activities, so the multitasking score has something to compare with */
+function condLoad(day){const A=(D().daily_actions||[]).filter(x=>x.action_date===day&&!isLight(x)&&x.start_time&&(x.end_time||x.planned_min));
+  const B=A.map(x=>({s:mins(x.start_time),e:x.end_time?mins(x.end_time):mins(x.start_time)+num(x.planned_min),a:x.activity_id||''})).sort((p,q)=>p.s-q.s);
+  let ov=0;for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++)if(B[j].s<B[i].e)ov++;
+  const acts=new Set(B.map(b=>b.a).filter(Boolean));return {n:B.length,overlap:ov,acts:acts.size}}
+function condAutoLoad(day){const c=condLoad(day);return c.n?`Dari Daily Actions hari ini: ${c.n} action berjadwal, ${c.overlap} yang waktunya bertumpuk, ${c.acts} Activity berbeda. Pakai ini sebagai pembanding untuk skor multitasking-mu.`:''}
+CHG.cndnote=()=>{const box=$('#cnd_note');if(!box)return;const g=n=>{const e=document.querySelector(`input[name="c_${n}"]:checked`);return e?+e.value:null};
+  box.innerHTML=(g('mood')===1||g('stress')===5)?`<div class="callout" role="note" style="margin-top:10px">${ic('info')}<div><b>Terdengar berat.</b> Ini bukan diagnosis. Jika berlangsung lama atau mengganggu hidupmu, bicaralah dengan orang yang kamu percaya atau tenaga profesional. ${esc(HC_EMERGENCY)}</div></div>`:''};
+ACT.cndclr=el=>{$$(`input[name="c_${el.dataset.id}"]`).forEach(i=>{i.checked=false});CHG.cndnote()};
+ACT.cndadd=el=>condForm(null,{date:(el&&el.dataset&&el.dataset.d)||undefined});
+ACT.cndsave=async el=>{
+  const g=n=>{const e=document.querySelector(`input[name="c_${n}"]:checked`);return e?+e.value:null},all=n=>$$(`input[name="${n}"]:checked`).map(i=>i.value);
+  const o={time:($('#c_time')||{}).value||condNow()};CND_DIM.forEach(d=>{o[d.id]=g(d.id)});
+  const date=($('#c_date')||{}).value,feel=all('c_feel'),ache=all('c_ache'),notes=(($('#c_notes')||{}).value||'').trim();
+  if(!date){toast('Isi tanggal',1);return}
+  if(!CND_DIM.some(d=>o[d.id]!=null)&&!feel.length&&!ache.length&&!notes){toast('Pilih minimal satu isian',1);return}
+  const d={section:'condition',kind:'Check-in kondisi',title:condTitle(o),rec_date:date,value:o.mood,unit:o.mood==null?null:'skor',provenance:HC_PROV[0],notes:notes||null,
+    cond_time:o.time,cond_mood:o.mood,cond_body:o.body,cond_mind:o.mind,cond_stress:o.stress,cond_multi:o.multi,cond_feel:feel.join('|')||null,cond_ache:ache.join('|')||null};
+  el.disabled=true;
+  try{const row=await saveRow('health_records',d,el.dataset.id||undefined);if(!row)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Kondisi tersimpan');renderView();if(typeof pipRefresh==='function')pipRefresh()}
+  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+
+/* ---------- on Daily Actions (One day) ---------- */
+function condChips(o){return CND_DIM.filter(d=>o[d.id]!=null).map(d=>`<span class="badge b-slate" title="${esc(d.t)}: ${esc(d.lab[o[d.id]-1])}">${esc(d.short)} ${o[d.id]}</span>`).join(' ')}
+function condStrip(day){
+  if(cndMissing())return '';
+  const L=condRows(day),t=todayS();
+  if(!L.length)return day>t?'':`<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="color:var(--brand)">${ic('heart')}</span><div style="flex:1;min-width:200px"><b>${day===t?'Bagaimana kondisimu hari ini?':'Belum ada check-in kondisi hari ini.'}</b><div class="sm ink2">Dua puluh detik, privat. Dengan ini energi dan sesi fokus bisa dibaca bersama kondisimu.</div></div><button class="btn p" data-act="cndadd" data-d="${day}">${ic('plus',15)} Cek kondisi</button></div>`;
+  const last=condParse(L[L.length-1]),low=(last.body!=null&&last.body<=2)||(last.mind!=null&&last.mind<=2)||(last.mood!=null&&last.mood<=2)||(last.stress!=null&&last.stress>=4)||(last.multi!=null&&last.multi>=4);
+  return `<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><span style="color:var(--brand)">${ic('heart')}</span><b>Kondisi${L.length>1?` (${L.length} check-in)`:''}</b><span class="sm mut">${esc(last.time)}</span>${condChips(last)}<span class="sp"></span><button class="btn s" data-act="cndpattern">${ic('chart',14)} Lihat pola</button><button class="btn s" data-act="cndadd" data-d="${day}">${ic('plus',14)} Check-in lagi</button></div>${low?`<p class="sm ink2" style="margin:8px 0 0">Kondisimu sedang kurang ringan. Bila memungkinkan, kerjakan yang ringan dulu, kurangi berpindah-pindah tugas dan sisipkan istirahat. Itu saran umum, bukan penilaian.</p>`:''}</div>`}
+(function(){const _v=VIEWS['execute/daily'];if(!_v)return;
+  VIEWS['execute/daily']=function(){const h=_v.apply(this,arguments);if(S.ui.dayView==='all')return h;const i=h.indexOf('</div>');if(i<0)return h;
+    const bar=`<button class="pill noprint" data-act="wkopen">${ic('clock',14)} Rangkuman minggu</button>`+(typeof aotButton==='function'?aotButton():'');return h.slice(0,i)+bar+h.slice(i,i+6)+condStrip(S.ui.day)+h.slice(i+6)}})();
+/* the check-in that applies to an action, shown in its detail */
+(function(){const _e=EXTRA.daily_actions;EXTRA.daily_actions=x=>{let h=_e?_e(x):'';if(cndMissing())return h;const r=condAt(x.action_date,x.start_time);
+  if(r){const o=condParse(r);h+=`<p class="sm ink2" style="margin-top:12px" data-cnd-link><b>Kondisi saat action ini</b> (check-in ${esc(o.time||'hari itu')}): ${condChips(o)}${x.energy?` · energi action ${x.energy}`:''}${num(x.pomodoros)?` · ${x.pomodoros} sesi fokus`:''} <a href="#" data-act="cndpattern">Lihat pola</a></p>`}
+  return h}})();
+
+/* ---------- the pattern ---------- */
+const cndTier=v=>v<=2?'low':v===3?'mid':'high',CND_TIER={low:'Skor 1–2',mid:'Skor 3',high:'Skor 4–5'};
+function condPairs(){const out=[];(D().daily_actions||[]).forEach(x=>{if(isLight(x)||x.status==='Cancelled'||x.action_date>todayS())return;const r=condAt(x.action_date,x.start_time);if(r)out.push({x,o:condParse(r)})});return out}
+function condStats(){
+  const P=condPairs(),res={};
+  CND_DIM.filter(d=>d.id!=='multi'||true).forEach(d=>{const g={low:{n:0,e:0,eN:0,f:0,done:0},mid:{n:0,e:0,eN:0,f:0,done:0},high:{n:0,e:0,eN:0,f:0,done:0}};
+    P.forEach(({x,o})=>{if(o[d.id]==null)return;const t=g[cndTier(o[d.id])];t.n++;if(x.energy){t.e+=+x.energy;t.eN++}t.f+=num(x.pomodoros);if(x.status==='Completed')t.done++});res[d.id]=g});
+  return {res,pairs:P.length,withE:P.filter(p=>p.x.energy).length,days:new Set(condRows().map(condDay)).size}}
+/* the other direction: how busy the day was with work (overlaps, different activities) against the mood, stress and body noted that day */
+function condLoadStats(){const byDay={};condRows().forEach(r=>{const dy=condDay(r);(byDay[dy]=byDay[dy]||[]).push(condParse(r))});
+  const rows=Object.keys(byDay).filter(dy=>dy<=todayS()).map(dy=>{const c=condLoad(dy),L=byDay[dy],avg=k=>{const a=L.map(o=>o[k]).filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null};
+    return {dy,busy:c.overlap+Math.max(0,c.acts-2),c,mood:avg('mood'),stress:avg('stress'),body:avg('body'),multi:avg('multi')}}).filter(r=>r.c.n);
+  const hi=rows.filter(r=>r.busy>=2),lo=rows.filter(r=>r.busy<2),av=(A,k)=>{const a=A.map(r=>r[k]).filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null};
+  return {rows,hi,lo,av}}
+function condPatternHtml(){
+  if(cndMissing())return '';
+  const st=condStats(),ls=condLoadStats(),f1=v=>v==null?'—':fmtN(v,1);
+  if(st.pairs<5||st.withE<3)return `<p class="sm ink2" data-cnd-empty>Belum cukup data untuk membaca pola. Saat ini ada ${st.days} hari dengan check-in dan ${st.pairs} action yang bisa dipasangkan (${st.withE} dengan energi). Isi check-in beberapa kali sehari dan beri energi 1–5 pada action; sekitar dua minggu biasanya sudah cukup.</p>`;
+  const lines=[];
+  CND_DIM.forEach(d=>{const g=st.res[d.id];if(g.low.eN>=2&&g.high.eN>=2){const lo=g.low.e/g.low.eN,hi=g.high.e/g.high.eN;lines.push({k:Math.abs(hi-lo),t:`Saat ${d.t.toLowerCase()} skor 4–5, energi action rata-rata ${f1(hi)} dibanding ${f1(lo)} saat skor 1–2.`})}});
+  lines.sort((a,b)=>b.k-a.k);
+  const rowsH=CND_DIM.map(d=>{let first=true;return ['low','mid','high'].map(t=>{const c=st.res[d.id][t];if(!c.n)return '';const lab=first?esc(d.t):'';first=false;return `<tr><td data-l="Faktor">${lab}</td><td data-l="Skor">${CND_TIER[t]}</td><td data-l="Action" class="r">${c.n}</td><td data-l="Energi" class="r">${c.eN?f1(c.e/c.eN):'—'}</td><td data-l="Sesi fokus" class="r">${f1(c.f/c.n)}</td><td data-l="Selesai" class="r">${Math.round(c.done/c.n*100)}%</td></tr>`}).join('')}).join('');
+  const multi=ls.hi.length&&ls.lo.length?`<p class="sm" data-cnd-load style="margin-top:10px"><b>Hari yang padat berpindah tugas</b> (action bertumpuk atau banyak Activity berbeda): ${ls.hi.length} hari, suasana hati rata-rata ${f1(ls.av(ls.hi,'mood'))}, stres ${f1(ls.av(ls.hi,'stress'))}, fisik ${f1(ls.av(ls.hi,'body'))}. Hari yang lebih terfokus: ${ls.lo.length} hari, suasana hati ${f1(ls.av(ls.lo,'mood'))}, stres ${f1(ls.av(ls.lo,'stress'))}, fisik ${f1(ls.av(ls.lo,'body'))}.</p>`:`<p class="sm mut" style="margin-top:10px">Perbandingan hari padat dan hari terfokus muncul bila kedua jenis hari sudah ada.</p>`;
+  return `<div data-cnd-pattern>${lines.length?`<ul class="sm" style="margin:0 0 8px 18px">${lines.slice(0,3).map(l=>`<li>${esc(l.t)}</li>`).join('')}</ul>`:''}
+   <div class="tw"><table class="tbl stack"><thead><tr><th>Faktor</th><th>Skor</th><th class="r">Action</th><th class="r">Energi</th><th class="r">Sesi fokus/action</th><th class="r">Selesai</th></tr></thead><tbody>${rowsH}</tbody></table></div>${multi}
+   <p class="xs mut" style="margin-top:8px">Dibaca dari ${st.days} hari check-in dan ${st.pairs} action. Setiap action dipasangkan dengan check-in terdekat sebelum jam mulainya. Ini pola datamu sendiri: bisa kebetulan, dan dua hal yang bergerak bersama tidak berarti yang satu menyebabkan yang lain. Bukan diagnosis.</p></div>`}
+ACT.cndpattern=e=>{if(e&&e.preventDefault)e.preventDefault();openModal('Kondisi, energi dan fokus',`<p class="sm ink2">Bagaimana kondisimu, termasuk beban multitasking, bergerak bersama energi, sesi fokus dan penyelesaian action.</p>${condPatternHtml()}`,`<span class="sp"></span><button class="btn" data-act="closeModal">Tutup</button><button class="btn p" data-act="go" data-p="health" data-s="condition">Buka Kondisi Harian</button>`,'wide')};
+VIEWS['health/condition']=()=>hcSectionView('condition')+`<div class="card" style="margin-top:12px"><div class="ch"><h3>Pola: kondisi, energi dan fokus</h3></div>${condPatternHtml()}</div>`;
+(function(){const _s=VIEWS['health/summary'];VIEWS['health/summary']=function(){const h=_s.apply(this,arguments);if(cndMissing())return h;const L=condRows(todayS());
+  return h+`<div class="card" style="margin-top:12px" data-cnd-sum><div class="ch"><h3>Kondisi hari ini</h3><span class="sp"></span><button class="btn p" data-act="cndadd">${ic('plus',15)} Cek kondisi</button></div><p class="sm">${L.length?'Check-in terakhir '+esc(condParse(L[L.length-1]).time)+': '+condChips(condParse(L[L.length-1])):'Belum ada check-in hari ini.'}</p></div>`}})();
+
+(function(){const st=document.createElement('style');st.textContent=`
+.cnd-g{border:0;margin:10px 0 0;padding:0}.cnd-g legend{font-weight:600;font-size:13px;padding:0;margin-bottom:4px}
+.cnd-r{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cnd-o,.cnd-c{position:relative;cursor:pointer}
+.cnd-o input,.cnd-c input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.cnd-o span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;border:1px solid var(--line);border-radius:10px;min-height:52px;text-align:center;background:var(--card)}
+.cnd-o b{font-size:16px}.cnd-o small{font-size:10.5px;color:var(--mut);line-height:1.15}
+.cnd-o input:checked+span{background:var(--brand);border-color:var(--brand);color:#fff}.cnd-o input:checked+span small{color:#fff}
+.cnd-c span{display:inline-block;padding:5px 11px;border:1px solid var(--line);border-radius:999px;font-size:13px;background:var(--card)}
+.cnd-c input:checked+span{background:var(--brand);border-color:var(--brand);color:#fff}
+.cnd-o input:focus-visible+span,.cnd-c input:focus-visible+span{outline:2px solid var(--brand);outline-offset:2px}
+.cnd-ch{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.cnd-clr{background:none;border:0;color:var(--mut);font-size:12px;cursor:pointer;padding:2px 0;text-decoration:underline}
+@media(max-width:480px){.cnd-o small{font-size:9.5px}}`;document.head.appendChild(st)})();
+
+/* ---------- guidance (Bahasa Indonesia, like the rest of Healthcare) ---------- */
+function condGuide(){
+  const det=(t,li)=>`<details style="margin-top:8px"><summary class="b">${esc(t)}</summary><ul class="sm" style="margin:6px 0 0 18px">${li.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`;
+  return `<div class="card" style="margin-top:12px" data-cnd-guide><div class="ch"><h3>Panduan Kondisi Harian</h3><span class="sp"></span>${badge('Informasi umum · belum ditinjau profesional','amber')}</div>
+   <p class="sm">Panduan singkat agar catatanmu konsisten dan polanya bisa dibaca. ${esc(HC_NOTE)}</p>
+   ${det('Cara mengisi',['Tekan “Cek kondisi” (di Daily Actions atau di sini). Pilih angka 1–5 untuk yang ingin kamu catat; yang lain boleh kosong.','Isi pada jam yang kurang lebih sama, misalnya pagi sebelum mulai kerja dan sore sesudah makan siang. Dua kali sehari sudah cukup.','Angkanya adalah perasaanmu saat ini, bukan rata-rata hari. Tidak ada jawaban benar atau salah.','Catatan boleh ditambah di belakang hari: ubah tanggal dan jam di pop-up.'])}
+   ${det('Arti skala',['Suasana hati dan kondisi fisik: 1 = sangat rendah, 5 = sangat baik.','Mental: 1 = pikiran keruh dan sulit fokus, 5 = sangat jernih.','Stres: 1 = tenang, 5 = sangat tinggi. Di sini angka tinggi berarti lebih berat.','Multitasking: 1 = mengerjakan satu hal pada satu waktu, 5 = terus berpindah tugas, banyak yang terpotong.'])}
+   ${det('Multitasking dan rasa lelah',['Berpindah-pindah tugas membuat pikiran membawa “sisa” tugas sebelumnya, jadi terasa lebih lelah walau pekerjaannya tidak lebih banyak. Itu bisa ikut menurunkan suasana hati dan kondisi fisik.','Polaris One membandingkan skor multitasking-mu dengan Daily Actions hari itu (action yang waktunya bertumpuk dan jumlah Activity berbeda), lalu menunjukkan apakah hari yang padat berpindah tugas juga hari dengan suasana hati atau stres yang berbeda.','Yang bisa dicoba: satu blok fokus dengan satu tugas, kelompokkan email dan pesan pada jam tertentu, matikan notifikasi saat blok fokus, beri jeda 5 menit antar tugas.','Lihat sendiri hasilnya setelah dua minggu. Jika polanya tidak jelas, tidak apa-apa: itu juga informasi.'])}
+   ${det('Menghubungkan dengan energi dan sesi fokus',['Setiap action dipasangkan dengan check-in terdekat sebelum jam mulainya (tanpa jam: check-in pertama hari itu).','Pola dibaca dari energi 1–5 yang kamu beri pada action dan jumlah sesi fokus. Beri energi pada beberapa action setiap hari supaya datanya cukup.','Polanya memperlihatkan hubungan, bukan sebab-akibat. Tidur, makanan, cuaca dan beban kerja ikut berperan.','Detail action menampilkan “Kondisi saat action ini”. Tidak ada yang ditulis ke action itu, dan tidak ada yang dikirim ke Notion, AI atau API.'])}
+   ${det('Kapan mencari bantuan',['Jika suasana hati rendah atau stres tinggi berlangsung berhari-hari, atau mengganggu tidur, makan, kerja atau hubungan, bicarakan dengan orang yang kamu percaya atau tenaga profesional.','Aplikasi ini tidak mendiagnosis dan tidak memberi nasihat obat. Jika ada pikiran menyakiti diri atau keadaan darurat, hubungi layanan darurat atau orang terdekat sekarang.'])}
+   ${det('Privasi',['Hanya akunmu yang dapat membaca catatan ini. Admin tidak dapat membacanya.','Catatan masuk ke ekspor dan penghapusan Healthcare milikmu sendiri (Ringkasan → Datamu).'])}</div>`}
+(function(){const _c=VIEWS['health/condition'];VIEWS['health/condition']=function(){return _c.apply(this,arguments)+condGuide()}})();
+putFaq('What is the daily condition check-in?','Healthcare → Kondisi Harian, or the “Cek kondisi” button on Daily Actions (One day). A short pop-up: mood, body, mind, stress, how much you switched between tasks (multitasking), feelings and physical complaints. You can add several check-ins a day. It is private to your account and not shared. Closing or saving it brings you back to where you were.');
+putFaq('Does my mood affect my energy and focus sessions?','Polaris One shows your own pattern rather than a general claim. Each Daily Action is paired with the check-in closest before its start time, and the “Lihat pola” pop-up compares energy, focus sessions and completion for low, middle and high scores. It also compares busy, task-switching days (overlapping actions, many different activities) with the mood, stress and body you noted. It needs about two weeks of data, shows a relationship and not a cause, and is not a diagnosis.');
+putFaq('Why does switching between tasks make me tired?','Each switch leaves part of your attention on the previous task, so the same work feels heavier. Rate “Beban multitasking” in the check-in and open “Lihat pola” to see whether your busy, overlapping days also have lower mood or higher stress. The Kondisi Harian page has a short guide with ideas such as single-task focus blocks, batching messages and short breaks.');
+
+/* ---- r14: 99_zzzzzzzz_aot.js ---- */
+/* =====================================================================
+   REV 30 · ALWAYS ON TOP for "One day"   (laptop / desktop only; never on phones or tablets)
+   • In the installed desktop app (Windows, Mac): the window becomes a small one that stays above other windows, and back again.
+   • In Chrome or Edge on a laptop (also the installed web app): a floating mini window (Document Picture-in-Picture) that stays on top
+     with today's list, a tick box for each action and a one-tap mood.
+   • Where neither exists (Safari, Firefox, phones, tablets) the button is simply not shown.
+   ===================================================================== */
+function aotDesktop(){try{
+  if(/Android|iPhone|iPad|iPod|Mobi|Tablet/i.test(navigator.userAgent))return false;
+  if(/Mac/i.test(navigator.platform||'')&&navigator.maxTouchPoints>1)return false;          /* iPad that says it is a Mac */
+  return !!(window.matchMedia&&matchMedia('(pointer:fine)').matches&&matchMedia('(hover:hover)').matches)}catch(e){return false}}
+const aotNative=()=>!!(window.polarisNative&&typeof window.polarisNative.toggleMini==='function');
+const aotPip=()=>!!(window.documentPictureInPicture&&typeof documentPictureInPicture.requestWindow==='function'&&window.isSecureContext);
+function aotAvail(){return aotDesktop()&&(aotNative()||aotPip())}
+S.aot=S.aot||{on:false,win:null,timer:0};
+function aotButton(){
+  if(!aotAvail())return '';
+  const on=aotNative()?S.aot.on:!!(window.documentPictureInPicture&&documentPictureInPicture.window);
+  return `<button class="pill noprint" data-act="aot" aria-pressed="${on}" title="Jendela kecil yang selalu di atas aplikasi lain (hanya laptop dan komputer)">${ic('clock',14)} ${on?'Matikan selalu di atas':'Selalu di atas'}</button>`}
+
+function pipHtml(){
+  const t=todayS(),rows=(D().daily_actions||[]).filter(x=>x.action_date===t&&!isLight(x)&&x.status!=='Cancelled').sort((a,b)=>(tm(a.start_time)||'99:99').localeCompare(tm(b.start_time)||'99:99'));
+  const done=rows.filter(x=>x.status==='Completed').length,now=condNow();
+  const nxt=rows.find(x=>x.status!=='Completed'&&(!x.start_time||tm(x.start_time)>=now))||rows.find(x=>x.status!=='Completed');
+  const L=typeof condRows==='function'?condRows(t):[];const lastC=L.length?condParse(L[L.length-1]):null;
+  return `<div class="pip"><div class="pip-h"><b>One day</b><span class="mut">${esc(fmtDay(t))}</span><span class="sp"></span><b data-pip-clock>${esc(now)}</b></div>
+   <div class="pip-p"><div style="width:${rows.length?Math.round(done/rows.length*100):0}%"></div></div><div class="xs mut">${done} dari ${rows.length} selesai</div>
+   ${nxt?`<div class="pip-n"><span class="xs mut">Berikutnya</span><br><b>${esc(tm(nxt.start_time)||'')} ${esc(trunc(nxt.title,60))}</b></div>`:`<div class="pip-n"><b>${rows.length?'Semua selesai 🎉':'Belum ada action hari ini'}</b></div>`}
+   <ul class="pip-l">${rows.map(x=>`<li class="${x.status==='Completed'?'dn':''}"><label><input type="checkbox" data-pip-done="${x.id}" ${x.status==='Completed'?'checked':''}><span><span class="xs mut">${esc(tm(x.start_time)||'--:--')}</span> ${esc(trunc(x.title,70))}</span></label></li>`).join('')}</ul>
+   <div class="pip-m"><div class="xs mut">Suasana hati sekarang${lastC&&lastC.mood!=null?` (terakhir ${lastC.mood}${lastC.time?' · '+esc(lastC.time):''})`:''}</div><div class="pip-e">${['😞','🙁','😐','🙂','😄'].map((e,i)=>`<button type="button" data-pip-mood="${i+1}" aria-label="Suasana hati ${i+1}">${e}</button>`).join('')}</div></div>
+   <button type="button" class="btn s" data-pip-main style="width:100%;margin-top:8px">Buka jendela utama</button></div>`}
+const PIP_CSS=`.pip{padding:12px;font:14px/1.35 system-ui,sans-serif}.pip-h{display:flex;gap:8px;align-items:baseline}.pip-h .sp{flex:1}
+.pip-p{height:6px;border-radius:99px;background:var(--line);margin:8px 0 4px;overflow:hidden}.pip-p div{height:100%;background:var(--brand)}
+.pip-n{margin:10px 0;padding:8px 10px;background:var(--soft);border-radius:10px}.pip-l{list-style:none;margin:0;padding:0;max-height:46vh;overflow:auto}
+.pip-l li{padding:5px 0;border-bottom:1px solid var(--line)}.pip-l label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.pip-l input{margin-top:3px;width:18px;height:18px;accent-color:var(--brand)}
+.pip-l li.dn span{text-decoration:line-through;color:var(--mut)}.pip-e{display:flex;gap:6px;margin-top:4px}.pip-e button{flex:1;font-size:20px;padding:6px 0;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer}
+.pip-e button:hover{background:var(--soft)}.pip-m{margin-top:10px}.mut{color:var(--mut)}.xs{font-size:12px}`;
+function pipRefresh(){const w=window.documentPictureInPicture&&documentPictureInPicture.window;if(!w)return;
+  const sc=w.document.querySelector('.pip-l'),y=sc?sc.scrollTop:0;w.document.body.innerHTML=pipHtml();const n=w.document.querySelector('.pip-l');if(n)n.scrollTop=y}
+async function aotOpenPip(){
+  const pw=await documentPictureInPicture.requestWindow({width:340,height:560});S.aot.win=pw;
+  let css='';for(const sh of document.styleSheets){try{css+=[...sh.cssRules].map(r=>r.cssText).join('\n')}catch(e){}}
+  const st=pw.document.createElement('style');st.textContent=css+PIP_CSS;pw.document.head.appendChild(st);
+  pw.document.title='Polaris One · One day';pw.document.documentElement.className=document.documentElement.className;
+  [...document.documentElement.attributes].forEach(a=>{if(a.name.startsWith('data-'))pw.document.documentElement.setAttribute(a.name,a.value)});
+  pw.document.body.style.margin='0';pw.document.body.style.background=getComputedStyle(document.body).backgroundColor;pw.document.body.style.color=getComputedStyle(document.body).color;
+  pw.document.body.innerHTML=pipHtml();
+  pw.document.addEventListener('change',async e=>{const id=e.target&&e.target.dataset&&e.target.dataset.pipDone;if(!id)return;
+    try{await ACT.toggleDone({dataset:{id}})}catch(x){console.warn(x)}pipRefresh()});
+  pw.document.addEventListener('click',async e=>{const m=e.target.closest&&e.target.closest('[data-pip-mood]'),mn=e.target.closest&&e.target.closest('[data-pip-main]');
+    if(mn){try{window.focus()}catch(x){}return}
+    if(m&&typeof saveRow==='function'&&!cndMissing()){const v=+m.dataset.pipMood,o={time:condNow(),mood:v};
+      try{await saveRow('health_records',{section:'condition',kind:'Check-in kondisi',title:condTitle(o),rec_date:todayS(),value:v,unit:'skor',provenance:HC_PROV[0],cond_time:o.time,cond_mood:v});toast('Suasana hati tersimpan');renderView()}catch(x){toast('Belum tersimpan: '+((x&&x.message)||x),1)}pipRefresh()}});
+  clearInterval(S.aot.timer);S.aot.timer=setInterval(()=>{if(!documentPictureInPicture.window){clearInterval(S.aot.timer);return}pipRefresh()},20000);
+  pw.addEventListener('pagehide',()=>{clearInterval(S.aot.timer);S.aot.win=null;try{renderView()}catch(e){}})}
+ACT.aot=async()=>{
+  if(!aotAvail()){toast('Selalu di atas hanya ada di laptop atau komputer, dengan aplikasi desktop Polaris One atau Chrome/Edge.',1);return}
+  try{
+    if(aotNative()){const on=await window.polarisNative.toggleMini();S.aot.on=!!on;if(on){S.ui.dayView='day';S.ui.day=todayS();go('execute','daily')}else renderView();return}
+    const w=documentPictureInPicture.window;
+    if(w){w.close();S.aot.win=null;renderView();return}
+    await aotOpenPip();renderView()
+  }catch(e){toast('Jendela melayang tidak bisa dibuka: '+((e&&e.message)||e),1)}};
+/* keep the floating window current whenever the app redraws */
+(function(){const _r=renderView;renderView=function(){const r=_r.apply(this,arguments);try{pipRefresh()}catch(e){}return r}})();
+
+/* ---- r14: 99_zzzzzzzzz_rel30.js ---- */
+/* REV 30 · release notes */
+RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
+ {t:'New',items:[
+  ['Daily condition check-in','A short pop-up for mood, feelings, body, mind, stress and how much you switched between tasks (multitasking). Open it from One day (“Cek kondisi”) or Healthcare → Kondisi Harian. It is private, like the rest of Healthcare, and linked to your Daily Actions only for reading.'],
+  ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “Lihat pola” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
+  ['Weekly summary, like a personal assistant','“Rangkuman minggu” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
+  ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
+  ['Always on top for One day','On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
+ {t:'Changed',items:[
+  ['Forms return to where you came from','A form opened from a pop-up (an Activity, a Goal, a Meeting …) now opens on top of it. Saving, deleting or cancelling takes you back to that pop-up, refreshed, not to the page behind.']]},
+ {t:'For the admin',items:[
+  ['Run schema.sql once','schema.sql adds eight columns to health_records (cond_mood, cond_body, cond_mind, cond_stress, cond_multi, cond_time, cond_feel, cond_ache) and the table cv_entries, readable only by its owner (not by an admin). Until it is run, check-ins still save and keep their numbers in the title; the Biodata screens ask for schema.sql. Nothing else changed in the database.',null,null,null,1]]}
+]});
+
+putFaq('What is the weekly summary?','A look back over a week, like a personal assistant: what you did, what is still open, your condition, and five areas of growth (potential, professional, knowledge, emotional, spiritual) compared with the week before, plus one step for next week. Open it with “Rangkuman minggu” on Daily Actions; from Friday 15:00 to Monday 12:00 a card on Home and the bell remind you once. It only reads what is already in Polaris One and describes it; it does not grade you.');
+putFaq('Who can see my Biodata (CV)?','Only you. Biodata (CV) is stored like Healthcare: an admin cannot read it either. Work experience, education, certifications, seminars and skills are read from Skills & Knowledge, hobbies and the short health summary from Healthcare, so nothing is entered twice. The health summary and personal details only appear in the printed CV if you tick them.');
+putFaq('Can I keep One day above my other windows?','On a laptop or computer, yes: the button “Selalu di atas” on One day. In the desktop app (Windows, Mac) the window becomes a small one that stays on top. In Chrome or Edge it opens a floating mini window with today’s list. It is not offered on phones and tablets, nor in Safari or Firefox.');
+
+/* ---- r14: 99_zzzzzzzzzz_weekly.js ---- */
+/* =====================================================================
+   REV 30 · RANGKUMAN MINGGUAN  (the personal assistant that looks back over the week)
+   Done · not done · your condition · growth (potential, professional, knowledge, emotional, spiritual) · one step for next week.
+   • Everything is read from what is already in Polaris One. Nothing is sent anywhere. The condition part is private to you.
+   • A card on Home and a bell alert appear from Friday 15:00 to Monday 12:00 (closed once you open it); the button on Daily Actions is always there.
+   • Plain rules, no scoring of you as a person. Differences are described, never diagnosed.
+   ===================================================================== */
+S.wk=S.wk||{ws:null};
+const WK_PRAY=()=>(typeof PRAYER_NAMES!=='undefined'?PRAYER_NAMES.map(p=>'Shalat '+p[1]):['Shalat Subuh','Shalat Dzuhur','Shalat Ashar','Shalat Maghrib','Shalat Isya']);
+function wkDue(){const n=new Date(),t=todayS(),dow=(n.getDay()+6)%7,hm=n.getHours()*60+n.getMinutes();           /* Mon=0 … Sun=6 */
+  if(dow===4&&hm>=15*60||dow===5||dow===6)return weekStart(t);
+  if(dow===0&&hm<12*60)return addD(weekStart(t),-7);return null}
+function wkSeen(ws){try{return localStorage.getItem('po_wk_seen')===ws}catch(e){return S.wk.seen===ws}}
+function wkMark(ws){S.wk.seen=ws;try{localStorage.setItem('po_wk_seen',ws)}catch(e){}}
+function wkData(ws){
+  const we=addD(ws,6),t=todayS(),inW=d=>d>=ws&&d<=we;
+  const all=(D().daily_actions||[]).filter(x=>inW(x.action_date)&&x.status!=='Cancelled'&&x.action_date<=t);
+  const DA=all.filter(x=>!isLight(x)),done=DA.filter(x=>x.status==='Completed'),open=DA.filter(x=>x.status!=='Completed');
+  const pr=WK_PRAY(),prayAll=all.filter(x=>x.time_cat==='Ibadah'&&pr.includes(x.title)||x.time_cat==='Ibadah'&&pr.some(p=>String(x.title||'').endsWith(p))),prayDone=prayAll.filter(x=>x.status==='Completed');
+  const ibad=all.filter(x=>x.time_cat==='Ibadah'&&!prayAll.includes(x)&&x.status==='Completed');
+  const en=DA.filter(x=>x.energy).map(x=>+x.energy),cat=c=>done.filter(x=>x.time_cat===c);
+  const act=(D().activities||[]);
+  const cond=(D().health_records||[]).filter(r=>r.section==='condition'&&inW(condDay(r))).map(condParse);
+  const avg=k=>{const a=cond.map(o=>o[k]).filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null};
+  const feel={};(D().health_records||[]).filter(r=>r.section==='condition'&&inW(condDay(r))).forEach(r=>String(r.cond_feel||'').split('|').filter(Boolean).forEach(f=>{feel[f]=(feel[f]||0)+1}));
+  const grat=(D().health_records||[]).filter(r=>inW(condDay(r))&&((r.section==='mental'&&/Syukur/i.test(r.kind||''))||(r.section==='condition'&&/Bersyukur/.test(r.cond_feel||'')))).length;
+  const mood=cond.length?{n:cond.length,mood:avg('mood'),body:avg('body'),mind:avg('mind'),stress:avg('stress'),multi:avg('multi')}:null;
+  return {ws,we,total:DA.length,done,open,rate:DA.length?done.length/DA.length:null,top3:DA.filter(x=>x.is_top3),top3done:DA.filter(x=>x.is_top3&&x.status==='Completed'),
+    focus:DA.reduce((s,x)=>s+num(x.pomodoros),0),energy:en.length?en.reduce((p,q)=>p+q,0)/en.length:null,
+    workMin:cat('Work').reduce((s,x)=>s+dMin(x),0),learnN:cat('Learning').length,learnMin:cat('Learning').reduce((s,x)=>s+dMin(x),0),exMin:cat('Exercise').reduce((s,x)=>s+dMin(x),0),
+    notes:(D().notes||[]).filter(n=>inW(String(n.created_at||'').slice(0,10))).length,
+    actDone:act.filter(a=>a.completed_on&&inW(a.completed_on)),actOpen:act.filter(a=>!isClosed(a)&&a.planned_finish&&a.planned_finish<=we),
+    prayDone:prayDone.length,prayTotal:prayAll.length,ibad:ibad.length,ibadMin:ibad.reduce((s,x)=>s+dMin(x),0),mood,feel,grat}}
+const wkF=(v,d)=>v==null?'—':fmtN(v,d==null?1:d);
+function wkDelta(c,p,unit,inv){if(c==null||p==null)return '';const d=c-p;if(Math.abs(d)<0.05)return '<span class="xs mut"> · sama dengan minggu lalu</span>';
+  const good=inv?d<0:d>0;return `<span class="xs ${good?'':'mut'}" style="${good?'color:var(--green,#1E7B54)':''}"> · ${d>0?'▲ +':'▼ '}${fmtN(d,Math.abs(d)<10&&!Number.isInteger(d)?1:0)}${unit||''} dari minggu lalu</span>`}
+function wkNotes(c,p){
+  const w=[],a=[],g=[];
+  if(c.rate!=null){const pct=Math.round(c.rate*100);w.push(`Kamu menyelesaikan ${c.done.length} dari ${c.total} action (${pct}%)${p.rate!=null?(c.rate>p.rate+.04?', naik dari minggu lalu':c.rate<p.rate-.04?', turun dari minggu lalu':', sama seperti minggu lalu'):''}.`)}
+  if(c.focus>0)w.push(`${c.focus} sesi fokus terkumpul.`);
+  if(c.actDone.length)w.push(`${c.actDone.length} Activity selesai: ${c.actDone.slice(0,2).map(x=>x.name).join(', ')}${c.actDone.length>2?' dan lainnya':''}.`);
+  if(c.prayTotal&&c.prayDone===c.prayTotal)w.push('Semua shalat yang tercatat minggu ini terlaksana.');
+  if(!w.length)w.push('Minggu ini belum banyak yang tercatat. Mulai dari satu action kecil hari ini.');
+  if(c.open.length)a.push(`${c.open.length} action belum selesai${c.open.length>3?'; pilih yang masih penting dan pindahkan ke minggu depan, sisanya boleh dilepas':''}.`);
+  if(c.actOpen.length)a.push(`${c.actOpen.length} Activity melewati target minggu ini.`);
+  if(c.mood&&(c.mood.stress>=3.5||c.mood.mood<=2.5||c.mood.multi>=4))a.push('Kondisimu terasa berat beberapa kali. Beri ruang untuk istirahat; kalau berlangsung lama, bicarakan dengan orang yang kamu percaya atau tenaga profesional.');
+  if(!c.mood)a.push('Belum ada check-in kondisi minggu ini, jadi pola energi dan suasana hati belum terbaca.');
+  if(c.prayTotal&&c.prayDone<c.prayTotal)a.push(`${c.prayTotal-c.prayDone} shalat belum ditandai selesai.`);
+  if(typeof cvComplete==='function'&&cvComplete()<60)a.push(`Biodata (CV) baru ${cvComplete()}% lengkap; lengkapi bila ada waktu.`);
+  if(!a.length)a.push('Tidak ada yang mendesak. Pertahankan ritme ini.');
+  if(c.mood&&c.mood.multi!=null&&c.mood.multi>=4)g.push('Banyak berpindah tugas: coba satu blok fokus tanpa notifikasi untuk satu tugas.');
+  else if(!c.mood)g.push('Isi “Cek kondisi” dua kali sehari minggu depan agar pola energi, fokus dan suasana hati terlihat.');
+  else if(c.open.length)g.push('Tetapkan tiga prioritas utama untuk Senin sebelum menutup minggu ini.');
+  else g.push('Tentukan satu hal kecil yang ingin kamu tingkatkan minggu depan.');
+  return {w,a,g}}
+function wkGrowth(c,p){
+  const hrs=m=>fmtN(m/60,1)+' jam',bh=typeof bestHour==='function'?bestHour():null;
+  return [
+   {i:'🚀',t:'Potensi',v:`${c.focus} sesi fokus${wkDelta(c.focus,p.focus,'')}`,l:`Energi rata-rata ${wkF(c.energy)}${c.top3.length?` · Top 3 selesai ${c.top3done.length}/${c.top3.length}`:''}${bh?` · jam puncakmu sekitar ${pad(bh.h)}:00`:''}.`,q:'Kapan kamu terasa paling berenergi, dan apa yang kamu kerjakan saat itu?'},
+   {i:'💼',t:'Profesional',v:`${hrs(c.workMin)} kerja selesai${wkDelta(c.workMin/60,p.workMin/60,' jam')}`,l:`${c.actDone.length} Activity selesai${c.actOpen.length?` · ${c.actOpen.length} melewati target`:''}.`,q:'Hasil apa yang paling kamu banggakan minggu ini, dan apa buktinya?'},
+   {i:'📚',t:'Pengetahuan',v:`${c.learnN} sesi belajar (${hrs(c.learnMin)})${wkDelta(c.learnMin/60,p.learnMin/60,' jam')}`,l:`${c.notes} catatan baru ditulis minggu ini.`,q:'Apa satu hal baru yang kamu pelajari, dan di mana akan kamu pakai?'},
+   {i:'💛',t:'Emosional',v:c.mood?`Suasana hati ${wkF(c.mood.mood)}${wkDelta(c.mood.mood,p.mood&&p.mood.mood,'')}`:'Belum ada check-in',l:c.mood?`Stres ${wkF(c.mood.stress)} · fisik ${wkF(c.mood.body)}${c.mood.multi!=null?` · multitasking ${wkF(c.mood.multi)}`:''}${Object.keys(c.feel).length?' · paling sering: '+Object.entries(c.feel).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]).join(', '):''}${c.grat?` · ${c.grat} catatan syukur`:''}.`:'Satu check-in sehari sudah cukup untuk mulai melihat pola.',q:'Apa yang paling menguras dan paling mengisi tenagamu minggu ini?'},
+   {i:'🕌',t:'Spiritual',v:c.prayTotal?`Shalat tercatat ${c.prayDone}/${c.prayTotal}${wkDelta(c.prayDone,p.prayDone,'')}`:'Belum ada shalat tercatat',l:`${c.ibad} kegiatan ibadah lain selesai${c.ibadMin?` (${hrs(c.ibadMin)})`:''}${c.exMin?` · olahraga ${hrs(c.exMin)}`:''}.`,q:'Apa satu kebiasaan ibadah yang ingin kamu jaga atau tambah minggu depan?'}]}
+function wkOpen(ws){
+  const t=todayS();ws=ws||S.wk.ws||weekStart(t);S.wk.ws=ws;const c=wkData(ws),p=wkData(addD(ws,-7)),n=wkNotes(c,p),gr=wkGrowth(c,p),cur=ws===weekStart(t);
+  const li=a=>a.map(x=>`<li>${esc(x)}</li>`).join('');
+  const body=`<div data-wk>
+   <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s" data-act="wkshift" data-n="-1" aria-label="Minggu sebelumnya">${ic('cl',14)}</button><b>${esc(fmtS(c.ws))} – ${esc(fmtD(c.we))}</b>${cur?'<span class="badge b-blue">minggu ini</span>':`<button class="btn s" data-act="wkshift" data-n="0">Minggu ini</button>`}<button class="btn s" data-act="wkshift" data-n="1" aria-label="Minggu berikutnya" ${addD(ws,7)>t?'disabled':''}>${ic('cr',14)}</button></div>
+   <div class="g g3" style="margin-top:10px">
+    <div class="card flat"><b>✅ Sudah dilakukan</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-done>${li(n.w)}</ul></div>
+    <div class="card flat"><b>⏳ Belum dilakukan</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-open>${li(n.a)}</ul>${c.open.length?`<div class="xs mut" style="margin-top:6px">${c.open.slice(0,5).map(x=>esc(trunc(x.title,38))).join(' · ')}${c.open.length>5?' …':''}</div>`:''}</div>
+    <div class="card flat"><b>🌱 Saran asisten</b><ul class="sm" style="margin:6px 0 0 18px">${li(n.g)}</ul></div></div>
+   <div class="g g3" style="margin-top:10px" data-wk-growth>${gr.map(x=>`<div class="card flat"><div><b>${x.i} ${esc(x.t)}</b></div><div class="sm" style="margin-top:4px">${x.v}</div><div class="xs mut" style="margin-top:2px">${esc(x.l)}</div><div class="xs" style="margin-top:6px"><i>${esc(x.q)}</i></div></div>`).join('')}</div>
+   <label class="sm b" for="wk_next" style="display:block;margin-top:12px">Satu langkah untuk minggu depan</label>
+   <input class="in" id="wk_next" style="width:100%" maxlength="140" placeholder="Misalnya: satu blok fokus 90 menit tanpa notifikasi setiap pagi">
+   <p class="xs mut" style="margin-top:8px">Dibaca dari Daily Actions, Activity, catatan, waktu ibadah dan Kondisi Harian milikmu. Hanya perbandingan dan gambaran; bukan penilaian dan bukan diagnosis. ${esc(HC_NOTE)}</p></div>`;
+  const d=openModal('Rangkuman mingguan',body,`<button class="btn" data-act="wkreview">${ic('edit',15)} Buat review mingguan</button><span class="sp"></span><button class="btn" data-act="closeModal">Tutup</button><button class="btn p" data-act="wkstep">${ic('plus',15)} Jadikan action Senin</button>`,'wide');
+  d._re=()=>wkOpen(S.wk.ws);if(cur||wkDue()===ws)wkMark(ws);return d}
+ACT.wkopen=()=>wkOpen(wkDue()||weekStart(todayS()));
+ACT.wkshift=el=>{const n=+el.dataset.n,t=todayS();S.wk.ws=n===0?weekStart(t):addD(S.wk.ws||weekStart(t),n*7);refreshTop()};
+ACT.wkstep=async el=>{const v=(($('#wk_next')||{}).value||'').trim();if(!v){toast('Tulis dulu satu langkahnya',1);const i=$('#wk_next');if(i)i.focus();return}
+  el.disabled=true;try{const mon=addD(weekStart(S.wk.ws||todayS()),7),day=mon<todayS()?todayS():mon;await saveRow('daily_actions',{action_date:day,title:trunc(v,140),priority:'High',time_cat:'Other',status:'Not Started',progress:0,pomodoros:0,is_top3:true,description:'Dari Rangkuman mingguan.'});toast('Ditambahkan ke '+fmtDay(day));el.disabled=false;$('#wk_next').value='';renderView()}
+  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+ACT.wkreview=()=>{const ws=S.wk.ws||weekStart(todayS()),c=wkData(ws),n=wkNotes(c,wkData(addD(ws,-7)));
+  openForm('reviews',null,{review_type:'Weekly',period_start:ws,period_end:addD(ws,6),score:c.total?Math.round(c.done.length/c.total*100):70,wins:n.w.map(x=>'• '+x).join('\n'),gaps:n.a.map(x=>'• '+x).join('\n'),insights:n.g.join(' '),next_actions:(($('#wk_next')||{}).value||'').trim()})};
+
+/* where the assistant shows up */
+function wkCard(){const ws=wkDue();if(!ws||wkSeen(ws)||isKid&&isKid())return '';const c=wkData(ws);
+  return `<div class="card flat noprint" data-wk-card style="background:var(--soft);margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="font-size:22px" aria-hidden="true">🗓️</span><div style="flex:1;min-width:220px"><b>Rangkuman minggu ini siap</b><div class="sm ink2">${c.total?`${c.done.length} dari ${c.total} action selesai, ${c.open.length} belum. `:''}Lihat yang sudah dan belum dilakukan, kondisimu dan pertumbuhanmu.</div></div><button class="btn p" data-act="wkopen">Buka rangkuman</button></div>`}
+(function(){const o=VIEWS['dashboard/overview'];if(!o)return;VIEWS['dashboard/overview']=function(){const h=o.apply(this,arguments);let c='';try{c=wkCard()}catch(e){console.error(e)}return c?c+h:h}})();
+(function(){const _a=alerts;alerts=function(){const out=_a.apply(this,arguments);try{const ws=wkDue();if(ws&&!wkSeen(ws)&&!(isKid&&isKid()))out.unshift({tone:'blue',t:'Rangkuman minggu ini siap',m:'Yang sudah dan belum dilakukan, kondisimu dan pertumbuhanmu',go:['execute','daily'],fn:'wkopen'})}catch(e){console.error(e)}return out}})();
+
+/* ---- r14: 99_zzzzzzzzzzz_cv.js ---- */
+/* =====================================================================
+   REV 30 · BIODATA (CV) for every user
+   • Menu "Biodata (CV)": Data diri · Bahasa, minat dan nilai · CV lengkap (preview, print / save as PDF, copy as text).
+   • It ASSEMBLES what is already in Polaris One instead of asking twice: work experience, education, certifications, trainings,
+     seminars and skills come from Skills & Knowledge; hobbies and the short health summary come from Healthcare.
+   • New data (personal details, languages, interests, values, extra hobbies) is in ONE table, cv_entries. Like Healthcare it is
+     readable only by its owner: not even an admin can read it, and the audit trail records that something happened, never what.
+   • The health summary and the personal details are only in the CV when you tick them in the preview. Nothing is uploaded.
+   ===================================================================== */
+const CV_PROFILE=[['full_name','Nama lengkap'],['headline','Profesi atau judul singkat'],['birth_place','Tempat lahir'],['birth_date','Tanggal lahir','date'],['gender','Jenis kelamin','sel',['','Laki-laki','Perempuan']],['nationality','Kewarganegaraan'],['religion','Agama'],['address','Alamat','wide'],['city','Kota'],['phone','Telepon'],['email','Email','email'],['website','Situs web atau LinkedIn'],['summary','Tentang saya','area']];
+const CV_SEC={
+ language:{t:'Bahasa',one:'bahasa',ph:'Misalnya: Inggris',lvl:['Dasar','Menengah','Lancar','Fasih atau bahasa ibu'],lvlL:'Tingkat',dt:'Catatan (misalnya skor tes)'},
+ interest:{t:'Minat',one:'minat',ph:'Misalnya: Keselamatan penerbangan',lvl:null,dt:'Keterangan singkat'},
+ value:{t:'Nilai hidup dan prinsip',one:'nilai',ph:'Misalnya: Jujur dan bertanggung jawab',lvl:null,dt:'Arti bagimu'},
+ hobby:{t:'Hobi',one:'hobi',ph:'Misalnya: Bersepeda',lvl:null,dt:'Keterangan singkat'}};
+MOD.cv_entries={t:'cv_entries',one:'Biodata',many:'Biodata (CV)',main:'title',sort:['sort_order','asc'],hiddenUI:1,placeholder:'biodata',
+ fields:[
+  F('section','Bagian','hidden','',{sql:'text'}),
+  F('title','Judul','text','Isi judul.',{req:1,wide:1}),
+  F('level','Tingkat','hidden','',{sql:'text'}),
+  F('detail','Keterangan','textarea','Keterangan.',{wide:1,rows:3}),
+  F('data','Data','hidden','',{sql:'jsonb'}),
+  F('sort_order','Urutan','hidden','',{sql:'int'})],cols:['section','title']};
+ORDER.push('cv_entries');NEWER_TABLES.push('cv_entries');
+NAV.splice(NAV.findIndex(n=>n.id==='health'),0,{id:'cv',label:'Biodata (CV)',ic:'user',subs:[['profile','Data diri'],['more','Bahasa, minat dan nilai'],['preview','CV lengkap']]});
+(function(){const _b=buildSQL;buildSQL=function(){return _b.apply(this,arguments)+`
+-- =====================================================================
+-- BIODATA (CV) PRIVACY (Rev 30): the owner alone. Not even an admin can read, change or delete cv_entries;
+-- the audit trail records that something happened, never what. Safe to run again.
+-- =====================================================================
+create or replace function public.audit_row_meta() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+  insert into public.audit_log(user_id,table_name,record_id,action,old_data,new_data)
+  values(auth.uid(),TG_TABLE_NAME,coalesce(new.id,old.id),TG_OP,null,null);
+  return coalesce(new,old);
+end $$;
+drop trigger if exists cv_entries_audit on public.cv_entries;
+create trigger cv_entries_audit after insert or update or delete on public.cv_entries for each row execute function public.audit_row_meta();
+drop policy if exists cv_entries_sel on public.cv_entries;
+create policy cv_entries_sel on public.cv_entries for select using (owner=auth.uid() and public.is_active());
+drop policy if exists cv_entries_ins on public.cv_entries;
+create policy cv_entries_ins on public.cv_entries for insert with check (public.is_active() and owner=auth.uid() and public.perm_level('cv_entries','create')='allow');
+drop policy if exists cv_entries_upd on public.cv_entries;
+create policy cv_entries_upd on public.cv_entries for update using (owner=auth.uid() and public.is_active() and public.perm_level('cv_entries','edit')='allow') with check (owner=auth.uid() and public.perm_level('cv_entries','edit')='allow');
+drop policy if exists cv_entries_del on public.cv_entries;
+create policy cv_entries_del on public.cv_entries for delete using (owner=auth.uid() and public.is_active() and public.perm_level('cv_entries','delete')='allow');
+`}})();
+S.cv=S.cv||{inc:{profile:1,summary:1,work:1,edu:1,cert:1,sem:1,skills:1,lang:1,interest:1,value:1,hobby:1,health:0}};
+const cvMissing=()=>!!(S.missingTables&&S.missingTables.includes('cv_entries'));
+const cvRows=sec=>(D().cv_entries||[]).filter(r=>r.section===sec).sort((a,b)=>num(a.sort_order)-num(b.sort_order)||String(a.created_at||'').localeCompare(String(b.created_at||'')));
+function cvProfile(){const r=cvRows('profile')[0],d=Object.assign({},r&&r.data||{});
+  if(!d.full_name&&S.profile)d.full_name=S.profile.full_name||'';if(!d.email&&S.profile)d.email=S.profile.email||'';return {row:r,d}}
+const cvDate=s=>s?fmtD(s):'';
+const cvRange=(a,b,cur)=>{const x=a?fmtMY(a):'',y=b?fmtMY(b):(cur||!b?'sekarang':'');return x||y?(x+(x?' – ':'')+y):''};
+function fmtMY(s){const d=pd(s);return isNaN(d)?String(s):MON[d.getMonth()]+' '+d.getFullYear()}
+
+/* ---------- forms (pop-ups; closing returns to where you were) ---------- */
+function cvProfileForm(){
+  if(cvMissing()){toast('Biodata belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  const {row,d}=cvProfile();
+  const f=CV_PROFILE.map(([k,l,t,o])=>{const v=esc(d[k]||'');
+    if(t==='area')return `<label class="sm b" style="grid-column:1/-1">${l}<textarea class="in" id="cvp_${k}" rows="4" style="width:100%;display:block" placeholder="Dua sampai empat kalimat tentang dirimu, keahlianmu dan arah kariermu">${v}</textarea></label>`;
+    if(t==='sel')return `<label class="sm b">${l}<select class="in" id="cvp_${k}" style="width:100%;display:block">${o.map(x=>`<option ${d[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`;
+    return `<label class="sm b" ${t==='wide'?'style="grid-column:1/-1"':''}>${l}<input class="in" id="cvp_${k}" type="${t==='date'?'date':t==='email'?'email':'text'}" value="${v}" style="width:100%;display:block"></label>`}).join('');
+  openModal('Data diri',`<p class="sm ink2">Hanya kamu yang dapat membaca ini; admin tidak. Isi seperlunya. Bagian ini baru masuk ke CV bila kamu mencentangnya di pratinjau.</p><div class="fgrid" style="margin-top:8px">${f}</div>`,`<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cvpsave">${ic('check',15)} Simpan</button>`,'wide')}
+ACT.cvprofile=()=>cvProfileForm();
+ACT.cvpsave=async el=>{const d={};CV_PROFILE.forEach(([k])=>{const e=document.getElementById('cvp_'+k);if(e&&e.value.trim())d[k]=e.value.trim()});
+  el.disabled=true;try{const {row}=cvProfile();const r=await saveRow('cv_entries',{section:'profile',title:d.full_name||'Data diri',data:d,sort_order:0},row&&row.id);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Data diri tersimpan');renderView()}
+  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+function cvEntryForm(sec,rec){
+  if(cvMissing()){toast('Biodata belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  const s=CV_SEC[sec],r=rec||{};
+  openModal((rec?'Ubah ':'Tambah ')+s.one,`<label class="sm b" for="cve_t">${esc(s.t)}</label><input class="in" id="cve_t" value="${esc(r.title||'')}" placeholder="${esc(s.ph)}" style="width:100%">
+   ${s.lvl?`<label class="sm b" for="cve_l" style="display:block;margin-top:10px">${s.lvlL}</label><select class="in" id="cve_l" style="width:100%">${s.lvl.map(x=>`<option ${r.level===x?'selected':''}>${esc(x)}</option>`).join('')}</select>`:''}
+   <label class="sm b" for="cve_d" style="display:block;margin-top:10px">${esc(s.dt)}</label><textarea class="in" id="cve_d" rows="3" style="width:100%">${esc(r.detail||'')}</textarea>`,
+   `${rec?`<button class="btn d" data-act="cvedel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cvesave" data-sec="${sec}" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Simpan</button>`)}
+ACT.cvadd=el=>cvEntryForm(el.dataset.sec);
+ACT.cvedit=el=>{const r=byId('cv_entries',el.dataset.id);if(r)cvEntryForm(r.section,r)};
+ACT.cvesave=async el=>{const t=(($('#cve_t')||{}).value||'').trim();if(!t){toast('Isi dulu isiannya',1);return}
+  const l=$('#cve_l'),d={section:el.dataset.sec,title:t,level:l?l.value:null,detail:(($('#cve_d')||{}).value||'').trim()||null,sort_order:el.dataset.id?undefined:cvRows(el.dataset.sec).length+1};
+  if(d.sort_order===undefined)delete d.sort_order;
+  el.disabled=true;try{const r=await saveRow('cv_entries',d,el.dataset.id||undefined);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Tersimpan');renderView()}
+  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+ACT.cvedel=async el=>{if(!(await ask('Hapus?','Tindakan ini tidak dapat dibatalkan.','Hapus',true)))return;
+  try{await removeRow('cv_entries',el.dataset.id);finishModal();toast('Dihapus');renderView()}catch(e){toast('Belum terhapus: '+((e&&e.message)||e),1)}};
+
+/* ---------- screens ---------- */
+const cvBanner=()=>`<div class="callout" role="note">${ic('info')}<div><b>Privat.</b> Biodata hanya dapat dibaca akunmu; admin tidak dapat membacanya. Pengalaman kerja, pendidikan, sertifikasi, seminar dan keahlian diambil dari <a href="#" data-act="go" data-p="growth" data-s="workexp">Skills &amp; Knowledge</a>, jadi tidak perlu diisi dua kali.</div></div>`;
+function cvHealth(){const g=k=>(D().health_records||[]).filter(r=>r.section==='profile'&&r.kind===k).map(r=>r.title+(r.notes?' ('+r.notes+')':'')).filter(Boolean);
+  return {blood:g('Golongan darah'),allergy:g('Alergi'),emergency:g('Kontak darurat')}}
+function cvHobbies(){const own=cvRows('hobby').map(r=>r.title),h=(D().health_records||[]).filter(r=>r.section==='active'&&r.kind==='Hobi yang aktif').map(r=>r.title);return [...new Set([...own,...h])]}
+function cvComplete(){const {d}=cvProfile(),keys=['full_name','headline','birth_date','address','phone','email','summary'];const n=keys.filter(k=>d[k]).length;
+  const parts=[n/keys.length,(D().work_experience||[]).length?1:0,(D().competencies||[]).some(c=>c.type==='Academic')?1:0,cvRows('language').length?1:0];return Math.round(parts.reduce((a,b)=>a+b,0)/parts.length*100)}
+VIEWS['cv/profile']=()=>{
+  if(cvMissing())return missingCard('Biodata (CV)');
+  const {d}=cvProfile(),has=CV_PROFILE.some(([k])=>d[k]&&k!=='full_name'&&k!=='email'),hl=cvHealth(),hb=cvHobbies();
+  return `${cvBanner()}
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Data diri</h3><span class="sp"></span>${badge('CV '+cvComplete()+'% lengkap','blue')}<button class="btn p" data-act="cvprofile">${ic('edit',15)} ${has?'Ubah':'Isi'} data diri</button></div>
+   ${has?`<dl class="kv" data-cv-profile>${CV_PROFILE.filter(([k])=>d[k]).map(([k,l,t])=>`<dt>${esc(l)}</dt><dd>${esc(t==='date'?cvDate(d[k]):d[k])}</dd>`).join('')}</dl>`:`<p class="sm mut">Belum diisi. Tekan “Isi data diri”.</p>`}</div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Ringkasan kesehatan</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="health" data-s="profile">Ubah di Healthcare</button></div>
+   <p class="sm ink2">Diambil dari Healthcare → Profil Kesehatan. Tidak disalin ke sini, dan baru masuk ke CV bila kamu mencentangnya di pratinjau.</p>
+   <ul class="sm" style="margin:6px 0 0 18px" data-cv-health>${[['Golongan darah',hl.blood],['Alergi',hl.allergy],['Kontak darurat',hl.emergency]].map(([l,a])=>`<li>${l}: ${a.length?(S.hc&&S.hc.show?esc(a.join('; ')):'<span class="mut" aria-label="disembunyikan">••••</span>'):'<span class="mut">belum dicatat</span>'}</li>`).join('')}</ul>
+   <p class="xs mut" style="margin-top:6px">Detail tampil di sini bila “Tampilkan detail” di Healthcare menyala. ${esc(HC_NOTE)}</p></div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Hobi</h3></div><p class="sm">${hb.length?esc(hb.join(', ')):'<span class="mut">Belum ada.</span>'}</p><p class="xs mut">Hobi dari Healthcare → Aktivitas Sehat &amp; Hobi ikut tampil. Tambahkan hobi lain di “Bahasa, minat dan nilai”.</p></div>`};
+VIEWS['cv/more']=()=>{
+  if(cvMissing())return missingCard('Biodata (CV)');
+  return cvBanner()+Object.keys(CV_SEC).map(sec=>{const s=CV_SEC[sec],L=cvRows(sec);
+   return `<div class="card" style="margin-top:12px" data-cv-sec="${sec}"><div class="ch"><h3>${esc(s.t)} (${L.length})</h3><span class="sp"></span><button class="btn p" data-act="cvadd" data-sec="${sec}">${ic('plus',15)} Tambah</button></div>
+   ${L.length?`<div class="list">${L.map(r=>`<div class="item" data-act="cvedit" data-id="${r.id}" style="cursor:pointer"><span class="t" style="flex:1"><b>${esc(r.title)}</b>${r.level?` · ${esc(r.level)}`:''}${r.detail?`<div class="sm mut">${esc(trunc(r.detail,120))}</div>`:''}</span></div>`).join('')}</div>`:'<p class="sm mut">Belum ada.</p>'}</div>`}).join('')};
+/* ---- the document ---- */
+function cvDoc(inc){
+  const {d}=cvProfile(),H=[];
+  const sec=(t,b)=>b?`<section class="cvs"><h3>${esc(t)}</h3>${b}</section>`:'';
+  const head=`<header class="cvh"><div class="cvn">${esc(d.full_name||'Nama lengkap')}</div>${d.headline?`<div class="cvhl">${esc(d.headline)}</div>`:''}${inc.profile?`<div class="cvc">${[d.city,d.phone,d.email,d.website].filter(Boolean).map(esc).join(' · ')}</div>`:''}</header>`;
+  const personal=inc.profile?[['Tempat, tanggal lahir',[d.birth_place,d.birth_date?cvDate(d.birth_date):''].filter(Boolean).join(', ')],['Jenis kelamin',d.gender],['Kewarganegaraan',d.nationality],['Agama',d.religion],['Alamat',d.address]].filter(x=>x[1]):[];
+  H.push(head);
+  if(personal.length)H.push(sec('Data pribadi',`<dl class="kv">${personal.map(x=>`<dt>${esc(x[0])}</dt><dd>${esc(x[1])}</dd>`).join('')}</dl>`));
+  if(inc.summary&&d.summary)H.push(sec('Tentang saya',`<p>${esc(d.summary)}</p>`));
+  if(inc.work){const W=(D().work_experience||[]).slice().sort((a,b)=>String(b.date_start||'').localeCompare(String(a.date_start||'')));
+    H.push(sec('Pengalaman kerja',W.map(w=>`<div class="cvi"><div class="cvt"><b>${esc(w.position||'')}</b>${w.organization?' · '+esc(w.organization):''}<span class="cvd">${esc(cvRange(w.date_start,w.date_end))}</span></div>${w.location||w.employment_type?`<div class="xs mut">${esc([w.employment_type,w.location].filter(Boolean).join(' · '))}</div>`:''}${w.responsibilities?`<p>${esc(w.responsibilities)}</p>`:''}${w.achievements?`<p><i>Pencapaian:</i> ${esc(w.achievements)}</p>`:''}${w.skills?`<div class="xs mut">Keahlian: ${esc(w.skills)}</div>`:''}</div>`).join('')))}
+  const C=(D().competencies||[]).filter(c=>c.status!=='Planned');
+  if(inc.edu){const E=C.filter(c=>c.type==='Academic').sort((a,b)=>String(b.date_end||'').localeCompare(String(a.date_end||'')));
+    H.push(sec('Pendidikan',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(cvRange(c.date_start,c.date_end))}</span></div>${c.notes?`<p>${esc(c.notes)}</p>`:''}</div>`).join('')))}
+  if(inc.cert){const E=C.filter(c=>['Certification','Training','Workshop'].includes(c.type)).sort((a,b)=>String(b.date_end||'').localeCompare(String(a.date_end||'')));
+    H.push(sec('Sertifikasi dan pelatihan',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(c.date_end?fmtMY(c.date_end):'')}</span></div><div class="xs mut">${esc([c.type,c.certificate_no?'No. '+c.certificate_no:'',c.hours?c.hours+' jam':'',c.expiry_date?'berlaku sampai '+fmtMY(c.expiry_date):''].filter(Boolean).join(' · '))}</div></div>`).join('')))}
+  if(inc.sem){const E=(D().seminars||[]).filter(e=>e.status!=='Cancelled'&&['Speaker','Keynote speaker','Panelist','Moderator','Trainer'].includes(e.role)).sort((a,b)=>String(b.date_start||'').localeCompare(String(a.date_start||'')));
+    H.push(sec('Pembicara, seminar dan konferensi',E.map(e=>`<div class="cvi"><div class="cvt"><b>${esc(e.title)}</b>${e.role?' · '+esc(e.role):''}<span class="cvd">${esc(e.date_start?fmtMY(e.date_start):'')}</span></div>${e.topic?`<div class="xs mut">${esc(e.topic)}</div>`:''}</div>`).join('')))}
+  if(inc.skills){const sk={};C.filter(c=>c.status==='Completed'||c.status==='In Progress').forEach(c=>String(c.skills||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>{const k=s.toLowerCase(),o=sk[k]=sk[k]||{name:s,lvl:0};o.lvl=Math.max(o.lvl,num(c.level))}));
+    const lv=['','Pemula','Dasar','Kompeten','Mahir','Ahli'],L=Object.values(sk).sort((a,b)=>b.lvl-a.lvl);
+    H.push(sec('Keahlian',L.length?`<p>${L.map(o=>esc(o.name)+(o.lvl?' ('+lv[o.lvl]+')':'')).join(' · ')}</p>`:''))}
+  if(inc.lang){const L=cvRows('language');H.push(sec('Bahasa',L.length?`<p>${L.map(r=>esc(r.title)+(r.level?' ('+esc(r.level)+')':'')+(r.detail?' – '+esc(r.detail):'')).join(' · ')}</p>`:''))}
+  if(inc.interest){const L=cvRows('interest');H.push(sec('Minat',L.length?`<p>${L.map(r=>esc(r.title)).join(' · ')}</p>`:''))}
+  if(inc.value){const L=cvRows('value');H.push(sec('Nilai dan prinsip',L.length?`<p>${L.map(r=>esc(r.title)+(r.detail?' – '+esc(r.detail):'')).join('; ')}</p>`:''))}
+  if(inc.hobby){const L=cvHobbies();H.push(sec('Hobi',L.length?`<p>${L.map(esc).join(' · ')}</p>`:''))}
+  if(inc.health){const h=cvHealth(),L=[['Golongan darah',h.blood],['Alergi',h.allergy],['Kontak darurat',h.emergency]].filter(x=>x[1].length);H.push(sec('Kesehatan',L.length?`<p>${L.map(x=>esc(x[0])+': '+esc(x[1].join('; '))).join(' · ')}</p>`:''))}
+  return `<article class="cvdoc" data-cv-doc>${H.join('')}</article>`}
+const CV_INC=[['profile','Data pribadi dan kontak'],['summary','Tentang saya'],['work','Pengalaman kerja'],['edu','Pendidikan'],['cert','Sertifikasi dan pelatihan'],['sem','Pembicara dan seminar'],['skills','Keahlian'],['lang','Bahasa'],['interest','Minat'],['value','Nilai dan prinsip'],['hobby','Hobi'],['health','Ringkasan kesehatan (sensitif)']];
+VIEWS['cv/preview']=()=>{
+  if(cvMissing())return missingCard('Biodata (CV)');
+  const inc=S.cv.inc;
+  return `<div class="card noprint"><div class="ch"><h3>CV lengkap</h3><span class="sp"></span><button class="btn" data-act="cvcopy">${ic('copy',15)} Salin sebagai teks</button><button class="btn p" data-act="print">${ic('print',15)} Cetak atau simpan PDF</button></div>
+   <p class="sm ink2">Pilih bagian yang ikut. Dokumen dibuat di perangkatmu dan tidak diunggah. Untuk PDF, pilih “Simpan sebagai PDF” di jendela cetak.</p>
+   <div class="cvinc" data-cv-inc>${CV_INC.map(([k,l])=>`<label class="cnd-c"><input type="checkbox" data-change="cvinc" data-k="${k}" ${inc[k]?'checked':''}><span>${esc(l)}</span></label>`).join('')}</div></div>
+   <div class="card cvpage" style="margin-top:12px">${cvDoc(inc)}</div>`};
+CHG.cvinc=el=>{S.cv.inc[el.dataset.k]=el.checked?1:0;renderView()};
+ACT.cvcopy=async()=>{const tmp=document.createElement('div');tmp.innerHTML=cvDoc(S.cv.inc);
+  const txt=[...tmp.querySelectorAll('.cvh .cvn,.cvhl,.cvc,.cvs h3,.cvt,.cvi>p,.cvi .xs,.cvs>p,.cvs dt,.cvs dd')].map(e=>{const t=e.textContent.replace(/\s+/g,' ').trim();return e.matches('.cvn')?t.toUpperCase():e.matches('.cvs h3')?'\n'+t.toUpperCase():t}).join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('CV disalin sebagai teks')}catch(e){toast('Tidak bisa menyalin otomatis; gunakan Cetak.',1)}};
+(function(){const st=document.createElement('style');st.textContent=`
+.cvpage{background:#fff;color:#111}.cvdoc{max-width:780px;margin:0 auto;font-size:13px;line-height:1.45;color:#111}
+.cvh{border-bottom:2px solid #1F3A5F;padding-bottom:8px;margin-bottom:8px}.cvh .cvn{font-weight:700;font-size:24px;margin:0;color:#1F3A5F}.cvhl{font-size:14px;color:#333}.cvc{font-size:12px;color:#444;margin-top:2px}
+.cvs{margin-top:12px;break-inside:avoid}.cvs h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#1F3A5F;border-bottom:1px solid #cfd8e3;padding-bottom:2px;margin:0 0 6px}
+.cvi{margin-bottom:8px}.cvt{display:flex;gap:6px;flex-wrap:wrap}.cvd{margin-left:auto;color:#444;font-size:12px}.cvdoc p{margin:2px 0}.cvdoc .xs{font-size:11.5px;color:#555}.cvdoc .kv{margin:0}
+.cvinc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+@media print{.cvpage{border:0;box-shadow:none;padding:0}}`;document.head.appendChild(st)})();
 
 
 /* =====================================================================
