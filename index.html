@@ -2032,8 +2032,8 @@ async function offerNext(r){if(!await ask('Create the next occurrence?',`“${es
    ===================================================================== */
 const fmtDay=s=>{const d=pd(s);return `${DOW[d.getDay()]}, ${fmtD(s)}`};
 const dMin=x=>num(x.actual_min!=null?x.actual_min:x.planned_min);
-function timerInner(){const T=S.timer,tot=(T.mode==='work'?(T.preset==='50'?50:25):(T.preset==='50'?10:5))*60;
-  const open=(D().daily_actions||[]).filter(x=>x.action_date===S.ui.day&&x.status!=='Completed');
+function timerInner(day){const T=S.timer,tot=(T.mode==='work'?(T.preset==='50'?50:25):(T.preset==='50'?10:5))*60;
+  const open=(D().daily_actions||[]).filter(x=>x.action_date===(day||S.ui.day)&&x.status!=='Completed');
   return `<div class="sm mut c" style="margin-bottom:4px">${T.mode==='work'?'Focus session':'Break'} · ${T.preset==='50'?'50 / 10':'25 / 5'}</div><div class="pomo" id="pomo-time" aria-live="off">${pad(Math.floor(T.left/60))}:${pad(T.left%60)}</div><div class="pbar" style="margin:10px 0"><i style="width:${clamp((1-T.left/tot)*100,0,100)}%"></i></div>
   <div class="row" style="justify-content:center"><button class="btn p" data-act="timerToggle">${ic(T.run?'pause':'play',15)} ${T.run?'Pause':'Start'}</button><button class="btn" data-act="timerReset">Reset</button></div>
   <div class="row" style="margin-top:10px"><select class="in" data-change="timerPreset" aria-label="Timer preset"><option value="25" ${T.preset==='25'?'selected':''}>25 min work / 5 min break</option><option value="50" ${T.preset==='50'?'selected':''}>50 min work / 10 min break</option></select></div>
@@ -6617,7 +6617,7 @@ async function seedSample(){
   add('cv_entries',{section:'hobby',title:'Bersepeda',sort_order:1});
   const CMOOD=[0,4,2,5,3,4,2],CBODY=[0,4,3,5,3,4,2],CMIND=[0,4,2,5,3,4,3],CSTR=[0,2,4,1,3,2,5];
   for(let i=1;i<=6;i++){const dd=d(-i);
-    add('health_records',{section:'condition',kind:'Condition check-in',title:condTitle({time:'07:45',mood:CMOOD[i],body:CBODY[i],mind:CMIND[i],stress:CSTR[i]}),rec_date:dd,value:CMOOD[i],unit:'skor',provenance:'Saya catat sendiri',cond_time:'07:45',cond_mood:CMOOD[i],cond_body:CBODY[i],cond_mind:CMIND[i],cond_stress:CSTR[i]});
+    add('health_records',{section:'condition',kind:'Condition check-in',title:condTitle({time:'07:45',mood:CMOOD[i],body:CBODY[i],mind:CMIND[i],stress:CSTR[i]}),rec_date:dd,value:CMOOD[i],unit:'score',provenance:'I recorded it myself',cond_time:'07:45',cond_mood:CMOOD[i],cond_body:CBODY[i],cond_mind:CMIND[i],cond_stress:CSTR[i]});
     DA(dd,'Deep work block','08:30','10:00','Work','Completed',{energy:Math.max(1,Math.min(5,CMIND[i]+1)),pomodoros:CMIND[i]>=4?3:CMIND[i]===3?2:1,is_top3:true,priority:'High',result:'Main task moved forward',lesson_learned:i===1?'Phone on silent doubled my output':null});
     DA(dd,'Meetings & email','13:30','14:30','Work','Completed',{energy:2,blocker:i===1?'Back-to-back meetings':null});
     DA(dd,'Admin tasks','16:00','17:00','Work','Completed',{energy:3});
@@ -14893,78 +14893,87 @@ ACT.bdgo=el=>{
 
 /* ---- r14: 99_health.js ---- */
 /* =====================================================================
-   REV 25 · HEALTHCARE   (menu Healthcare, 8 sub-sections, in Bahasa Indonesia)
-   Ringkasan · Profil Kesehatan · Aktivitas Sehat & Hobi · Pola / Gaya Hidup · Riwayat Keluarga & Pencegahan ·
-   Saat Sakit & Perawatan · Pemulihan · Kesehatan Mental
+   REV 25 · HEALTHCARE   (menu Healthcare, 8 sub-sections, in English since Rev 30)
+   Summary · Daily Condition · Health Profile · Healthy Activity & Hobbies · Habits & Lifestyle · Family History & Prevention ·
+   Illness & Care · Recovery · Mental Health
    ---------------------------------------------------------------------
    PRIVACY FIRST
    • One table, health_records. In the database only the OWNER can read or change a row: the admin's usual right to read everything does NOT apply
      to this table, and the audit trail keeps only that "a row was added / changed / removed" (no content).
    • The table is not in the list that an admin can share with another user, and nothing here is sent to any service, AI, API or analytics.
-   • On screen the details are shown; "Sembunyikan detail" masks them.
+   • On screen the details are shown; "Hide details" masks them.
    • It is part of YOUR backup/export (Settings → Data & backup), like your other notes.
    WHAT IT IS NOT
    • No diagnosis, no "normal / abnormal" labels, no risk score, no dose or medicine advice. Numbers are shown as you wrote them.
-   • Every guidance text says it is general information and "belum ditinjau profesional" (not yet reviewed by a health professional).
-   • Emergency pointers are on the Ringkasan, Saat Sakit and Kesehatan Mental screens.
+   • Every guidance text says it is general information and says it is not yet reviewed by a health professional.
+   • Emergency pointers are on the Summary, Illness & Care and Mental Health screens.
    ===================================================================== */
-const HC_NOTE='Informasi umum, belum ditinjau profesional. Bukan diagnosis dan bukan pengganti dokter atau tenaga kesehatan.';
-const HC_EMERGENCY='Darurat? Hubungi layanan darurat di tempatmu sekarang (Indonesia: 112 untuk darurat umum, 119 untuk layanan gawat darurat medis; periksa kembali nomor yang berlaku di daerahmu) atau minta orang terdekat membawamu ke IGD.';
+const HC_NOTE='General information, not yet reviewed by a health professional. It is not a diagnosis and does not replace a doctor or other health professional.';
+const HC_EMERGENCY='Emergency? Call the emergency service where you are now (Indonesia: 112 for general emergencies, 119 for medical emergencies; check the numbers that apply in your area) or ask someone close to take you to the emergency room.';
+/* Records saved before Rev 30 carry Indonesian kinds, statuses, sources and relations. The screens read them through these maps, so old notes keep working and new ones are saved in English. */
+const HC_LEGACY={'Golongan darah':'Blood type','Alergi':'Allergy','Kondisi yang saya miliki':'Conditions I have','Obat atau suplemen yang saya pakai':'Medicines or supplements I take','Pengukuran':'Measurement','Dokter atau fasilitas kesehatan':'Doctor or health facility','Kontak darurat':'Emergency contact',
+ 'Olahraga':'Exercise','Jalan atau bersepeda':'Walking or cycling','Hobi yang aktif':'Active hobby','Relaksasi':'Relaxation','Tidur (jam)':'Sleep (hours)','Air minum (gelas)':'Water (glasses)','Langkah':'Steps','Makan':'Meals','Waktu layar (jam)':'Screen time (hours)','Catatan kebiasaan':'Habit note',
+ 'Riwayat keluarga':'Family history','Pemeriksaan atau skrining terjadwal':'Scheduled check-up or screening','Imunisasi atau vaksin':'Immunization or vaccine','Hasil pemeriksaan':'Check-up result','Gejala':'Symptom','Kunjungan dokter':'Doctor visit','Rencana perawatan dari dokter':'Care plan from the doctor','Hasil tes':'Test result','Pengingat (sesuai resep)':'Reminder (as prescribed)',
+ 'Rencana pemulihan':'Recovery plan','Latihan atau terapi':'Exercise or therapy','Istirahat':'Rest','Kemajuan':'Progress','Suasana hati (1–5)':'Mood (1–5)','Stres (1–5)':'Stress (1–5)','Syukur atau jurnal':'Gratitude or journal','Sumber bantuan':'Sources of help',
+ 'Saya catat sendiri':'I recorded it myself','Dari perangkat atau alat ukur':'From a device or measuring tool','Diagnosis atau keterangan tenaga profesional':'Diagnosis or statement from a professional','Belum diverifikasi':'Not verified',
+ 'Ayah':'Father','Ibu':'Mother','Saudara kandung':'Sibling','Kakek atau nenek':'Grandparent','Paman atau bibi':'Uncle or aunt','Anak':'Child','Lainnya':'Other',
+ 'Sedang berlangsung':'Ongoing','Sudah membaik':'Improving','Sudah selesai':'Finished','Terjadwal':'Scheduled','Sudah dilakukan':'Done','Sesuai resep dokter':"As prescribed by a doctor",'Tanpa resep (saya catat sendiri)':'Without a prescription (I recorded it)','Sudah dihentikan':'Stopped','Pengingat saya':'My reminder','Saya catat sudah diminum':'I recorded that I took it','skor':'score'};
+const hcL=v=>v==null?v:(HC_LEGACY[v]||v);
 const HC_SECTIONS=[
  {id:'condition',label:'Daily Condition',icon:'🌤️',kinds:['Condition check-in'],unit:0,emergency:1,mood:1,custom:1,
   intro:'Record your mood, feelings, physical condition, mental clarity, stress and multitasking load in one short pop-up, as often as you like. It is linked to your energy and focus sessions in Daily Actions, so you can see your own pattern.',
   tips:['It takes twenty seconds: pick a number from 1 to 5, nothing is required.','Check in at about the same times (for example morning and afternoon) so the pattern is easy to read.','A pattern usually shows after about two weeks. It describes your data; it is not cause and effect and not a diagnosis.','If a heavy feeling lasts, talk to someone you trust or a professional.']},
- {id:'profile',label:'Profil Kesehatan',icon:'🧾',kinds:['Golongan darah','Alergi','Kondisi yang saya miliki','Obat atau suplemen yang saya pakai','Pengukuran','Dokter atau fasilitas kesehatan','Kontak darurat'],unit:1,
-  intro:'Satu tempat untuk data dasarmu, supaya mudah dibuka saat berobat.',
-  tips:['Tulis obat persis seperti di resep atau label. Aplikasi ini tidak memberi saran dosis.','Isi kontak darurat dan alergi lebih dulu: itu yang paling berguna saat genting.','Tulis angka pengukuran apa adanya dengan tanggalnya. Aplikasi tidak menilai angka itu normal atau tidak.']},
- {id:'active',label:'Aktivitas Sehat & Hobi',icon:'🚶',kinds:['Olahraga','Jalan atau bersepeda','Hobi yang aktif','Relaksasi'],unit:1,unitDef:'menit',
-  intro:'Gerak dan hobi yang membuatmu segar. Catat lama dan apa yang kamu rasakan.',
-  tips:['Mulai dari yang kecil dan bisa diulang setiap hari.','Pilih hobi yang kamu nikmati; itu yang bertahan.','Jika ada kondisi kesehatan, tanyakan dokter jenis dan takaran gerak yang aman untukmu.']},
- {id:'lifestyle',label:'Pola / Gaya Hidup',icon:'🌙',kinds:['Tidur (jam)','Air minum (gelas)','Langkah','Makan','Waktu layar (jam)','Catatan kebiasaan'],unit:1,
-  intro:'Tidur, makan, minum dan kebiasaan harian. Lihat pola, bukan menghakimi diri.',
-  tips:['Catat beberapa hari berturut-turut untuk melihat polanya.','Ubah satu kebiasaan dalam satu waktu.','Pertanyaan tentang diet khusus atau kondisi tertentu sebaiknya dibawa ke dokter atau ahli gizi.']},
- {id:'family',label:'Riwayat Keluarga & Pencegahan',icon:'👪',kinds:['Riwayat keluarga','Pemeriksaan atau skrining terjadwal','Imunisasi atau vaksin','Hasil pemeriksaan'],unit:0,
-  intro:'Penyakit yang ada di keluarga dan pemeriksaan pencegahan yang ingin kamu jadwalkan.',
-  tips:['Tulis hubungan keluarga (ayah, ibu, kakek…) dan kondisinya. Jangan menebak sendiri artinya bagimu.','Beri tanggal pada pemeriksaan yang terjadwal agar muncul di Ringkasan.','Tanyakan dokter pemeriksaan apa yang cocok untuk usia dan riwayatmu.']},
- {id:'sick',label:'Saat Sakit & Perawatan',icon:'🤒',kinds:['Gejala','Kunjungan dokter','Rencana perawatan dari dokter','Hasil tes','Pengingat (sesuai resep)'],unit:1,emergency:1,
-  intro:'Catatan saat kamu tidak enak badan: apa yang terasa, kapan mulai, apa kata dokter.',
-  tips:['Catat kapan mulai, seberapa sering, dan apa yang memperberat atau meringankan. Catatan ini membantu dokter.','Ikuti petunjuk dokter dan label obat. Aplikasi ini tidak menyarankan obat atau dosis.','Jangan menunda bila gejala berat, mendadak atau memburuk.']},
- {id:'recovery',label:'Pemulihan',icon:'🌱',kinds:['Rencana pemulihan','Latihan atau terapi','Istirahat','Kemajuan'],unit:1,
-  intro:'Setelah sakit, cedera atau masa berat: langkah kecil, istirahat, dan kemajuan.',
-  tips:['Pemulihan tidak lurus; hari yang lambat itu biasa.','Ikuti rencana dari dokter atau terapismu, lalu catat kemajuannya di sini.','Naikkan beban sedikit demi sedikit dan berhenti bila nyeri bertambah, lalu hubungi tenaga kesehatan.']},
- {id:'mental',label:'Kesehatan Mental',icon:'🧠',kinds:['Suasana hati (1–5)','Stres (1–5)','Syukur atau jurnal','Sumber bantuan'],unit:1,emergency:1,mood:1,
-  intro:'Tempat mencatat perasaanmu dengan aman. Mengetahui pola membantu kamu mencari dukungan lebih awal.',
-  tips:['Menulis tiga hal yang kamu syukuri atau satu hal yang berat sudah cukup.','Berbicara dengan orang yang dipercaya atau tenaga profesional itu kuat, bukan lemah.','Aplikasi ini tidak mendiagnosis dan tidak menggantikan psikolog atau psikiater.']}];
-const HC_PROV=['Saya catat sendiri','Dari perangkat atau alat ukur','Diagnosis atau keterangan tenaga profesional','Belum diverifikasi'];
-const HC_REL=['Ayah','Ibu','Saudara kandung','Kakek atau nenek','Paman atau bibi','Anak','Lainnya'];
-const HC_STATUS={'Gejala':['Sedang berlangsung','Sudah membaik','Sudah selesai'],'Kunjungan dokter':['Terjadwal','Sudah dilakukan'],'Obat atau suplemen yang saya pakai':['Sesuai resep dokter','Tanpa resep (saya catat sendiri)','Sudah dihentikan'],'Pengingat (sesuai resep)':['Pengingat saya','Saya catat sudah diminum']};
+ {id:'profile',label:'Health Profile',icon:'🧾',kinds:['Blood type','Allergy','Conditions I have','Medicines or supplements I take','Measurement','Doctor or health facility','Emergency contact'],unit:1,
+  intro:'One place for your basic details, easy to open when you see a doctor.',
+  tips:['Write medicines exactly as on the prescription or the label. This app gives no dosage advice.','Fill in the emergency contact and allergies first: they matter most in a critical moment.','Write measurements as they are, with the date. The app does not judge whether a number is normal.']},
+ {id:'active',label:'Healthy Activity & Hobbies',icon:'🚶',kinds:['Exercise','Walking or cycling','Active hobby','Relaxation'],unit:1,unitDef:'minutes',
+  intro:'Movement and hobbies that keep you fresh. Note how long and how you felt.',
+  tips:['Start small, with something you can repeat every day.','Pick a hobby you enjoy; that is the one that lasts.','If you have a health condition, ask your doctor which kind and amount of movement is safe for you.']},
+ {id:'lifestyle',label:'Habits & Lifestyle',icon:'🌙',kinds:['Sleep (hours)','Water (glasses)','Steps','Meals','Screen time (hours)','Habit note'],unit:1,
+  intro:'Sleep, food, drink and daily habits. Look for patterns, not for blame.',
+  tips:['Record several days in a row to see the pattern.','Change one habit at a time.','Questions about a special diet or a specific condition are best taken to a doctor or dietitian.']},
+ {id:'family',label:'Family History & Prevention',icon:'👪',kinds:['Family history','Scheduled check-up or screening','Immunization or vaccine','Check-up result'],unit:0,
+  intro:'Illnesses that run in the family and the preventive check-ups you want to schedule.',
+  tips:['Write the family relation (father, mother, grandparent…) and the condition. Do not guess what it means for you.','Date the scheduled check-ups so they appear in the Summary.','Ask your doctor which check-ups suit your age and history.']},
+ {id:'sick',label:'Illness & Care',icon:'🤒',kinds:['Symptom','Doctor visit','Care plan from the doctor','Test result','Reminder (as prescribed)'],unit:1,emergency:1,
+  intro:'Notes for when you feel unwell: what you feel, when it started, what the doctor said.',
+  tips:['Note when it started, how often, and what makes it worse or better. These notes help your doctor.','Follow your doctor’s instructions and the medicine label. This app does not suggest medicines or doses.','Do not delay if symptoms are severe, sudden or getting worse.']},
+ {id:'recovery',label:'Recovery',icon:'🌱',kinds:['Recovery plan','Exercise or therapy','Rest','Progress'],unit:1,
+  intro:'After an illness, an injury or a hard period: small steps, rest and progress.',
+  tips:['Recovery is not a straight line; slow days are normal.','Follow the plan from your doctor or therapist, then note your progress here.','Increase the load a little at a time and stop if pain grows, then contact a health professional.']},
+ {id:'mental',label:'Mental Health',icon:'🧠',kinds:['Mood (1–5)','Stress (1–5)','Gratitude or journal','Sources of help'],unit:1,emergency:1,mood:1,
+  intro:'A safe place to note how you feel. Knowing your pattern helps you look for support earlier.',
+  tips:['Writing three things you are grateful for, or one thing that is heavy, is enough.','Talking to someone you trust or to a professional is strong, not weak.','This app does not diagnose and does not replace a psychologist or psychiatrist.']}];
+const HC_PROV=['I recorded it myself','From a device or measuring tool','Diagnosis or statement from a professional','Not verified'];
+const HC_REL=['Father','Mother','Sibling','Grandparent','Uncle or aunt','Child','Other'];
+const HC_STATUS={'Symptom':['Ongoing','Improving','Finished'],'Doctor visit':['Scheduled','Done'],'Medicines or supplements I take':['As prescribed by a doctor','Without a prescription (I recorded it)','Stopped'],'Reminder (as prescribed)':['My reminder','I recorded that I took it']};
 const HC_REVIEWED='2026-10-17';
 /* hobby safety guidance: general, conservative, DRAFT. Nothing here is advice for a condition; check with a clinician and the rules of the sport. */
 const HC_HOBBY=[
- {id:'run',name:'Lari',before:['Pakai sepatu yang pas dan sudah dikenal','Pemanasan ringan 5–10 menit','Bawa air; hindari jam terpanas'],during:['Bicara tetap bisa: kalau tidak, kurangi tempo','Berhenti bila nyeri dada, pusing berat atau sesak yang tidak biasa'],after:['Pendinginan dan jalan santai','Minum, lalu catat rasa tubuhmu','Tambah jarak sedikit demi sedikit, bukan melonjak']},
- {id:'cycle',name:'Bersepeda',before:['Periksa rem, ban dan lampu','Pakai helm yang pas','Beri tahu seseorang rute dan perkiraan pulang'],during:['Patuhi lalu lintas; jaga jarak aman','Minum teratur, berhenti istirahat bila lelah'],after:['Regangan ringan','Catat bila ada nyeri lutut, punggung atau tangan']},
- {id:'tour',name:'Touring (sepeda motor atau sepeda)',before:['Rencanakan etape dan tempat istirahat','Periksa kendaraan dan perlengkapan pelindung','Siapkan kontak darurat dan peta tanpa sinyal'],during:['Istirahat tiap 1–2 jam; jangan berkendara saat mengantuk','Utamakan tiba dengan selamat, bukan cepat'],after:['Istirahat cukup sebelum perjalanan berikutnya','Periksa kendaraan dan catat hal yang perlu diperbaiki']},
- {id:'hike',name:'Mendaki',before:['Cek cuaca dan izin jalur; kabari orang yang tidak ikut','Bawa air, makanan, senter, P3K dan pakaian lapis','Latih fisik bertahap sebelum jalur panjang'],during:['Jangan memisahkan diri dari rombongan','Putar balik bila cuaca memburuk atau waktu mepet; puncak bukan segalanya','Waspadai tanda mabuk ketinggian, hipotermia atau kepanasan'],after:['Periksa kaki dan tubuh; minum dan makan','Laporkan bila sudah turun','Catat apa yang perlu dibawa lain kali']},
- {id:'shoot',name:'Menembak (olahraga, di lapangan resmi)',before:['Hanya di lapangan dan dengan izin yang sah','Ikuti aturan keselamatan senjata dan pengawas lapangan','Pakai pelindung mata dan telinga'],during:['Arahkan laras ke arah aman; jari di luar pelatuk sampai siap','Patuhi aba-aba petugas lapangan'],after:['Kosongkan dan periksa senjata; simpan terpisah dari amunisi','Cuci tangan setelah menangani amunisi']},
- {id:'martial',name:'Bela diri',before:['Berlatih di perguruan dengan pelatih yang berpengalaman','Pemanasan dan peregangan; pelindung sesuai latihan'],during:['Kontrol tenaga saat sparing; beri tanda tepuk bila ingin berhenti','Hentikan latihan bila pusing, nyeri tajam atau pukulan di kepala'],after:['Pendinginan; cek memar atau nyeri','Setelah benturan kepala, istirahat dan periksakan bila ada keluhan']},
- {id:'archery',name:'Memanah',before:['Berlatih di area yang aman dan jelas batasnya','Periksa busur, tali dan anak panah dari retak'],during:['Panah hanya bila area target bebas orang','Tunggu aba-aba bersama sebelum mengambil anak panah'],after:['Lepas tali busur sesuai petunjuk pembuatnya','Regangkan bahu dan lengan']}];
+ {id:'run',name:'Running',before:['Wear well-fitting shoes you already know','Warm up lightly for 5–10 minutes','Carry water; avoid the hottest hours'],during:['You should still be able to talk: if not, slow down','Stop for chest pain, severe dizziness or unusual shortness of breath'],after:['Cool down with an easy walk','Drink, then note how your body feels','Add distance a little at a time, not in jumps']},
+ {id:'cycle',name:'Cycling',before:['Check the brakes, tyres and lights','Wear a well-fitting helmet','Tell someone your route and when you expect to be back'],during:['Follow traffic rules and keep a safe distance','Drink regularly and stop to rest when tired'],after:['Light stretching','Note any knee, back or hand pain']},
+ {id:'tour',name:'Touring (motorcycle or bicycle)',before:['Plan the stages and rest stops','Check the vehicle and the protective gear','Prepare emergency contacts and an offline map'],during:['Rest every 1–2 hours; never ride when sleepy','Arriving safely matters more than arriving fast'],after:['Rest enough before the next trip','Check the vehicle and note what needs fixing']},
+ {id:'hike',name:'Hiking',before:['Check the weather and trail permit; tell someone who is not going','Bring water, food, a torch, first aid and layered clothing','Build fitness gradually before a long trail'],during:['Do not separate from the group','Turn back if the weather worsens or time runs short; the summit is not everything','Watch for signs of altitude sickness, hypothermia or overheating'],after:['Check your feet and body; drink and eat','Report in once you are down','Note what to bring differently next time']},
+ {id:'shoot',name:'Shooting (sport, at an official range)',before:['Only at a legal range and with valid permits','Follow the firearm safety rules and the range officer','Wear eye and ear protection'],during:['Keep the muzzle pointed in a safe direction; finger off the trigger until ready','Follow the range officer’s commands'],after:['Unload and check the firearm; store it apart from ammunition','Wash your hands after handling ammunition']},
+ {id:'martial',name:'Martial arts',before:['Train at a school with an experienced instructor','Warm up and stretch; wear protection suited to the training'],during:['Control your force when sparring; tap out when you want to stop','Stop training for dizziness, sharp pain or a blow to the head'],after:['Cool down; check for bruises or pain','After a head impact, rest and see a professional if you have symptoms']},
+ {id:'archery',name:'Archery',before:['Practise in a safe area with clear boundaries','Check the bow, string and arrows for cracks'],during:['Shoot only when the target area is clear of people','Wait for the shared signal before collecting arrows'],after:['Unstring the bow as the maker instructs','Stretch your shoulders and arms']}];
 const HC_SOURCES=[
- ['WHO · Guidelines on physical activity and sedentary behaviour (2020)','who.int','Dasar umum untuk gerak; perlu diverifikasi untuk kondisimu'],
- ['Kementerian Kesehatan RI · materi aktivitas fisik','kemkes.go.id','Rujukan lokal; perlu diverifikasi'],
- ['Panduan keselamatan dari federasi cabang olahraga yang kamu ikuti','—','Setiap cabang punya aturan sendiri; perlu diverifikasi']];
+ ['WHO · Guidelines on physical activity and sedentary behaviour (2020)','who.int','General basis for movement; verify for your own condition'],
+ ['Indonesian Ministry of Health · physical activity materials','kemkes.go.id','Local reference; needs verification'],
+ ['Safety guidance from the federation of the sport you do','—','Every sport has its own rules; needs verification']];
 const hcSec=id=>HC_SECTIONS.find(s=>s.id===id);
 
-MOD.health_records={t:'health_records',one:'Catatan kesehatan',many:'Catatan kesehatan',main:'title',sort:['rec_date','desc'],hiddenUI:1,placeholder:'catatan kesehatan',
+MOD.health_records={t:'health_records',one:'Health record',many:'Health records',main:'title',sort:['rec_date','desc'],hiddenUI:1,placeholder:'health record',
  fields:[
-  F('section','Bagian','hidden','',{sql:'text'}),
-  F('kind','Jenis','text','Jenis catatan.',{req:1}),
-  F('title','Judul','text','Judul singkat.',{req:1,wide:1}),
-  F('rec_date','Tanggal','date','Tanggal catatan atau jadwal.',{req:1}),
-  F('value','Angka','number','Jika ada angka (opsional).'),
-  F('unit','Satuan','text','Contoh: menit, jam, kg, mmHg.'),
-  F('provenance','Sumber data','hidden','',{sql:'text'}),
-  F('relation','Hubungan keluarga','hidden','',{sql:'text'}),
-  F('age_dx','Usia saat didiagnosis','hidden','',{sql:'int'}),
+  F('section','Section','hidden','',{sql:'text'}),
+  F('kind','Kind','text','Kind of record.',{req:1}),
+  F('title','Title','text','A short title.',{req:1,wide:1}),
+  F('rec_date','Date','date','Date of the record or the schedule.',{req:1}),
+  F('value','Number','number','If there is a number (optional).'),
+  F('unit','Unit','text','For example: minutes, hours, kg, mmHg.'),
+  F('provenance','Source of the data','hidden','',{sql:'text'}),
+  F('relation','Family relation','hidden','',{sql:'text'}),
+  F('age_dx','Age at diagnosis','hidden','',{sql:'int'}),
   F('status','Status','hidden','',{sql:'text'}),
   F('cond_mood','Mood','hidden','',{sql:'int'}),
   F('cond_body','Physical condition','hidden','',{sql:'int'}),
@@ -14974,10 +14983,10 @@ MOD.health_records={t:'health_records',one:'Catatan kesehatan',many:'Catatan kes
   F('cond_time','Time','hidden','',{sql:'text'}),
   F('cond_feel','Feelings','hidden','',{sql:'text'}),
   F('cond_ache','Physical complaints','hidden','',{sql:'text'}),
-  F('notes','Catatan','textarea','Isi catatan.',{wide:1,rows:3})],cols:['rec_date','kind','title']};
+  F('notes','Notes','textarea','What the note says.',{wide:1,rows:3})],cols:['rec_date','kind','title']};
 ORDER.push('health_records');NEWER_TABLES.push('health_records');
 COL_NEWER.health_records=['cond_multi','cond_mood','cond_body','cond_mind','cond_stress','cond_time','cond_feel','cond_ache'];
-NAV.splice(NAV.findIndex(n=>n.id==='finance'),0,{id:'health',label:'Healthcare',ic:'heart',subs:[['summary','Ringkasan'],...HC_SECTIONS.map(s=>[s.id,s.label])]});
+NAV.splice(NAV.findIndex(n=>n.id==='finance'),0,{id:'health',label:'Healthcare',ic:'heart',subs:[['summary','Summary'],...HC_SECTIONS.map(s=>[s.id,s.label])]});
 if(!IC.heart)IC.heart='<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>';
 
 /* the database: ONLY the owner can read or change these rows; the audit trail holds no content */
@@ -15009,100 +15018,100 @@ create policy health_records_del on public.health_records for delete using (owne
 /* ---------- state ---------- */
 S.hc=S.hc||{show:true,bad:'',editing:null};
 const hcRows=sec=>(D().health_records||[]).filter(r=>!sec||r.section===sec).sort((a,b)=>String(b.rec_date).localeCompare(String(a.rec_date))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
-const hcMask=(v,hide)=>hide?'<span class="mut" aria-label="disembunyikan">••••</span>':esc(v==null||v===''?'—':v);
-const hcBanner=()=>`<div class="callout" role="note" data-hc-note>${ic('info')}<div><b>Belum ditinjau profesional.</b> ${esc(HC_NOTE)}</div></div>`;
+const hcMask=(v,hide)=>hide?'<span class="mut" aria-label="hidden">••••</span>':esc(v==null||v===''?'—':v);
+const hcBanner=()=>`<div class="callout" role="note" data-hc-note>${ic('info')}<div><b>Not yet reviewed by a professional.</b> ${esc(HC_NOTE)}</div></div>`;
 const hcEmerg=()=>`<div class="callout err" role="note" data-hc-emerg>${ic('alert')}<div>${esc(HC_EMERGENCY)}</div></div>`;
-const hcPrivacy=()=>`<div class="card" data-hc-privacy style="margin-top:14px"><div class="ch"><h3>Privasi</h3></div><ul class="sm" style="margin:0 0 0 18px"><li>Hanya akunmu yang dapat membaca catatan ini. Admin tidak dapat membacanya, dan jejak audit hanya mencatat bahwa ada perubahan, bukan isinya.</li><li>Tidak ada catatan Healthcare yang dikirim ke layanan lain, AI, API atau analitik.</li><li>Catatan ikut dalam cadangan datamu sendiri (Pengaturan → Data & backup). Simpan cadangan itu dengan aman.</li><li>Di layar, detail langsung tampil. Tekan “Sembunyikan detail” bila ada orang lain di dekatmu.</li></ul></div>`;
-const hcToggle=()=>`<button class="btn s" data-act="hcshow" aria-pressed="${S.hc.show}">${S.hc.show?'Sembunyikan detail':'Tampilkan detail'}</button>`;
+const hcPrivacy=()=>`<div class="card" data-hc-privacy style="margin-top:14px"><div class="ch"><h3>Privacy</h3></div><ul class="sm" style="margin:0 0 0 18px"><li>Only your account can read these notes. An admin cannot read them, and the audit trail records that something changed, not what it says.</li><li>No Healthcare note is sent to any other service, AI, API or analytics.</li><li>The notes are part of your own data backup (Settings → Data & backup). Keep that backup safe.</li><li>On screen the details show right away. Press “Hide details” when someone else is near you.</li></ul></div>`;
+const hcToggle=()=>`<button class="btn s" data-act="hcshow" aria-pressed="${S.hc.show}">${S.hc.show?'Hide details':'Show details'}</button>`;
 
 function hcExtra(sec,kind,r){
   r=r||{};let h='';
-  if(sec==='family'&&kind==='Riwayat keluarga')h+=`<div class="row" style="gap:10px;margin-top:10px"><label class="sm b">Hubungan keluarga<select class="in" id="hc_rel" style="display:block;width:180px">${HC_REL.map(k=>`<option ${r.relation===k?'selected':''}>${esc(k)}</option>`).join('')}</select></label><label class="sm b">Usia saat didiagnosis (opsional)<input class="in" id="hc_agedx" type="number" min="0" max="120" step="1" value="${esc(r.age_dx==null?'':r.age_dx)}" style="width:120px;display:block"></label></div><p class="xs mut">Tidak ada persentase risiko di sini. Bawa catatan ini ke dokter untuk dibahas.</p>`;
+  kind=hcL(kind);if(sec==='family'&&kind==='Family history')h+=`<div class="row" style="gap:10px;margin-top:10px"><label class="sm b">Family relation<select class="in" id="hc_rel" style="display:block;width:180px">${HC_REL.map(k=>`<option ${hcL(r.relation)===k?'selected':''}>${esc(k)}</option>`).join('')}</select></label><label class="sm b">Age at diagnosis (optional)<input class="in" id="hc_agedx" type="number" min="0" max="120" step="1" value="${esc(r.age_dx==null?'':r.age_dx)}" style="width:120px;display:block"></label></div><p class="xs mut">There is no risk percentage here. Take this note to your doctor to discuss.</p>`;
   const st=HC_STATUS[kind];
-  if(st)h+=`<label class="sm b" for="hc_status" style="display:block;margin-top:10px">Status</label><select class="in" id="hc_status" style="width:100%"><option value="">—</option>${st.map(k=>`<option ${r.status===k?'selected':''}>${esc(k)}</option>`).join('')}</select>${/Pengingat|Obat/.test(kind)?'<p class="xs mut">Mengikuti resep dokter atau label. Pengingat bukan bukti obat sudah diminum; pilih “Saya catat sudah diminum” hanya bila memang sudah. Aplikasi ini tidak menyarankan dosis.</p>':''}`;
+  if(st)h+=`<label class="sm b" for="hc_status" style="display:block;margin-top:10px">Status</label><select class="in" id="hc_status" style="width:100%"><option value="">—</option>${st.map(k=>`<option ${hcL(r.status)===k?'selected':''}>${esc(k)}</option>`).join('')}</select>${/Reminder|Medicine/.test(kind)?'<p class="xs mut">Follow the doctor’s prescription or the label. A reminder is not proof that you took the medicine; choose “I recorded that I took it” only if you did. This app does not suggest doses.</p>':''}`;
   return h}
 CHG.hckind=el=>{const sec=el.dataset.sec,x=document.getElementById('hc_extra');if(x)x.innerHTML=hcExtra(sec,el.value,{})};
 function hcForm(sec,rec){
   const s=hcSec(sec),r=rec||{},kinds=s.kinds;
-  const body=`<div data-hc-form>${S.hc.bad?`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${esc(S.hc.bad)} Isianmu masih ada; tekan Simpan untuk mencoba lagi.</div></div>`:''}
-   <label class="sm b" for="hc_kind">Jenis</label><select class="in" id="hc_kind" data-change="hckind" data-sec="${sec}" style="width:100%">${kinds.map(k=>`<option ${r.kind===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
-   <label class="sm b" for="hc_title" style="display:block;margin-top:10px">Judul</label><input class="in" id="hc_title" value="${esc(r.title||'')}" style="width:100%">
-   <label class="sm b" for="hc_date" style="display:block;margin-top:10px">Tanggal</label><input class="in" id="hc_date" type="date" value="${esc(String(r.rec_date||todayS()).slice(0,10))}" style="width:200px">
-   <label class="sm b" for="hc_prov" style="display:block;margin-top:10px">Sumber data</label><select class="in" id="hc_prov" style="width:100%">${HC_PROV.map(k=>`<option ${(r.provenance||HC_PROV[0])===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
+  const body=`<div data-hc-form>${S.hc.bad?`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Not saved yet.</b> ${esc(S.hc.bad)} Your entry is still here; press Save to try again.</div></div>`:''}
+   <label class="sm b" for="hc_kind">Kind</label><select class="in" id="hc_kind" data-change="hckind" data-sec="${sec}" style="width:100%">${kinds.map(k=>`<option ${hcL(r.kind)===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
+   <label class="sm b" for="hc_title" style="display:block;margin-top:10px">Title</label><input class="in" id="hc_title" value="${esc(r.title||'')}" style="width:100%">
+   <label class="sm b" for="hc_date" style="display:block;margin-top:10px">Date</label><input class="in" id="hc_date" type="date" value="${esc(String(r.rec_date||todayS()).slice(0,10))}" style="width:200px">
+   <label class="sm b" for="hc_prov" style="display:block;margin-top:10px">Source of the data</label><select class="in" id="hc_prov" style="width:100%">${HC_PROV.map(k=>`<option ${hcL(r.provenance||HC_PROV[0])===k?'selected':''}>${esc(k)}</option>`).join('')}</select>
    <div id="hc_extra">${hcExtra(sec,r.kind||kinds[0],r)}</div>
-   ${s.unit?`<div class="row" style="gap:10px;margin-top:10px"><label class="sm b">Angka (opsional)<input class="in" id="hc_value" type="number" step="any" value="${esc(r.value==null?'':r.value)}" style="width:140px;display:block"></label><label class="sm b">Satuan<input class="in" id="hc_unit" value="${esc(r.unit||s.unitDef||'')}" style="width:140px;display:block"></label></div>`:''}
-   <label class="sm b" for="hc_notes" style="display:block;margin-top:10px">Catatan</label><textarea class="in" id="hc_notes" rows="3" style="width:100%">${esc(r.notes||'')}</textarea>
+   ${s.unit?`<div class="row" style="gap:10px;margin-top:10px"><label class="sm b">Number (optional)<input class="in" id="hc_value" type="number" step="any" value="${esc(r.value==null?'':r.value)}" style="width:140px;display:block"></label><label class="sm b">Unit<input class="in" id="hc_unit" value="${esc(r.unit||s.unitDef||'')}" style="width:140px;display:block"></label></div>`:''}
+   <label class="sm b" for="hc_notes" style="display:block;margin-top:10px">Notes</label><textarea class="in" id="hc_notes" rows="3" style="width:100%">${esc(r.notes||'')}</textarea>
    <p class="xs mut" style="margin-top:8px">${esc(HC_NOTE)}</p></div>`;
-  openModal((rec?'Ubah ':'Tambah ')+'catatan · '+s.label,body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="hcsave" data-sec="${sec}" data-id="${rec?rec.id:''}">Simpan</button>`)}
+  openModal((rec?'Edit ':'Add ')+'record · '+s.label,body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Delete</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="hcsave" data-sec="${sec}" data-id="${rec?rec.id:''}">Save</button>`)}
 ACT.hcadd=el=>{S.hc.bad='';if(el.dataset.sec==='condition'&&typeof condForm==='function')return condForm();hcForm(el.dataset.sec)};
 ACT.hcedit=el=>{const r=byId('health_records',el.dataset.id);if(r){S.hc.bad='';if(r.section==='condition'&&typeof condForm==='function')return condForm(r);hcForm(r.section,r)}};
 ACT.hcshow=()=>{S.hc.show=!S.hc.show;renderView()};
 ACT.hcsave=async el=>{
   const g=id=>{const e=document.getElementById(id);return e?e.value:''};
   const d={section:el.dataset.sec,kind:g('hc_kind'),title:g('hc_title').trim(),rec_date:g('hc_date'),notes:g('hc_notes').trim()||null,provenance:g('hc_prov')||HC_PROV[0],relation:g('hc_rel')||null,age_dx:g('hc_agedx')===''?null:Math.round(+g('hc_agedx')),status:g('hc_status')||null};
-  if(d.age_dx!=null&&(!(d.age_dx>=0)||d.age_dx>120)){S.hc.bad='Usia saat didiagnosis harus 0–120.';const b=$('[data-hc-form]');if(b&&!$('[data-hc-bad]'))b.insertAdjacentHTML('afterbegin',`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${S.hc.bad}</div></div>`);return}
+  if(d.age_dx!=null&&(!(d.age_dx>=0)||d.age_dx>120)){S.hc.bad='Age at diagnosis must be 0–120.';const b=$('[data-hc-form]');if(b&&!$('[data-hc-bad]'))b.insertAdjacentHTML('afterbegin',`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Not saved yet.</b> ${S.hc.bad}</div></div>`);return}
   const s=hcSec(el.dataset.sec);if(s.unit){d.value=g('hc_value')===''?null:+g('hc_value');d.unit=g('hc_unit').trim()||null}
-  if(!d.title||!d.rec_date){const b=$('[data-hc-form]');S.hc.bad='Isi judul dan tanggal.';const h=$('[data-hc-bad]');if(!h&&b)b.insertAdjacentHTML('afterbegin',`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${S.hc.bad}</div></div>`);return}
+  if(!d.title||!d.rec_date){const b=$('[data-hc-form]');S.hc.bad='Fill in the title and the date.';const h=$('[data-hc-bad]');if(!h&&b)b.insertAdjacentHTML('afterbegin',`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Not saved yet.</b> ${S.hc.bad}</div></div>`);return}
   el.disabled=true;
-  try{const r=await saveRow('health_records',d,el.dataset.id||undefined);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');S.hc.bad='';finishModal();toast('Catatan tersimpan');renderView()}
-  catch(e){el.disabled=false;S.hc.bad=(e&&e.message)||String(e);const b=$('[data-hc-form]');const h=$('[data-hc-bad]');const html=`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Belum tersimpan.</b> ${esc(S.hc.bad)} Isianmu masih ada; tekan Simpan untuk mencoba lagi.</div></div>`;if(h)h.outerHTML=html;else if(b)b.insertAdjacentHTML('afterbegin',html)}};
+  try{const r=await saveRow('health_records',d,el.dataset.id||undefined);if(!r)throw new Error('Your account is not allowed to save this, or it is waiting for approval.');S.hc.bad='';finishModal();toast('Record saved');renderView()}
+  catch(e){el.disabled=false;S.hc.bad=(e&&e.message)||String(e);const b=$('[data-hc-form]');const h=$('[data-hc-bad]');const html=`<div class="callout err" role="alert" data-hc-bad>${ic('alert')}<div><b>Not saved yet.</b> ${esc(S.hc.bad)} Your entry is still here; press Save to try again.</div></div>`;if(h)h.outerHTML=html;else if(b)b.insertAdjacentHTML('afterbegin',html)}};
 ACT.hcdel=async el=>{
-  if(!confirm('Hapus catatan ini? Tindakan ini tidak dapat dibatalkan.'))return;
-  try{await removeRow('health_records',el.dataset.id);finishModal();toast('Catatan dihapus');renderView()}
-  catch(e){toast('Belum terhapus: '+((e&&e.message)||e),1)}};
+  if(!confirm('Delete this record? This cannot be undone.'))return;
+  try{await removeRow('health_records',el.dataset.id);finishModal();toast('Record deleted');renderView()}
+  catch(e){toast('Not deleted yet: '+((e&&e.message)||e),1)}};
 
 /* ---------- screens ---------- */
 function hcMoodNote(){
-  const L=hcRows().filter(r=>((r.section==='mental'&&/Suasana hati/.test(r.kind))||r.section==='condition')&&r.value!=null).slice(0,7);
+  const L=hcRows().filter(r=>((r.section==='mental'&&/^Mood/.test(hcL(r.kind)))||r.section==='condition')&&r.value!=null).slice(0,7);
   if(L.length<4)return '';
   const avg=sum(L.map(r=>num(r.value)))/L.length;
-  return avg<=2?`<div class="callout" role="note" data-hc-mood>${ic('info')}<div><b>Beberapa hari terakhir terasa berat.</b> Ini bukan diagnosis. Jika perasaan ini berlangsung lama atau mengganggu hidupmu, pertimbangkan bicara dengan orang yang kamu percaya atau tenaga profesional.</div></div>`:''}
+  return avg<=2?`<div class="callout" role="note" data-hc-mood>${ic('info')}<div><b>The last few days have felt heavy.</b> This is not a diagnosis. If the feeling lasts or disturbs your life, consider talking to someone you trust or a professional.</div></div>`:''}
 function hcSectionView(id){
   const s=hcSec(id),rows=hcRows(id),hide=!S.hc.show;
   if(S.missingTables&&S.missingTables.includes('health_records'))return missingCard('Healthcare');
   return `${hcBanner()}${s.emergency?hcEmerg():''}${id==='mental'?hcMoodNote():''}
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>${s.icon} ${esc(s.label)}</h3><span class="sp"></span>${hcToggle()}<button class="btn p" data-act="hcadd" data-sec="${id}">${ic('plus',15)} Tambah catatan</button></div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>${s.icon} ${esc(s.label)}</h3><span class="sp"></span>${hcToggle()}<button class="btn p" data-act="hcadd" data-sec="${id}">${ic('plus',15)} Add record</button></div>
    <p class="sm">${esc(s.intro)}</p><ul class="sm" style="margin:6px 0 0 18px" data-hc-tips>${s.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Catatanmu (${rows.length})</h3></div>${rows.length?`<div class="tw"><table class="tbl stack" data-hc-list><thead><tr><th>Tanggal</th><th>Jenis</th><th>Judul</th>${s.unit?'<th class="r">Angka</th>':''}<th><span class="sr">Aksi</span></th></tr></thead><tbody>${rows.map(r=>`<tr><td data-l="Tanggal">${esc(fmtD(r.rec_date))}</td><td data-l="Jenis">${esc(r.kind||'')}</td><td data-l="Judul">${hcMask(r.title,hide)}${!hide?`<div class="xs mut" data-hc-meta>${esc([r.provenance||HC_PROV[0],r.relation,r.age_dx!=null?'didiagnosis usia '+r.age_dx:'',r.status].filter(Boolean).join(' · '))}</div>`:''}${!hide&&r.notes?`<div class="sm mut">${esc(r.notes)}</div>`:''}</td>${s.unit?`<td data-l="Angka" class="r">${r.value==null?'—':hcMask(fmtN(r.value,2)+' '+(r.unit||''),hide)}</td>`:''}<td class="r"><button class="btn s" data-act="hcedit" data-id="${r.id}" aria-label="Ubah catatan">Ubah</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Belum dicatat</b>Tekan “Tambah catatan” untuk mulai. Isi seperlunya saja.</div>`}</div>${id==='active'?hcHobby():''}${hcSources()}`}
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Your records (${rows.length})</h3></div>${rows.length?`<div class="tw"><table class="tbl stack" data-hc-list><thead><tr><th>Date</th><th>Kind</th><th>Title</th>${s.unit?'<th class="r">Number</th>':''}<th><span class="sr">Action</span></th></tr></thead><tbody>${rows.map(r=>`<tr><td data-l="Date">${esc(fmtD(r.rec_date))}</td><td data-l="Kind">${esc(hcL(r.kind)||'')}</td><td data-l="Title">${hcMask(r.title,hide)}${!hide?`<div class="xs mut" data-hc-meta>${esc([hcL(r.provenance||HC_PROV[0]),hcL(r.relation),r.age_dx!=null?'diagnosed at age '+r.age_dx:'',hcL(r.status)].filter(Boolean).join(' · '))}</div>`:''}${!hide&&r.notes?`<div class="sm mut">${esc(r.notes)}</div>`:''}</td>${s.unit?`<td data-l="Number" class="r">${r.value==null?'—':hcMask(fmtN(r.value,2)+' '+(hcL(r.unit)||''),hide)}</td>`:''}<td class="r"><button class="btn s" data-act="hcedit" data-id="${r.id}" aria-label="Edit record">Edit</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Nothing recorded yet</b>Press “Add record” to start. Fill in only what you need.</div>`}</div>${id==='active'?hcHobby():''}${hcSources()}`}
 function hcHobby(){
-  return `<div class="card" style="margin-top:12px" data-hc-hobby><div class="ch"><h3>Panduan keselamatan hobi</h3><span class="sp"></span>${badge('Draf · perlu verifikasi','amber')}</div>
-   <p class="sm mut">Panduan umum dan konservatif, ditinjau terakhir ${esc(fmtD(HC_REVIEWED))}. Bukan nasihat untuk kondisimu. Tanyakan dokter bila ada penyakit, cedera atau obat, dan ikuti aturan cabang olahraganya. Mencatat kegiatan di sini tidak memberi XP.</p>
-   ${HC_HOBBY.map(h=>`<details style="margin-top:8px" data-hobby="${h.id}"><summary class="b">${esc(h.name)}</summary>${[['Sebelum',h.before],['Selama',h.during],['Sesudah',h.after]].map(x=>`<div class="sm b" style="margin-top:6px">${x[0]}</div><ul class="sm" style="margin:2px 0 0 18px">${x[1].map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`).join('')}</details>`).join('')}</div>`}
+  return `<div class="card" style="margin-top:12px" data-hc-hobby><div class="ch"><h3>Hobby safety guidance</h3><span class="sp"></span>${badge('Draft · needs verification','amber')}</div>
+   <p class="sm mut">General, conservative guidance, last reviewed ${esc(fmtD(HC_REVIEWED))}. It is not advice for your condition. Ask your doctor if you have an illness, an injury or take medicine, and follow the rules of the sport. Recording an activity here does not give XP.</p>
+   ${HC_HOBBY.map(h=>`<details style="margin-top:8px" data-hobby="${h.id}"><summary class="b">${esc(h.name)}</summary>${[['Before',h.before],['During',h.during],['After',h.after]].map(x=>`<div class="sm b" style="margin-top:6px">${x[0]}</div><ul class="sm" style="margin:2px 0 0 18px">${x[1].map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`).join('')}</details>`).join('')}</div>`}
 function hcSources(){
-  return `<div class="card" style="margin-top:12px" data-hc-sources><div class="ch"><h3>Sumber rujukan</h3><span class="sp"></span>${badge('perlu verifikasi','amber')}</div>
-   <p class="sm mut">Teks panduan di halaman ini disusun sebagai draf dari rujukan umum berikut dan belum ditinjau profesional. Ditinjau terakhir ${esc(fmtD(HC_REVIEWED))}.</p>
+  return `<div class="card" style="margin-top:12px" data-hc-sources><div class="ch"><h3>Reference sources</h3><span class="sp"></span>${badge('needs verification','amber')}</div>
+   <p class="sm mut">The guidance text on this page is a draft built from the general references below and has not been reviewed by a professional. Last reviewed ${esc(fmtD(HC_REVIEWED))}.</p>
    <ul class="sm" style="margin:0 0 0 18px">${HC_SOURCES.map(x=>`<li>${esc(x[0])} · <span class="mut">${esc(x[1])}</span> · ${esc(x[2])}</li>`).join('')}</ul></div>`}
 /* export and delete: your own records only, delete needs a typed confirmation */
 ACT.hcexport=()=>{
-  const rows=hcRows().map(r=>({bagian:r.section,jenis:r.kind,judul:r.title,tanggal:r.rec_date,angka:r.value,satuan:r.unit,sumber_data:r.provenance,hubungan:r.relation,usia_diagnosis:r.age_dx,status:r.status,catatan:r.notes,time:r.cond_time,mood:r.cond_mood,body:r.cond_body,mind:r.cond_mind,stress:r.cond_stress,multitasking:r.cond_multi,feelings:r.cond_feel,complaints:r.cond_ache}));
-  if(!rows.length){toast('Belum ada catatan untuk diekspor');return}
-  download('catatan-kesehatan-'+todayS()+'.json',JSON.stringify({dibuat:todayS(),catatan:rows},null,2),'application/json');toast('Ekspor dibuat. Simpan file ini di tempat yang aman.')};
-ACT.hcwipe=()=>openModal('Hapus semua catatan kesehatan?',`<p class="sm">Ini menghapus <b>${hcRows().length}</b> catatan Healthcare milikmu secara permanen dan tidak dapat dibatalkan. Ekspor dulu bila ingin menyimpannya.</p><label class="sm b" for="hc_wipe">Ketik HAPUS untuk melanjutkan</label><input class="in" id="hc_wipe" autocomplete="off" style="width:100%">`,`<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn d" data-act="hcwipego">Hapus semua</button>`);
+  const rows=hcRows().map(r=>({section:r.section,kind:hcL(r.kind),title:r.title,date:r.rec_date,number:r.value,unit:hcL(r.unit),source:hcL(r.provenance),relation:hcL(r.relation),age_at_diagnosis:r.age_dx,status:hcL(r.status),notes:r.notes,time:r.cond_time,mood:r.cond_mood,body:r.cond_body,mind:r.cond_mind,stress:r.cond_stress,multitasking:r.cond_multi,feelings:r.cond_feel,complaints:r.cond_ache}));
+  if(!rows.length){toast('There are no records to export yet');return}
+  download('health-records-'+todayS()+'.json',JSON.stringify({created:todayS(),records:rows},null,2),'application/json');toast('Export created. Keep this file somewhere safe.')};
+ACT.hcwipe=()=>openModal('Delete all health records?',`<p class="sm">This permanently deletes <b>${hcRows().length}</b> of your Healthcare records and cannot be undone. Export first if you want to keep them.</p><label class="sm b" for="hc_wipe">Type DELETE to continue</label><input class="in" id="hc_wipe" autocomplete="off" style="width:100%">`,`<span class="sp"></span><button class="btn" data-act="closeModal">Cancel</button><button class="btn d" data-act="hcwipego">Delete all</button>`);
 ACT.hcwipego=async el=>{
-  const v=(document.getElementById('hc_wipe')||{}).value;if(String(v||'').trim()!=='HAPUS'){toast('Ketik HAPUS persis untuk melanjutkan',1);return}
+  const v=(document.getElementById('hc_wipe')||{}).value;if(String(v||'').trim()!=='DELETE'){toast('Type DELETE exactly to continue',1);return}
   el.disabled=true;let n=0;
-  try{for(const r of hcRows().slice()){await removeRow('health_records',r.id);n++}closeModal(true);toast(n+' catatan dihapus');renderView()}
-  catch(e){el.disabled=false;toast('Berhenti setelah '+n+' catatan: '+((e&&e.message)||e),1);renderView()}};
+  try{for(const r of hcRows().slice()){await removeRow('health_records',r.id);n++}closeModal(true);toast(n+' records deleted');renderView()}
+  catch(e){el.disabled=false;toast('Stopped after '+n+' records: '+((e&&e.message)||e),1);renderView()}};
 function hcSummaryView(){
   if(S.missingTables&&S.missingTables.includes('health_records'))return missingCard('Healthcare');
   const all=hcRows(),t=todayS(),hide=!S.hc.show;
-  const due=all.filter(r=>r.section==='family'&&/terjadwal/i.test(r.kind||'')&&String(r.rec_date).slice(0,10)>=t).sort((a,b)=>String(a.rec_date).localeCompare(String(b.rec_date))).slice(0,5);
-  const last=id=>{const r=hcRows(id)[0];return r?fmtD(r.rec_date):'belum dicatat'};
+  const due=all.filter(r=>r.section==='family'&&/scheduled/i.test(hcL(r.kind)||'')&&String(r.rec_date).slice(0,10)>=t).sort((a,b)=>String(a.rec_date).localeCompare(String(b.rec_date))).slice(0,5);
+  const last=id=>{const r=hcRows(id)[0];return r?fmtD(r.rec_date):'nothing yet'};
   const latest=all[0],empty=HC_SECTIONS.filter(s=>!hcRows(s.id).length);
   return `${hcBanner()}${hcEmerg()}
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Ringkasan</h3><span class="sp"></span>${hcToggle()}</div>
-   <p class="sm">Gambaran singkat catatan kesehatanmu. Tidak ada penilaian, hanya jumlah dan tanggal.</p>
-   <div class="g g4" data-hc-counts style="margin-top:8px">${HC_SECTIONS.map(s=>`<button class="stat" data-act="go" data-p="health" data-s="${s.id}" style="text-align:left;cursor:pointer"><div class="l">${s.icon} ${esc(s.label)}</div><div class="v">${hcRows(s.id).length}</div><div class="s">${hcRows(s.id).length?'terakhir: '+esc(last(s.id)):'belum dicatat'}</div></button>`).join('')}</div></div>
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Pemeriksaan terjadwal</h3></div>${due.length?`<ul class="sm" style="margin:0 0 0 18px" data-hc-due>${due.map(r=>`<li>${esc(fmtD(r.rec_date))} · ${hcMask(r.title,hide)}</li>`).join('')}</ul>`:'<p class="sm mut">Belum ada pemeriksaan terjadwal. Tambahkan di “Riwayat Keluarga & Pencegahan”.</p>'}</div>
-  <div class="card" style="margin-top:12px" data-hc-next><div class="ch"><h3>Catatan terbaru dan langkah berikutnya</h3></div>
-   <p class="sm">${latest?`Terakhir dicatat: ${esc(fmtD(latest.rec_date))} · ${esc(hcSec(latest.section)?hcSec(latest.section).label:'')} · ${hcMask(latest.title,hide)}`:'Belum dicatat. Belum ada data kesehatan di akun ini.'}</p>
-   ${empty.length&&empty.length<HC_SECTIONS.length?`<p class="sm mut">Bagian yang belum dicatat: ${esc(empty.map(s=>s.label).join(', '))}. Isi seperlunya; tidak ada kewajiban.</p>`:''}
-   <p class="sm mut">Saran pertama: kontak darurat dan alergi di “Profil Kesehatan”.</p></div>
-  <div class="card" style="margin-top:12px" data-hc-data><div class="ch"><h3>Datamu</h3></div><p class="sm">Ekspor hanya mencakup catatan Healthcare milikmu. Hapus semua meminta konfirmasi ketik.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="hcexport">Ekspor catatan (JSON)</button><button class="btn d" data-act="hcwipe">Hapus semua catatan</button></div></div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Summary</h3><span class="sp"></span>${hcToggle()}</div>
+   <p class="sm">A short overview of your health records. No judgement, only counts and dates.</p>
+   <div class="g g4" data-hc-counts style="margin-top:8px">${HC_SECTIONS.map(s=>`<button class="stat" data-act="go" data-p="health" data-s="${s.id}" style="text-align:left;cursor:pointer"><div class="l">${s.icon} ${esc(s.label)}</div><div class="v">${hcRows(s.id).length}</div><div class="s">${hcRows(s.id).length?'last: '+esc(last(s.id)):'nothing yet'}</div></button>`).join('')}</div></div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Scheduled check-ups</h3></div>${due.length?`<ul class="sm" style="margin:0 0 0 18px" data-hc-due>${due.map(r=>`<li>${esc(fmtD(r.rec_date))} · ${hcMask(r.title,hide)}</li>`).join('')}</ul>`:'<p class="sm mut">No scheduled check-ups yet. Add one in “Family History & Prevention”.</p>'}</div>
+  <div class="card" style="margin-top:12px" data-hc-next><div class="ch"><h3>Latest record and next step</h3></div>
+   <p class="sm">${latest?`Last recorded: ${esc(fmtD(latest.rec_date))} · ${esc(hcSec(latest.section)?hcSec(latest.section).label:'')} · ${hcMask(latest.title,hide)}`:'Nothing recorded yet. There is no health data in this account.'}</p>
+   ${empty.length&&empty.length<HC_SECTIONS.length?`<p class="sm mut">Sections with nothing yet: ${esc(empty.map(s=>s.label).join(', '))}. Fill in what you need; nothing is required.</p>`:''}
+   <p class="sm mut">First suggestion: the emergency contact and allergies in “Health Profile”.</p></div>
+  <div class="card" style="margin-top:12px" data-hc-data><div class="ch"><h3>Your data</h3></div><p class="sm">The export covers only your own Healthcare records. Delete all asks for a typed confirmation.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="hcexport">Export records (JSON)</button><button class="btn d" data-act="hcwipe">Delete all records</button></div></div>
   ${hcSources()}${hcPrivacy()}`}
 VIEWS['health/summary']=hcSummaryView;
 HC_SECTIONS.forEach(s=>{VIEWS['health/'+s.id]=()=>hcSectionView(s.id)});
-/* the details are hidden again whenever you come back to Healthcare */
+/* the details are shown again whenever you come back to Healthcare */
 (function(){const _go=go;go=function(p,s){if(p==='health'&&!(S.route&&S.route.p==='health'))S.hc.show=true;return _go.apply(this,arguments)}})();
 
 /* ---- r14: 99_hierarchy.js ---- */
@@ -20220,7 +20229,7 @@ RELEASE_NOTES.unshift({rev:25,date:'2026-10-17',groups:[
  {t:'Progress',items:[
   ['XP & Progress','A ledger of what you finished, by day, week, month and year, by Life Area and by skill. Each award is given once, can be reversed, and carries its rule version. The weights are a proposal (“Usulan”) until you choose them (“Dipilih”). KPI activation, KPI values and Money path steps also count. Filter All / Work / Personal. Earlier work is counted only if you agree.','performance','xp','Open XP & Progress']]},
  {t:'Healthcare',items:[
-  ['A private place for your health notes','Ringkasan, Profil Kesehatan, Aktivitas Sehat & Hobi, Pola / Gaya Hidup, Riwayat Keluarga & Pencegahan, Saat Sakit & Perawatan, Pemulihan and Kesehatan Mental. Only you can read them, and you can mask the details on screen with one button. General information not yet reviewed by a professional; no diagnosis, no doses. Emergency pointers are shown. Each note can say where the data came from; family history keeps relation and age at diagnosis; hobby safety guidance (draft); export and delete-all with a typed confirmation.','health','summary','Open Healthcare']]},
+  ['A private place for your health notes','Summary, Health Profile, Healthy Activity & Hobbies, Habits & Lifestyle, Family History & Prevention, Illness & Care, Recovery and Mental Health. Only you can read them, and you can mask the details on screen with one button. General information not yet reviewed by a professional; no diagnosis, no doses. Emergency pointers are shown. Each note can say where the data came from; family history keeps relation and age at diagnosis; hobby safety guidance (draft); export and delete-all with a typed confirmation.','health','summary','Open Healthcare']]},
  {t:'Money and investing',items:[
   ['Four paths: Personal Money, Business, Investment, Trading','Separate checklists that open the right screen. General frameworks, not advice. Each step has a start question, an example, a draft you can save and a skip-with-reason; simple cashflow, net-worth and return calculators. Not yet aligned to the reference pictures, which were not received.','guide','paths','Open the paths']]},
  {t:'Activities',items:[
@@ -21773,7 +21782,7 @@ ACT.cndsave=async el=>{
   const date=($('#c_date')||{}).value,feel=all('c_feel'),ache=all('c_ache'),notes=(($('#c_notes')||{}).value||'').trim();
   if(!date){toast('Fill in the date',1);return}
   if(!CND_DIM.some(d=>o[d.id]!=null)&&!feel.length&&!ache.length&&!notes){toast('Choose at least one answer',1);return}
-  const d={section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:date,value:o.mood,unit:o.mood==null?null:'skor',provenance:HC_PROV[0],notes:notes||null,
+  const d={section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:date,value:o.mood,unit:o.mood==null?null:'score',provenance:HC_PROV[0],notes:notes||null,
     cond_time:o.time,cond_mood:o.mood,cond_body:o.body,cond_mind:o.mind,cond_stress:o.stress,cond_multi:o.multi,cond_feel:feel.join('|')||null,cond_ache:ache.join('|')||null};
   el.disabled=true;
   try{const row=await saveRow('health_records',d,el.dataset.id||undefined);if(!row)throw new Error('Your account is not allowed to save this, or it is waiting for approval.');finishModal();toast('Condition saved');renderView();if(typeof pipRefresh==='function')pipRefresh()}
@@ -21887,8 +21896,11 @@ S.aot=S.aot||{on:false,win:null,timer:0};
 function aotButton(){
   if(!aotAvail())return '';
   const on=aotNative()?S.aot.on:!!(window.documentPictureInPicture&&documentPictureInPicture.window);
-  return `<button class="pill noprint" data-act="aot" aria-pressed="${on}" title="A small window that stays above other apps (laptops and computers only)">${ic('clock',14)} ${on?'Turn off always on top':'Always on top'}</button>`}
+  return `<button class="pill noprint" data-act="aot" aria-pressed="${on}" title="A small window that stays above other apps (laptops and computers only)">${ic('clock',14)} ${on?'Turn off always on top':'Always on top'}</button>${aotNative()?`<button class="pill noprint" data-act="aotopts" title="Start with the computer, and always on top when Polaris One opens">${ic('cog',14)} Startup</button>`:''}`}
 
+function pipTop3(rows,t){
+  const top=rows.filter(x=>x.is_top3).slice(0,3),all=rows.filter(x=>x.is_top3).length;
+  return `<div class="card pip-c"><div class="ch"><h3>Top 3 today</h3></div>${top.length?`<ul class="pip-l pip-t">${top.map(x=>`<li class="${x.status==='Completed'?'dn':''}"><label><input type="checkbox" data-pip-done="${x.id}" ${x.status==='Completed'?'checked':''}><span>${esc(trunc(x.title,70))}</span></label></li>`).join('')}</ul>`:`<p class="sm mut">${all?'All of today\'s Top 3 are done.':'Tap the star on up to three actions.'}</p>`}</div>`}
 function pipHtml(){
   const t=todayS(),rows=(D().daily_actions||[]).filter(x=>x.action_date===t&&!isLight(x)&&x.status!=='Cancelled').sort((a,b)=>(tm(a.start_time)||'99:99').localeCompare(tm(b.start_time)||'99:99'));
   const done=rows.filter(x=>x.status==='Completed').length,now=condNow();
@@ -21897,19 +21909,22 @@ function pipHtml(){
   return `<div class="pip"><div class="pip-h"><b>One day</b><span class="mut">${esc(fmtDay(t))}</span><span class="sp"></span><b data-pip-clock>${esc(now)}</b></div>
    <div class="pip-p"><div style="width:${rows.length?Math.round(done/rows.length*100):0}%"></div></div><div class="xs mut">${done} of ${rows.length} done</div>
    ${nxt?`<div class="pip-n"><span class="xs mut">Next</span><br><b>${esc(tm(nxt.start_time)||'')} ${esc(trunc(nxt.title,60))}</b></div>`:`<div class="pip-n"><b>${rows.length?'All done 🎉':'No actions today'}</b></div>`}
+   ${pipTop3(rows,t)}
+   <div class="pip-c">${typeof prayerCard==='function'?prayerCard(t,true):''}</div>
+   <div class="card pip-c" id="timerbox">${timerInner(t)}</div>
    <ul class="pip-l">${rows.map(x=>`<li class="${x.status==='Completed'?'dn':''}"><label><input type="checkbox" data-pip-done="${x.id}" ${x.status==='Completed'?'checked':''}><span><span class="xs mut">${esc(tm(x.start_time)||'--:--')}</span> ${esc(trunc(x.title,70))}</span></label></li>`).join('')}</ul>
    <div class="pip-m"><div class="xs mut">Mood right now${lastC&&lastC.mood!=null?` (last ${lastC.mood}${lastC.time?' · '+esc(lastC.time):''})`:''}</div><div class="pip-e">${['😞','🙁','😐','🙂','😄'].map((e,i)=>`<button type="button" data-pip-mood="${i+1}" aria-label="Mood ${i+1}">${e}</button>`).join('')}</div></div>
    <button type="button" class="btn s" data-pip-main style="width:100%;margin-top:8px">Open main window</button></div>`}
 const PIP_CSS=`.pip{padding:12px;font:14px/1.35 system-ui,sans-serif}.pip-h{display:flex;gap:8px;align-items:baseline}.pip-h .sp{flex:1}
 .pip-p{height:6px;border-radius:99px;background:var(--line);margin:8px 0 4px;overflow:hidden}.pip-p div{height:100%;background:var(--brand)}
-.pip-n{margin:10px 0;padding:8px 10px;background:var(--soft);border-radius:10px}.pip-l{list-style:none;margin:0;padding:0;max-height:46vh;overflow:auto}
+.pip-n{margin:10px 0;padding:8px 10px;background:var(--soft);border-radius:10px}.pip-l{list-style:none;margin:0;padding:0;max-height:34vh;overflow:auto}
 .pip-l li{padding:5px 0;border-bottom:1px solid var(--line)}.pip-l label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.pip-l input{margin-top:3px;width:18px;height:18px;accent-color:var(--brand)}
 .pip-l li.dn span{text-decoration:line-through;color:var(--mut)}.pip-e{display:flex;gap:6px;margin-top:4px}.pip-e button{flex:1;font-size:20px;padding:6px 0;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer}
-.pip-e button:hover{background:var(--soft)}.pip-m{margin-top:10px}.mut{color:var(--mut)}.xs{font-size:12px}`;
+.pip-c{margin-top:10px}.pip-c.card{padding:12px}.pip-t{max-height:none}.pip-e button:hover{background:var(--soft)}.pip-m{margin-top:10px}.mut{color:var(--mut)}.xs{font-size:12px}`;
 function pipRefresh(){const w=window.documentPictureInPicture&&documentPictureInPicture.window;if(!w)return;
   const sc=w.document.querySelector('.pip-l'),y=sc?sc.scrollTop:0;w.document.body.innerHTML=pipHtml();const n=w.document.querySelector('.pip-l');if(n)n.scrollTop=y}
 async function aotOpenPip(){
-  const pw=await documentPictureInPicture.requestWindow({width:340,height:560});S.aot.win=pw;
+  const pw=await documentPictureInPicture.requestWindow({width:380,height:760});S.aot.win=pw;
   let css='';for(const sh of document.styleSheets){try{css+=[...sh.cssRules].map(r=>r.cssText).join('\n')}catch(e){}}
   const st=pw.document.createElement('style');st.textContent=css+PIP_CSS;pw.document.head.appendChild(st);
   pw.document.title='Polaris One · One day';pw.document.documentElement.className=document.documentElement.className;
@@ -21918,10 +21933,12 @@ async function aotOpenPip(){
   pw.document.body.innerHTML=pipHtml();
   pw.document.addEventListener('change',async e=>{const id=e.target&&e.target.dataset&&e.target.dataset.pipDone;if(!id)return;
     try{await ACT.toggleDone({dataset:{id}})}catch(x){console.warn(x)}pipRefresh()});
+  pw.document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-act=timerToggle],[data-act=timerReset]');if(b){e.preventDefault();ACT[b.dataset.act](b)}});
+  pw.document.addEventListener('change',e=>{const t=e.target,f=t&&t.dataset&&t.dataset.change;if(f==='timerPreset'||f==='timerAct')CHG[f](t)});
   pw.document.addEventListener('click',async e=>{const m=e.target.closest&&e.target.closest('[data-pip-mood]'),mn=e.target.closest&&e.target.closest('[data-pip-main]');
     if(mn){try{window.focus()}catch(x){}return}
     if(m&&typeof saveRow==='function'&&!cndMissing()){const v=+m.dataset.pipMood,o={time:condNow(),mood:v};
-      try{await saveRow('health_records',{section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:todayS(),value:v,unit:'skor',provenance:HC_PROV[0],cond_time:o.time,cond_mood:v});toast('Mood saved');renderView()}catch(x){toast('Not saved: '+((x&&x.message)||x),1)}pipRefresh()}});
+      try{await saveRow('health_records',{section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:todayS(),value:v,unit:'score',provenance:HC_PROV[0],cond_time:o.time,cond_mood:v});toast('Mood saved');renderView()}catch(x){toast('Not saved: '+((x&&x.message)||x),1)}pipRefresh()}});
   clearInterval(S.aot.timer);S.aot.timer=setInterval(()=>{if(!documentPictureInPicture.window){clearInterval(S.aot.timer);return}pipRefresh()},20000);
   pw.addEventListener('pagehide',()=>{clearInterval(S.aot.timer);S.aot.win=null;try{renderView()}catch(e){}})}
 ACT.aot=async()=>{
@@ -21935,6 +21952,26 @@ ACT.aot=async()=>{
 /* keep the floating window current whenever the app redraws */
 (function(){const _r=renderView;renderView=function(){const r=_r.apply(this,arguments);try{pipRefresh()}catch(e){}return r}})();
 
+/* the focus timer lives in the main window; its twin in the floating window follows it */
+function pipTimerBox(){const w=window.documentPictureInPicture&&documentPictureInPicture.window;return w?w.document.getElementById('timerbox'):null}
+(function(){
+  const _u=timerUI;timerUI=function(){_u.apply(this,arguments);try{const b=pipTimerBox();if(b)b.innerHTML=timerInner(todayS())}catch(e){}};
+  const _t=timerTick;timerTick=function(){_t.apply(this,arguments);try{const b=pipTimerBox(),T=S.timer;if(b){const el=b.querySelector('#pomo-time');if(el)el.textContent=pad(Math.floor(T.left/60))+':'+pad(T.left%60)}}catch(e){}}
+})();
+
+/* desktop app: start with the computer, and go straight to the always-on-top window when Polaris One opens */
+ACT.aotopts=async()=>{
+  if(!aotNative()||!window.polarisNative.getSettings)return;
+  let c={miniOnStart:true,autoStart:false};try{c=await window.polarisNative.getSettings()}catch(e){}
+  const win=/Mac/i.test(navigator.platform||'')?'Mac':'Windows';
+  openModal('Startup',`<p class="sm">These two settings are kept on this computer only.</p>
+   <label class="chk" style="align-items:flex-start;padding:8px 0"><input type="checkbox" data-change="aotset" data-k="autoStart" ${c.autoStart?'checked':''}><span><b>Open Polaris One when ${win} starts</b><span class="help" style="display:block">Starts when you sign in to the computer.</span></span></label>
+   <label class="chk" style="align-items:flex-start;padding:8px 0"><input type="checkbox" data-change="aotset" data-k="miniOnStart" ${c.miniOnStart?'checked':''}><span><b>Always on top when Polaris One opens</b><span class="help" style="display:block">After you are signed in, it becomes the small window on One day that stays above other apps. Turn it off with the “Turn off always on top” button.</span></span></label>`,`<span class="sp"></span><button class="btn p" data-act="closeModal">Done</button>`)};
+CHG.aotset=async el=>{try{await window.polarisNative.setSettings({[el.dataset.k]:el.checked});toast('Saved')}catch(e){toast('Not saved: '+((e&&e.message)||e),1)}};
+(function(){const _s=startApp;startApp=async function(){const r=await _s.apply(this,arguments);
+  try{if(aotNative()&&window.polarisNative.startMini&&await window.polarisNative.startMini()){S.aot.on=true;S.ui.dayView='day';S.ui.day=todayS();go('execute','daily')}}catch(e){console.warn(e)}
+  return r}})();
+
 /* ---- r14: 99_zzzzzzzzz_rel30.js ---- */
 /* REV 30 · release notes */
 RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
@@ -21943,7 +21980,7 @@ RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
   ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “See pattern” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
   ['Weekly summary, like a personal assistant','“Weekly summary” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
   ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
-  ['Always on top for One day','On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
+  ['Always on top for One day','In the desktop app it now turns on by itself when Polaris One opens, and a Startup button can also open Polaris One when Windows or Mac starts. On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
  {t:'Changed',items:[
   ['Forms return to where you came from','A form opened from a pop-up (an Activity, a Goal, a Meeting …) now opens on top of it. Saving, deleting or cancelling takes you back to that pop-up, refreshed, not to the page behind.']]},
  {t:'For the admin',items:[
@@ -21952,7 +21989,7 @@ RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
 
 putFaq('What is the weekly summary?','A look back over a week, like a personal assistant: what you did, what is still open, your condition, and five areas of growth (potential, professional, knowledge, emotional, spiritual) compared with the week before, plus one step for next week. Open it with “Weekly summary” on Daily Actions; from Friday 15:00 to Monday 12:00 a card on Home and the bell remind you once. It only reads what is already in Polaris One and describes it; it does not grade you.');
 putFaq('Who can see my Biodata (CV)?','Only you. Biodata (CV) is stored like Healthcare: an admin cannot read it either. Work experience, education, certifications, seminars and skills are read from Skills & Knowledge, hobbies and the short health summary from Healthcare, so nothing is entered twice. The health summary and personal details only appear in the printed CV if you tick them.');
-putFaq('Can I keep One day above my other windows?','On a laptop or computer, yes: the button “Always on top” on One day. In the desktop app (Windows, Mac) the window becomes a small one that stays on top. In Chrome or Edge it opens a floating mini window with today’s list. It is not offered on phones and tablets, nor in Safari or Firefox.');
+putFaq('Can I keep One day above my other windows?','In the desktop app it turns on by itself every time Polaris One opens (Startup button: turn that off, or open Polaris One when Windows or Mac starts). A browser only allows its floating window after you click, so in Chrome or Edge press the button once. On a laptop or computer, yes: the button “Always on top” on One day. In the desktop app (Windows, Mac) the window becomes a small one that stays on top. In Chrome or Edge it opens a floating mini window with today’s list. It is not offered on phones and tablets, nor in Safari or Firefox.');
 
 /* ---- r14: 99_zzzzzzzzzz_weekly.js ---- */
 /* =====================================================================
@@ -21980,7 +22017,7 @@ function wkData(ws){
   const cond=(D().health_records||[]).filter(r=>r.section==='condition'&&inW(condDay(r))).map(condParse);
   const avg=k=>{const a=cond.map(o=>o[k]).filter(v=>v!=null);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null};
   const feel={};(D().health_records||[]).filter(r=>r.section==='condition'&&inW(condDay(r))).forEach(r=>String(r.cond_feel||'').split('|').filter(Boolean).forEach(f=>{feel[f]=(feel[f]||0)+1}));
-  const grat=(D().health_records||[]).filter(r=>inW(condDay(r))&&((r.section==='mental'&&/Syukur/i.test(r.kind||''))||(r.section==='condition'&&/Bersyukur/.test(r.cond_feel||'')))).length;
+  const grat=(D().health_records||[]).filter(r=>inW(condDay(r))&&((r.section==='mental'&&/Gratitude|Syukur/i.test(r.kind||''))||(r.section==='condition'&&/Bersyukur/.test(r.cond_feel||'')))).length;
   const mood=cond.length?{n:cond.length,mood:avg('mood'),body:avg('body'),mind:avg('mind'),stress:avg('stress'),multi:avg('multi')}:null;
   return {ws,we,total:DA.length,done,open,rate:DA.length?done.length/DA.length:null,top3:DA.filter(x=>x.is_top3),top3done:DA.filter(x=>x.is_top3&&x.status==='Completed'),
     focus:DA.reduce((s,x)=>s+num(x.pomodoros),0),energy:en.length?en.reduce((p,q)=>p+q,0)/en.length:null,
@@ -22137,9 +22174,9 @@ ACT.cvedel=async el=>{if(!(await ask('Delete?','This cannot be undone.','Delete'
 
 /* ---------- screens ---------- */
 const cvBanner=()=>`<div class="callout" role="note">${ic('info')}<div><b>Private.</b> Only your account can read your Biodata; an admin cannot. Work experience, education, certifications, seminars and skills are taken from <a href="#" data-act="go" data-p="growth" data-s="workexp">Skills &amp; Knowledge</a>, so nothing is entered twice.</div></div>`;
-function cvHealth(){const g=k=>(D().health_records||[]).filter(r=>r.section==='profile'&&r.kind===k).map(r=>r.title+(r.notes?' ('+r.notes+')':'')).filter(Boolean);
-  return {blood:g('Golongan darah'),allergy:g('Alergi'),emergency:g('Kontak darurat')}}
-function cvHobbies(){const own=cvRows('hobby').map(r=>r.title),h=(D().health_records||[]).filter(r=>r.section==='active'&&r.kind==='Hobi yang aktif').map(r=>r.title);return [...new Set([...own,...h])]}
+function cvHealth(){const g=k=>(D().health_records||[]).filter(r=>r.section==='profile'&&hcL(r.kind)===k).map(r=>r.title+(r.notes?' ('+r.notes+')':'')).filter(Boolean);
+  return {blood:g('Blood type'),allergy:g('Allergy'),emergency:g('Emergency contact')}}
+function cvHobbies(){const own=cvRows('hobby').map(r=>r.title),h=(D().health_records||[]).filter(r=>r.section==='active'&&hcL(r.kind)==='Active hobby').map(r=>r.title);return [...new Set([...own,...h])]}
 function cvComplete(){const {d}=cvProfile(),keys=['full_name','headline','birth_date','address','phone','email','summary'];const n=keys.filter(k=>d[k]).length;
   const parts=[n/keys.length,(D().work_experience||[]).length?1:0,(D().competencies||[]).some(c=>c.type==='Academic')?1:0,cvRows('language').length?1:0];return Math.round(parts.reduce((a,b)=>a+b,0)/parts.length*100)}
 VIEWS['cv/profile']=()=>{
@@ -22149,7 +22186,7 @@ VIEWS['cv/profile']=()=>{
   <div class="card" style="margin-top:12px"><div class="ch"><h3>Personal details</h3><span class="sp"></span>${badge('CV '+cvComplete()+'% complete','blue')}<button class="btn p" data-act="cvprofile">${ic('edit',15)} ${has?'Edit':'Fill in'} personal details</button></div>
    ${has?`<dl class="kv" data-cv-profile>${CV_PROFILE.filter(([k])=>d[k]).map(([k,l,t])=>`<dt>${esc(l)}</dt><dd>${esc(t==='date'?cvDate(d[k]):d[k])}</dd>`).join('')}</dl>`:`<p class="sm mut">Not filled in yet. Press “Fill in personal details”.</p>`}</div>
   <div class="card" style="margin-top:12px"><div class="ch"><h3>Health summary</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="health" data-s="profile">Edit in Healthcare</button></div>
-   <p class="sm ink2">Taken from Healthcare → Profil Kesehatan. It is not copied here, and only goes into the CV if you tick it in the preview.</p>
+   <p class="sm ink2">Taken from Healthcare → Health Profile. It is not copied here, and only goes into the CV if you tick it in the preview.</p>
    <ul class="sm" style="margin:6px 0 0 18px" data-cv-health>${[['Blood type',hl.blood],['Allergies',hl.allergy],['Emergency contact',hl.emergency]].map(([l,a])=>`<li>${l}: ${a.length?(S.hc&&S.hc.show?esc(a.join('; ')):'<span class="mut" aria-label="hidden">••••</span>'):'<span class="mut">not recorded yet</span>'}</li>`).join('')}</ul>
    <p class="xs mut" style="margin-top:6px">Details show here when “Show details” is on in Healthcare. General information, not professionally reviewed.</p></div>
   <div class="card" style="margin-top:12px"><div class="ch"><h3>Hobbies</h3></div><p class="sm">${hb.length?esc(hb.join(', ')):'<span class="mut">None yet.</span>'}</p><p class="xs mut">Hobbies from Healthcare → Aktivitas Sehat &amp; Hobi are included. Add other hobbies under “Languages, interests and values”.</p></div>`};
