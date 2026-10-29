@@ -6617,7 +6617,7 @@ async function seedSample(){
   add('cv_entries',{section:'hobby',title:'Bersepeda',sort_order:1});
   const CMOOD=[0,4,2,5,3,4,2],CBODY=[0,4,3,5,3,4,2],CMIND=[0,4,2,5,3,4,3],CSTR=[0,2,4,1,3,2,5];
   for(let i=1;i<=6;i++){const dd=d(-i);
-    add('health_records',{section:'condition',kind:'Check-in kondisi',title:condTitle({time:'07:45',mood:CMOOD[i],body:CBODY[i],mind:CMIND[i],stress:CSTR[i]}),rec_date:dd,value:CMOOD[i],unit:'skor',provenance:'Saya catat sendiri',cond_time:'07:45',cond_mood:CMOOD[i],cond_body:CBODY[i],cond_mind:CMIND[i],cond_stress:CSTR[i]});
+    add('health_records',{section:'condition',kind:'Condition check-in',title:condTitle({time:'07:45',mood:CMOOD[i],body:CBODY[i],mind:CMIND[i],stress:CSTR[i]}),rec_date:dd,value:CMOOD[i],unit:'skor',provenance:'Saya catat sendiri',cond_time:'07:45',cond_mood:CMOOD[i],cond_body:CBODY[i],cond_mind:CMIND[i],cond_stress:CSTR[i]});
     DA(dd,'Deep work block','08:30','10:00','Work','Completed',{energy:Math.max(1,Math.min(5,CMIND[i]+1)),pomodoros:CMIND[i]>=4?3:CMIND[i]===3?2:1,is_top3:true,priority:'High',result:'Main task moved forward',lesson_learned:i===1?'Phone on silent doubled my output':null});
     DA(dd,'Meetings & email','13:30','14:30','Work','Completed',{energy:2,blocker:i===1?'Back-to-back meetings':null});
     DA(dd,'Admin tasks','16:00','17:00','Work','Completed',{energy:3});
@@ -14901,7 +14901,7 @@ ACT.bdgo=el=>{
    • One table, health_records. In the database only the OWNER can read or change a row: the admin's usual right to read everything does NOT apply
      to this table, and the audit trail keeps only that "a row was added / changed / removed" (no content).
    • The table is not in the list that an admin can share with another user, and nothing here is sent to any service, AI, API or analytics.
-   • On screen the details are hidden until you press "Tampilkan detail" (switches off again when you leave Healthcare).
+   • On screen the details are shown; "Sembunyikan detail" masks them.
    • It is part of YOUR backup/export (Settings → Data & backup), like your other notes.
    WHAT IT IS NOT
    • No diagnosis, no "normal / abnormal" labels, no risk score, no dose or medicine advice. Numbers are shown as you wrote them.
@@ -14911,9 +14911,9 @@ ACT.bdgo=el=>{
 const HC_NOTE='Informasi umum, belum ditinjau profesional. Bukan diagnosis dan bukan pengganti dokter atau tenaga kesehatan.';
 const HC_EMERGENCY='Darurat? Hubungi layanan darurat di tempatmu sekarang (Indonesia: 112 untuk darurat umum, 119 untuk layanan gawat darurat medis; periksa kembali nomor yang berlaku di daerahmu) atau minta orang terdekat membawamu ke IGD.';
 const HC_SECTIONS=[
- {id:'condition',label:'Kondisi Harian',icon:'🌤️',kinds:['Check-in kondisi'],unit:0,emergency:1,mood:1,custom:1,
-  intro:'Catat suasana hati, perasaan, kondisi fisik, kejernihan pikiran, stres dan beban multitasking dalam satu pop-up singkat. Boleh beberapa kali sehari. Datanya dihubungkan dengan energi dan sesi fokus di Daily Actions, supaya kamu melihat pola pribadimu sendiri.',
-  tips:['Cukup 20 detik: pilih angka 1–5, tidak perlu mengisi semuanya.','Catat pada jam yang sama (misalnya pagi dan sore) agar polanya mudah dibaca.','Polanya baru terlihat setelah sekitar dua minggu. Ini gambaran dari datamu, bukan sebab-akibat dan bukan diagnosis.','Jika perasaan berat berlangsung lama, bicarakan dengan orang yang kamu percaya atau tenaga profesional.']},
+ {id:'condition',label:'Daily Condition',icon:'🌤️',kinds:['Condition check-in'],unit:0,emergency:1,mood:1,custom:1,
+  intro:'Record your mood, feelings, physical condition, mental clarity, stress and multitasking load in one short pop-up, as often as you like. It is linked to your energy and focus sessions in Daily Actions, so you can see your own pattern.',
+  tips:['It takes twenty seconds: pick a number from 1 to 5, nothing is required.','Check in at about the same times (for example morning and afternoon) so the pattern is easy to read.','A pattern usually shows after about two weeks. It describes your data; it is not cause and effect and not a diagnosis.','If a heavy feeling lasts, talk to someone you trust or a professional.']},
  {id:'profile',label:'Profil Kesehatan',icon:'🧾',kinds:['Golongan darah','Alergi','Kondisi yang saya miliki','Obat atau suplemen yang saya pakai','Pengukuran','Dokter atau fasilitas kesehatan','Kontak darurat'],unit:1,
   intro:'Satu tempat untuk data dasarmu, supaya mudah dibuka saat berobat.',
   tips:['Tulis obat persis seperti di resep atau label. Aplikasi ini tidak memberi saran dosis.','Isi kontak darurat dan alergi lebih dulu: itu yang paling berguna saat genting.','Tulis angka pengukuran apa adanya dengan tanggalnya. Aplikasi tidak menilai angka itu normal atau tidak.']},
@@ -14966,14 +14966,14 @@ MOD.health_records={t:'health_records',one:'Catatan kesehatan',many:'Catatan kes
   F('relation','Hubungan keluarga','hidden','',{sql:'text'}),
   F('age_dx','Usia saat didiagnosis','hidden','',{sql:'int'}),
   F('status','Status','hidden','',{sql:'text'}),
-  F('cond_mood','Suasana hati','hidden','',{sql:'int'}),
-  F('cond_body','Kondisi fisik','hidden','',{sql:'int'}),
-  F('cond_mind','Mental','hidden','',{sql:'int'}),
-  F('cond_stress','Stres','hidden','',{sql:'int'}),
-  F('cond_multi','Multitasking','hidden','',{sql:'int'}),
-  F('cond_time','Jam','hidden','',{sql:'text'}),
-  F('cond_feel','Perasaan','hidden','',{sql:'text'}),
-  F('cond_ache','Keluhan fisik','hidden','',{sql:'text'}),
+  F('cond_mood','Mood','hidden','',{sql:'int'}),
+  F('cond_body','Physical condition','hidden','',{sql:'int'}),
+  F('cond_mind','Mind','hidden','',{sql:'int'}),
+  F('cond_stress','Stress','hidden','',{sql:'int'}),
+  F('cond_multi','Multitasking load','hidden','',{sql:'int'}),
+  F('cond_time','Time','hidden','',{sql:'text'}),
+  F('cond_feel','Feelings','hidden','',{sql:'text'}),
+  F('cond_ache','Physical complaints','hidden','',{sql:'text'}),
   F('notes','Catatan','textarea','Isi catatan.',{wide:1,rows:3})],cols:['rec_date','kind','title']};
 ORDER.push('health_records');NEWER_TABLES.push('health_records');
 COL_NEWER.health_records=['cond_multi','cond_mood','cond_body','cond_mind','cond_stress','cond_time','cond_feel','cond_ache'];
@@ -15007,12 +15007,12 @@ create policy health_records_del on public.health_records for delete using (owne
 `}})();
 
 /* ---------- state ---------- */
-S.hc=S.hc||{show:false,bad:'',editing:null};
+S.hc=S.hc||{show:true,bad:'',editing:null};
 const hcRows=sec=>(D().health_records||[]).filter(r=>!sec||r.section===sec).sort((a,b)=>String(b.rec_date).localeCompare(String(a.rec_date))||String(b.created_at||'').localeCompare(String(a.created_at||'')));
 const hcMask=(v,hide)=>hide?'<span class="mut" aria-label="disembunyikan">••••</span>':esc(v==null||v===''?'—':v);
 const hcBanner=()=>`<div class="callout" role="note" data-hc-note>${ic('info')}<div><b>Belum ditinjau profesional.</b> ${esc(HC_NOTE)}</div></div>`;
 const hcEmerg=()=>`<div class="callout err" role="note" data-hc-emerg>${ic('alert')}<div>${esc(HC_EMERGENCY)}</div></div>`;
-const hcPrivacy=()=>`<div class="card" data-hc-privacy style="margin-top:14px"><div class="ch"><h3>Privasi</h3></div><ul class="sm" style="margin:0 0 0 18px"><li>Hanya akunmu yang dapat membaca catatan ini. Admin tidak dapat membacanya, dan jejak audit hanya mencatat bahwa ada perubahan, bukan isinya.</li><li>Tidak ada catatan Healthcare yang dikirim ke layanan lain, AI, API atau analitik.</li><li>Catatan ikut dalam cadangan datamu sendiri (Pengaturan → Data & backup). Simpan cadangan itu dengan aman.</li><li>Di layar, detail tersembunyi sampai kamu menekan “Tampilkan detail”.</li></ul></div>`;
+const hcPrivacy=()=>`<div class="card" data-hc-privacy style="margin-top:14px"><div class="ch"><h3>Privasi</h3></div><ul class="sm" style="margin:0 0 0 18px"><li>Hanya akunmu yang dapat membaca catatan ini. Admin tidak dapat membacanya, dan jejak audit hanya mencatat bahwa ada perubahan, bukan isinya.</li><li>Tidak ada catatan Healthcare yang dikirim ke layanan lain, AI, API atau analitik.</li><li>Catatan ikut dalam cadangan datamu sendiri (Pengaturan → Data & backup). Simpan cadangan itu dengan aman.</li><li>Di layar, detail langsung tampil. Tekan “Sembunyikan detail” bila ada orang lain di dekatmu.</li></ul></div>`;
 const hcToggle=()=>`<button class="btn s" data-act="hcshow" aria-pressed="${S.hc.show}">${S.hc.show?'Sembunyikan detail':'Tampilkan detail'}</button>`;
 
 function hcExtra(sec,kind,r){
@@ -15060,7 +15060,7 @@ function hcMoodNote(){
 function hcSectionView(id){
   const s=hcSec(id),rows=hcRows(id),hide=!S.hc.show;
   if(S.missingTables&&S.missingTables.includes('health_records'))return missingCard('Healthcare');
-  return `${hcBanner()}${s.emergency?hcEmerg():''}${id==='mental'||id==='condition'?hcMoodNote():''}
+  return `${hcBanner()}${s.emergency?hcEmerg():''}${id==='mental'?hcMoodNote():''}
   <div class="card" style="margin-top:12px"><div class="ch"><h3>${s.icon} ${esc(s.label)}</h3><span class="sp"></span>${hcToggle()}<button class="btn p" data-act="hcadd" data-sec="${id}">${ic('plus',15)} Tambah catatan</button></div>
    <p class="sm">${esc(s.intro)}</p><ul class="sm" style="margin:6px 0 0 18px" data-hc-tips>${s.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
   <div class="card" style="margin-top:12px"><div class="ch"><h3>Catatanmu (${rows.length})</h3></div>${rows.length?`<div class="tw"><table class="tbl stack" data-hc-list><thead><tr><th>Tanggal</th><th>Jenis</th><th>Judul</th>${s.unit?'<th class="r">Angka</th>':''}<th><span class="sr">Aksi</span></th></tr></thead><tbody>${rows.map(r=>`<tr><td data-l="Tanggal">${esc(fmtD(r.rec_date))}</td><td data-l="Jenis">${esc(r.kind||'')}</td><td data-l="Judul">${hcMask(r.title,hide)}${!hide?`<div class="xs mut" data-hc-meta>${esc([r.provenance||HC_PROV[0],r.relation,r.age_dx!=null?'didiagnosis usia '+r.age_dx:'',r.status].filter(Boolean).join(' · '))}</div>`:''}${!hide&&r.notes?`<div class="sm mut">${esc(r.notes)}</div>`:''}</td>${s.unit?`<td data-l="Angka" class="r">${r.value==null?'—':hcMask(fmtN(r.value,2)+' '+(r.unit||''),hide)}</td>`:''}<td class="r"><button class="btn s" data-act="hcedit" data-id="${r.id}" aria-label="Ubah catatan">Ubah</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><b>Belum dicatat</b>Tekan “Tambah catatan” untuk mulai. Isi seperlunya saja.</div>`}</div>${id==='active'?hcHobby():''}${hcSources()}`}
@@ -15074,7 +15074,7 @@ function hcSources(){
    <ul class="sm" style="margin:0 0 0 18px">${HC_SOURCES.map(x=>`<li>${esc(x[0])} · <span class="mut">${esc(x[1])}</span> · ${esc(x[2])}</li>`).join('')}</ul></div>`}
 /* export and delete: your own records only, delete needs a typed confirmation */
 ACT.hcexport=()=>{
-  const rows=hcRows().map(r=>({bagian:r.section,jenis:r.kind,judul:r.title,tanggal:r.rec_date,angka:r.value,satuan:r.unit,sumber_data:r.provenance,hubungan:r.relation,usia_diagnosis:r.age_dx,status:r.status,catatan:r.notes,jam:r.cond_time,suasana_hati:r.cond_mood,kondisi_fisik:r.cond_body,mental:r.cond_mind,stres:r.cond_stress,multitasking:r.cond_multi,perasaan:r.cond_feel,keluhan_fisik:r.cond_ache}));
+  const rows=hcRows().map(r=>({bagian:r.section,jenis:r.kind,judul:r.title,tanggal:r.rec_date,angka:r.value,satuan:r.unit,sumber_data:r.provenance,hubungan:r.relation,usia_diagnosis:r.age_dx,status:r.status,catatan:r.notes,time:r.cond_time,mood:r.cond_mood,body:r.cond_body,mind:r.cond_mind,stress:r.cond_stress,multitasking:r.cond_multi,feelings:r.cond_feel,complaints:r.cond_ache}));
   if(!rows.length){toast('Belum ada catatan untuk diekspor');return}
   download('catatan-kesehatan-'+todayS()+'.json',JSON.stringify({dibuat:todayS(),catatan:rows},null,2),'application/json');toast('Ekspor dibuat. Simpan file ini di tempat yang aman.')};
 ACT.hcwipe=()=>openModal('Hapus semua catatan kesehatan?',`<p class="sm">Ini menghapus <b>${hcRows().length}</b> catatan Healthcare milikmu secara permanen dan tidak dapat dibatalkan. Ekspor dulu bila ingin menyimpannya.</p><label class="sm b" for="hc_wipe">Ketik HAPUS untuk melanjutkan</label><input class="in" id="hc_wipe" autocomplete="off" style="width:100%">`,`<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn d" data-act="hcwipego">Hapus semua</button>`);
@@ -15103,7 +15103,7 @@ function hcSummaryView(){
 VIEWS['health/summary']=hcSummaryView;
 HC_SECTIONS.forEach(s=>{VIEWS['health/'+s.id]=()=>hcSectionView(s.id)});
 /* the details are hidden again whenever you come back to Healthcare */
-(function(){const _go=go;go=function(p,s){if(p==='health'&&!(S.route&&S.route.p==='health'))S.hc.show=false;return _go.apply(this,arguments)}})();
+(function(){const _go=go;go=function(p,s){if(p==='health'&&!(S.route&&S.route.p==='health'))S.hc.show=true;return _go.apply(this,arguments)}})();
 
 /* ---- r14: 99_hierarchy.js ---- */
 /* =====================================================================
@@ -20206,7 +20206,7 @@ RELEASE_NOTES.unshift({rev:24,date:'2026-10-13',groups:[
 putFaq('How do the five prayers fill my habits?','Tick a prayer in Plan · Do · Check (Subuh, Dzuhur, Ashar, Maghrib or Isya) and the habit of the same name is ticked for that day. Link the habits once in Execute → Habits & Routine → Prayer ticks; a habit is linked on its own only when exactly one active habit has the prayer’s name, otherwise you choose. Dhuha and every other habit are never touched. Only your own tick counts: Block prayer times, a new schedule, a location change or the time passing never tick anything. Un-ticking takes back only a tick that the link made; a tick you made yourself stays. If the habit could not be saved, the prayer shows “Not synced yet” with a Retry button.');
 putFaq('How do I set up a personal KPI?','Performance → Personal KPIs → New personal KPI. Eight steps: context, objective, strategy, what is measured, baseline, target, how you will record it, then review and activate. You can leave at any step and continue later. If you do not know your starting point, choose “Unknown”: it is never counted as 0, and progress says “needs a baseline” until you measure it. Work KPIs have their own screen and are not changed.');
 putFaq('How does XP work?','Performance → XP & Progress. Completing a Daily Action gives 10 XP (+5 for Top 3, +5 for 25 minutes or more); each of the five obligatory prayers gives 10 XP once a day, however many places you tick it; another habit tick gives 5. Un-ticking takes the XP back with a reversal row. A day is limited to 200 XP, the same title on one day counts once, and a future date earns nothing. The weights are a proposal (“Usulan”). Earlier work is counted only if you choose “Count earlier work” and agree.');
-putFaq('Who can see my Healthcare notes?','Only you. The database refuses to show them to anyone else, an admin included, and the audit trail records that a note changed but not what it says. Nothing is sent to any other service. On screen the details stay hidden until you press “Tampilkan detail”. Healthcare gives general information that has not been reviewed by a health professional; it does not diagnose and never suggests a dose.');
+putFaq('Who can see my Healthcare notes?','Only you. The database refuses to show them to anyone else, an admin included, and the audit trail records that a note changed but not what it says. Nothing is sent to any other service. On screen the details show right away; press “Sembunyikan detail” to mask them. Healthcare gives general information that has not been reviewed by a health professional; it does not diagnose and never suggests a dose.');
 putFaq('What are the “Money & Investing paths”?','Guide → Money & Investing paths: four separate checklists (Personal Money Management, Business, Investment and Trading), each step opening the screen that does the work. They are general frameworks, not advice, and nothing is bought, sold or sent. They are not yet aligned to the reference pictures, which were not received.');
 putFaq('Can an activity have sub-items and depend on another?','Yes. A main activity can have sub-items (sub-Activities); anything below that is a Daily Action. In an activity, “Structure” shows its parent, sub-items, predecessors (what must be finished first) and successors. One relation is stored per pair, in one direction, and a cycle is refused. A successor whose predecessor is not finished shows “Waiting for …”; it is a warning, not a lock.');
 putFaq('How does the Altair Project Management import handle levels?','Level 1 (TSK-0001 or 1) becomes an Activity. Level 2 (TSK-0001.1 or 1.1) becomes a sub-Activity of it. Level 3 and deeper (TSK-0001.1.1 or 1.1.1) become Daily Actions under their level-2 sub-Activity; a Daily Action cannot nest, so its immediate source parent, full path and depth are kept as data and no level is flattened away or invented. This is the automatic Altair Project Management import (Connections → Altair Project Management → Set up schedule import) and the Altair Project Management mapping screen. A row whose numbering and parent disagree, a duplicate number, or a missing level is shown as a conflict and not imported. Rows imported earlier by the old two-level rule stay as they are (nothing is deleted): level-2 items that were Daily Actions are now also created as sub-Activities, so remove the old copies yourself if you do not want both. Two-way sync is not built (it needs API or schema access).');
@@ -20220,7 +20220,7 @@ RELEASE_NOTES.unshift({rev:25,date:'2026-10-17',groups:[
  {t:'Progress',items:[
   ['XP & Progress','A ledger of what you finished, by day, week, month and year, by Life Area and by skill. Each award is given once, can be reversed, and carries its rule version. The weights are a proposal (“Usulan”) until you choose them (“Dipilih”). KPI activation, KPI values and Money path steps also count. Filter All / Work / Personal. Earlier work is counted only if you agree.','performance','xp','Open XP & Progress']]},
  {t:'Healthcare',items:[
-  ['A private place for your health notes','Ringkasan, Profil Kesehatan, Aktivitas Sehat & Hobi, Pola / Gaya Hidup, Riwayat Keluarga & Pencegahan, Saat Sakit & Perawatan, Pemulihan and Kesehatan Mental. Only you can read them, and the details are hidden until you ask. General information not yet reviewed by a professional; no diagnosis, no doses. Emergency pointers are shown. Each note can say where the data came from; family history keeps relation and age at diagnosis; hobby safety guidance (draft); export and delete-all with a typed confirmation.','health','summary','Open Healthcare']]},
+  ['A private place for your health notes','Ringkasan, Profil Kesehatan, Aktivitas Sehat & Hobi, Pola / Gaya Hidup, Riwayat Keluarga & Pencegahan, Saat Sakit & Perawatan, Pemulihan and Kesehatan Mental. Only you can read them, and you can mask the details on screen with one button. General information not yet reviewed by a professional; no diagnosis, no doses. Emergency pointers are shown. Each note can say where the data came from; family history keeps relation and age at diagnosis; hobby safety guidance (draft); export and delete-all with a typed confirmation.','health','summary','Open Healthcare']]},
  {t:'Money and investing',items:[
   ['Four paths: Personal Money, Business, Investment, Trading','Separate checklists that open the right screen. General frameworks, not advice. Each step has a start question, an example, a draft you can save and a skip-with-reason; simple cashflow, net-worth and return calculators. Not yet aligned to the reference pictures, which were not received.','guide','paths','Open the paths']]},
  {t:'Activities',items:[
@@ -21707,7 +21707,7 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
 
 /* ---- r14: 99_zzzzzzz_cond.js ---- */
 /* =====================================================================
-   REV 30 · KONDISI HARIAN (daily condition check-in), linked to Daily Actions
+   REV 30 · DAILY CONDITION check-in, linked to Daily Actions
    • A pop-up (not a page): mood, feelings, body, mind, stress, multitasking load, physical complaints, note. Opens over wherever you are and
      closes back to it.
    • Stored in health_records (section "condition"): only the owner can read it, exactly like the rest of Healthcare.
@@ -21716,18 +21716,20 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
    • It shows YOUR pattern (energy, focus sessions, completion; and multitasking → mood/stress/body). It is not a diagnosis and not cause and effect.
    ===================================================================== */
 const CND_DIM=[
- {id:'mood',k:'cond_mood',t:'Suasana hati',lab:['Sangat buruk','Kurang baik','Biasa','Baik','Sangat baik'],em:['😞','🙁','😐','🙂','😄'],short:'Hati'},
- {id:'body',k:'cond_body',t:'Kondisi fisik',lab:['Lemas','Kurang fit','Cukup','Fit','Prima'],short:'Fisik'},
- {id:'mind',k:'cond_mind',t:'Mental dan kejernihan pikiran',lab:['Keruh','Berkabut','Cukup jernih','Jernih','Sangat jernih'],short:'Mental'},
- {id:'stress',k:'cond_stress',t:'Tingkat stres',lab:['Tenang','Ringan','Sedang','Tinggi','Sangat tinggi'],short:'Stres'},
- {id:'multi',k:'cond_multi',t:'Beban multitasking',lab:['Satu per satu','Sedikit','Sedang','Banyak','Terus berpindah'],short:'Multitasking'}];
-const CND_FEEL=['Tenang','Senang','Bersyukur','Termotivasi','Cemas','Sedih','Marah','Kesepian','Kewalahan','Lelah'];
-const CND_ACHE=['Sakit kepala','Pegal atau nyeri otot','Mengantuk','Mual','Perut tidak nyaman','Pusing','Kurang tidur semalam','Mata lelah'];
+ {id:'mood',k:'cond_mood',t:'Mood',lab:['Very low','Low','Okay','Good','Very good'],em:['😞','🙁','😐','🙂','😄'],short:'Mood',old:'Hati'},
+ {id:'body',k:'cond_body',t:'Physical condition',lab:['Drained','Not fit','Fair','Fit','Great'],short:'Body',old:'Fisik'},
+ {id:'mind',k:'cond_mind',t:'Mind and mental clarity',lab:['Foggy','Cloudy','Fairly clear','Clear','Very clear'],short:'Mind',old:'Mental'},
+ {id:'stress',k:'cond_stress',t:'Stress level',lab:['Calm','Mild','Moderate','High','Very high'],short:'Stress',old:'Stres'},
+ {id:'multi',k:'cond_multi',t:'Multitasking load',lab:['One thing at a time','A little','Moderate','A lot','Constant switching'],short:'Multitasking',old:'Multitasking'}];
+const CND_FEEL=['Calm','Happy','Grateful','Motivated','Anxious','Sad','Angry','Lonely','Overwhelmed','Tired'];
+const CND_ACHE=['Headache','Sore or aching muscles','Sleepy','Nausea','Upset stomach','Dizzy','Slept badly last night','Tired eyes'];
+const CND_NOTE='General information, not yet reviewed by a professional. Not a diagnosis and not a substitute for a doctor or health worker.';
+const CND_EMERG='Emergency? Call your local emergency number now (Indonesia: 112 for general emergencies, 119 for medical emergencies; check the numbers for your area) or go to the nearest emergency room.';
 const cndMissing=()=>!!(S.missingTables&&S.missingTables.includes('health_records'));
-function condTitle(o){const p=[];CND_DIM.forEach(d=>{if(o[d.id]!=null&&o[d.id]!=='')p.push(d.short+' '+o[d.id])});return (o.time?o.time+' · ':'')+(p.join(' · ')||'Check-in kondisi')}
+function condTitle(o){const p=[];CND_DIM.forEach(d=>{if(o[d.id]!=null&&o[d.id]!=='')p.push(d.short+' '+o[d.id])});return (o.time?o.time+' · ':'')+(p.join(' · ')||'Condition check-in')}
 /* the columns may not exist yet (schema.sql not run): the title carries the numbers, so nothing is lost */
 function condParse(r){const o={time:r.cond_time||(/^(\d\d:\d\d)/.exec(r.title||'')||[])[1]||''};
-  CND_DIM.forEach(d=>{let v=r[d.k];if(v==null){const m=new RegExp(d.short+' (\\d)').exec(r.title||'');v=m?+m[1]:null}o[d.id]=v==null?null:+v});return o}
+  CND_DIM.forEach(d=>{let v=r[d.k];if(v==null){const m=new RegExp('(?:'+d.short+'|'+d.old+') (\\d)').exec(r.title||'');v=m?+m[1]:null}o[d.id]=v==null?null:+v});return o}
 const condDay=r=>String(r.rec_date).slice(0,10);
 function condRows(day){return (D().health_records||[]).filter(r=>r.section==='condition'&&(!day||condDay(r)===day)).sort((a,b)=>condDay(a).localeCompare(condDay(b))||condParse(a).time.localeCompare(condParse(b).time))}
 /* the check-in that applies to a moment: the latest one before the start time; before the first one, or with no time, the first of the day */
@@ -21736,65 +21738,65 @@ const condNow=()=>{const n=new Date();return pad(n.getHours())+':'+pad(n.getMinu
 
 /* ---------- the pop-up ---------- */
 function condForm(rec,opt){
-  if(cndMissing()){toast('Healthcare belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  if(cndMissing()){toast('Healthcare is not set up in the database yet. Run the latest schema.sql once.',1);return}
   opt=opt||{};const r=rec||{},v=rec?condParse(rec):{},sel=c=>new Set(String(c||'').split('|').filter(Boolean));
   const feel=sel(r.cond_feel),ache=sel(r.cond_ache);
-  const grp=d=>`<fieldset class="cnd-g"><legend>${esc(d.t)}</legend><div class="cnd-r" role="radiogroup">${[1,2,3,4,5].map(n=>`<label class="cnd-o"><input type="radio" name="c_${d.id}" value="${n}" ${v[d.id]===n?'checked':''} data-change="cndnote"><span><b>${d.em?d.em[n-1]:n}</b><small>${esc(d.lab[n-1])}</small></span></label>`).join('')}</div><button type="button" class="cnd-clr" data-act="cndclr" data-id="${d.id}">kosongkan</button></fieldset>`;
+  const grp=d=>`<fieldset class="cnd-g"><legend>${esc(d.t)}</legend><div class="cnd-r" role="radiogroup">${[1,2,3,4,5].map(n=>`<label class="cnd-o"><input type="radio" name="c_${d.id}" value="${n}" ${v[d.id]===n?'checked':''} data-change="cndnote"><span><b>${d.em?d.em[n-1]:n}</b><small>${esc(d.lab[n-1])}</small></span></label>`).join('')}</div><button type="button" class="cnd-clr" data-act="cndclr" data-id="${d.id}">clear</button></fieldset>`;
   const chips=(name,list,set)=>`<div class="cnd-ch">${list.map(x=>`<label class="cnd-c"><input type="checkbox" name="${name}" value="${esc(x)}" ${set.has(x)?'checked':''}><span>${esc(x)}</span></label>`).join('')}</div>`;
   const day=r.rec_date?condDay(r):(opt.date||todayS());
   const auto=condAutoLoad(day);
   const body=`<div data-cnd-form>
-   <p class="sm ink2">Pilih seperlunya, tidak semua harus diisi. Datanya privat dan hanya terlihat olehmu. ${esc(HC_NOTE)}</p>
-   <div class="row" style="gap:12px;margin:8px 0;flex-wrap:wrap"><label class="sm b">Tanggal<input class="in" id="c_date" type="date" value="${esc(day)}" style="display:block;width:170px"></label><label class="sm b">Jam<input class="in" id="c_time" type="time" value="${esc(v.time||condNow())}" style="display:block;width:130px"></label></div>
+   <p class="sm ink2">Fill in only what you want, nothing is required. This is private and only you can see it. ${esc(CND_NOTE)}</p>
+   <div class="row" style="gap:12px;margin:8px 0;flex-wrap:wrap"><label class="sm b">Date<input class="in" id="c_date" type="date" value="${esc(day)}" style="display:block;width:170px"></label><label class="sm b">Time<input class="in" id="c_time" type="time" value="${esc(v.time||condNow())}" style="display:block;width:130px"></label></div>
    ${CND_DIM.map(grp).join('')}
    ${auto?`<p class="xs mut cnd-auto" data-cnd-auto>${esc(auto)}</p>`:''}
    <div id="cnd_note"></div>
-   <div class="sm b" style="margin-top:12px">Perasaan</div>${chips('c_feel',CND_FEEL,feel)}
-   <div class="sm b" style="margin-top:12px">Keluhan fisik (bila ada)</div>${chips('c_ache',CND_ACHE,ache)}
-   <label class="sm b" for="c_notes" style="display:block;margin-top:12px">Catatan</label><textarea class="in" id="c_notes" rows="2" style="width:100%" placeholder="Misalnya: banyak rapat, harus berpindah tugas terus">${esc(r.notes||'')}</textarea>
-   <p class="xs mut" style="margin-top:8px">Berbeda dari “4 energi” di Toolkit: catatan ini tersimpan privat di Healthcare dan dihubungkan ke Daily Actions hanya untuk dibaca.</p></div>`;
-  const d0=openModal(rec?'Ubah kondisi':'Kondisi saya sekarang',body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cndsave" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Simpan</button>`,'wide');
+   <div class="sm b" style="margin-top:12px">Feelings</div>${chips('c_feel',CND_FEEL,feel)}
+   <div class="sm b" style="margin-top:12px">Physical complaints (if any)</div>${chips('c_ache',CND_ACHE,ache)}
+   <label class="sm b" for="c_notes" style="display:block;margin-top:12px">Note</label><textarea class="in" id="c_notes" rows="2" style="width:100%" placeholder="For example: many meetings, kept switching tasks">${esc(r.notes||'')}</textarea>
+   <p class="xs mut" style="margin-top:8px">Unlike the “4 energies” in the Toolkit, this is stored privately in Healthcare and only read by Daily Actions.</p></div>`;
+  const d0=openModal(rec?'Edit condition':'How I am right now',body,`${rec?`<button class="btn d" data-act="hcdel" data-id="${rec.id}">Delete</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="cndsave" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Save</button>`,'wide');
   CHG.cndnote();return d0}
 /* what the day looked like from the actions: overlapping blocks and different activities, so the multitasking score has something to compare with */
 function condLoad(day){const A=(D().daily_actions||[]).filter(x=>x.action_date===day&&!isLight(x)&&x.start_time&&(x.end_time||x.planned_min));
   const B=A.map(x=>({s:mins(x.start_time),e:x.end_time?mins(x.end_time):mins(x.start_time)+num(x.planned_min),a:x.activity_id||''})).sort((p,q)=>p.s-q.s);
   let ov=0;for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++)if(B[j].s<B[i].e)ov++;
   const acts=new Set(B.map(b=>b.a).filter(Boolean));return {n:B.length,overlap:ov,acts:acts.size}}
-function condAutoLoad(day){const c=condLoad(day);return c.n?`Dari Daily Actions hari ini: ${c.n} action berjadwal, ${c.overlap} yang waktunya bertumpuk, ${c.acts} Activity berbeda. Pakai ini sebagai pembanding untuk skor multitasking-mu.`:''}
+function condAutoLoad(day){const c=condLoad(day);return c.n?`From today’s Daily Actions: ${c.n} scheduled actions, ${c.overlap} overlapping in time, ${c.acts} different Activities. Use this to compare with your multitasking score.`:''}
 CHG.cndnote=()=>{const box=$('#cnd_note');if(!box)return;const g=n=>{const e=document.querySelector(`input[name="c_${n}"]:checked`);return e?+e.value:null};
-  box.innerHTML=(g('mood')===1||g('stress')===5)?`<div class="callout" role="note" style="margin-top:10px">${ic('info')}<div><b>Terdengar berat.</b> Ini bukan diagnosis. Jika berlangsung lama atau mengganggu hidupmu, bicaralah dengan orang yang kamu percaya atau tenaga profesional. ${esc(HC_EMERGENCY)}</div></div>`:''};
+  box.innerHTML=(g('mood')===1||g('stress')===5)?`<div class="callout" role="note" style="margin-top:10px">${ic('info')}<div><b>That sounds heavy.</b> This is not a diagnosis. If it lasts or gets in the way of your life, talk to someone you trust or a professional. ${esc(CND_EMERG)}</div></div>`:''};
 ACT.cndclr=el=>{$$(`input[name="c_${el.dataset.id}"]`).forEach(i=>{i.checked=false});CHG.cndnote()};
 ACT.cndadd=el=>condForm(null,{date:(el&&el.dataset&&el.dataset.d)||undefined});
 ACT.cndsave=async el=>{
   const g=n=>{const e=document.querySelector(`input[name="c_${n}"]:checked`);return e?+e.value:null},all=n=>$$(`input[name="${n}"]:checked`).map(i=>i.value);
   const o={time:($('#c_time')||{}).value||condNow()};CND_DIM.forEach(d=>{o[d.id]=g(d.id)});
   const date=($('#c_date')||{}).value,feel=all('c_feel'),ache=all('c_ache'),notes=(($('#c_notes')||{}).value||'').trim();
-  if(!date){toast('Isi tanggal',1);return}
-  if(!CND_DIM.some(d=>o[d.id]!=null)&&!feel.length&&!ache.length&&!notes){toast('Pilih minimal satu isian',1);return}
-  const d={section:'condition',kind:'Check-in kondisi',title:condTitle(o),rec_date:date,value:o.mood,unit:o.mood==null?null:'skor',provenance:HC_PROV[0],notes:notes||null,
+  if(!date){toast('Fill in the date',1);return}
+  if(!CND_DIM.some(d=>o[d.id]!=null)&&!feel.length&&!ache.length&&!notes){toast('Choose at least one answer',1);return}
+  const d={section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:date,value:o.mood,unit:o.mood==null?null:'skor',provenance:HC_PROV[0],notes:notes||null,
     cond_time:o.time,cond_mood:o.mood,cond_body:o.body,cond_mind:o.mind,cond_stress:o.stress,cond_multi:o.multi,cond_feel:feel.join('|')||null,cond_ache:ache.join('|')||null};
   el.disabled=true;
-  try{const row=await saveRow('health_records',d,el.dataset.id||undefined);if(!row)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Kondisi tersimpan');renderView();if(typeof pipRefresh==='function')pipRefresh()}
-  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+  try{const row=await saveRow('health_records',d,el.dataset.id||undefined);if(!row)throw new Error('Your account is not allowed to save this, or it is waiting for approval.');finishModal();toast('Condition saved');renderView();if(typeof pipRefresh==='function')pipRefresh()}
+  catch(e){el.disabled=false;toast('Not saved: '+((e&&e.message)||e),1)}};
 
 /* ---------- on Daily Actions (One day) ---------- */
 function condChips(o){return CND_DIM.filter(d=>o[d.id]!=null).map(d=>`<span class="badge b-slate" title="${esc(d.t)}: ${esc(d.lab[o[d.id]-1])}">${esc(d.short)} ${o[d.id]}</span>`).join(' ')}
 function condStrip(day){
   if(cndMissing())return '';
   const L=condRows(day),t=todayS();
-  if(!L.length)return day>t?'':`<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="color:var(--brand)">${ic('heart')}</span><div style="flex:1;min-width:200px"><b>${day===t?'Bagaimana kondisimu hari ini?':'Belum ada check-in kondisi hari ini.'}</b><div class="sm ink2">Dua puluh detik, privat. Dengan ini energi dan sesi fokus bisa dibaca bersama kondisimu.</div></div><button class="btn p" data-act="cndadd" data-d="${day}">${ic('plus',15)} Cek kondisi</button></div>`;
+  if(!L.length)return day>t?'':`<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="color:var(--brand)">${ic('heart')}</span><div style="flex:1;min-width:200px"><b>${day===t?'How are you today?':'No condition check-in yet today.'}</b><div class="sm ink2">Twenty seconds, private. It lets your energy and focus sessions be read together with how you feel.</div></div><button class="btn p" data-act="cndadd" data-d="${day}">${ic('plus',15)} Check in</button></div>`;
   const last=condParse(L[L.length-1]),low=(last.body!=null&&last.body<=2)||(last.mind!=null&&last.mind<=2)||(last.mood!=null&&last.mood<=2)||(last.stress!=null&&last.stress>=4)||(last.multi!=null&&last.multi>=4);
-  return `<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><span style="color:var(--brand)">${ic('heart')}</span><b>Kondisi${L.length>1?` (${L.length} check-in)`:''}</b><span class="sm mut">${esc(last.time)}</span>${condChips(last)}<span class="sp"></span><button class="btn s" data-act="cndpattern">${ic('chart',14)} Lihat pola</button><button class="btn s" data-act="cndadd" data-d="${day}">${ic('plus',14)} Check-in lagi</button></div>${low?`<p class="sm ink2" style="margin:8px 0 0">Kondisimu sedang kurang ringan. Bila memungkinkan, kerjakan yang ringan dulu, kurangi berpindah-pindah tugas dan sisipkan istirahat. Itu saran umum, bukan penilaian.</p>`:''}</div>`}
+  return `<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><span style="color:var(--brand)">${ic('heart')}</span><b>Condition${L.length>1?` (${L.length} check-ins)`:''}</b><span class="sm mut">${esc(last.time)}</span>${condChips(last)}<span class="sp"></span><button class="btn s" data-act="cndpattern">${ic('chart',14)} See pattern</button><button class="btn s" data-act="cndadd" data-d="${day}">${ic('plus',14)} Check in again</button></div>${low?`<p class="sm ink2" style="margin:8px 0 0">You seem to be running low. If you can, start with lighter tasks, switch between tasks less and take breaks. This is general advice, not an assessment.</p>`:''}</div>`}
 (function(){const _v=VIEWS['execute/daily'];if(!_v)return;
   VIEWS['execute/daily']=function(){const h=_v.apply(this,arguments);if(S.ui.dayView==='all')return h;const i=h.indexOf('</div>');if(i<0)return h;
-    const bar=`<button class="pill noprint" data-act="wkopen">${ic('clock',14)} Rangkuman minggu</button>`+(typeof aotButton==='function'?aotButton():'');return h.slice(0,i)+bar+h.slice(i,i+6)+condStrip(S.ui.day)+h.slice(i+6)}})();
+    const bar=`<button class="pill noprint" data-act="wkopen">${ic('clock',14)} Weekly summary</button>`+(typeof aotButton==='function'?aotButton():'');return h.slice(0,i)+bar+h.slice(i,i+6)+condStrip(S.ui.day)+h.slice(i+6)}})();
 /* the check-in that applies to an action, shown in its detail */
 (function(){const _e=EXTRA.daily_actions;EXTRA.daily_actions=x=>{let h=_e?_e(x):'';if(cndMissing())return h;const r=condAt(x.action_date,x.start_time);
-  if(r){const o=condParse(r);h+=`<p class="sm ink2" style="margin-top:12px" data-cnd-link><b>Kondisi saat action ini</b> (check-in ${esc(o.time||'hari itu')}): ${condChips(o)}${x.energy?` · energi action ${x.energy}`:''}${num(x.pomodoros)?` · ${x.pomodoros} sesi fokus`:''} <a href="#" data-act="cndpattern">Lihat pola</a></p>`}
+  if(r){const o=condParse(r);h+=`<p class="sm ink2" style="margin-top:12px" data-cnd-link><b>Condition at this action</b> (check-in ${esc(o.time||'that day')}): ${condChips(o)}${x.energy?` · action energy ${x.energy}`:''}${num(x.pomodoros)?` · ${x.pomodoros} focus sessions`:''} <a href="#" data-act="cndpattern">See pattern</a></p>`}
   return h}})();
 
 /* ---------- the pattern ---------- */
-const cndTier=v=>v<=2?'low':v===3?'mid':'high',CND_TIER={low:'Skor 1–2',mid:'Skor 3',high:'Skor 4–5'};
+const cndTier=v=>v<=2?'low':v===3?'mid':'high',CND_TIER={low:'Score 1–2',mid:'Score 3',high:'Score 4–5'};
 function condPairs(){const out=[];(D().daily_actions||[]).forEach(x=>{if(isLight(x)||x.status==='Cancelled'||x.action_date>todayS())return;const r=condAt(x.action_date,x.start_time);if(r)out.push({x,o:condParse(r)})});return out}
 function condStats(){
   const P=condPairs(),res={};
@@ -21810,19 +21812,31 @@ function condLoadStats(){const byDay={};condRows().forEach(r=>{const dy=condDay(
 function condPatternHtml(){
   if(cndMissing())return '';
   const st=condStats(),ls=condLoadStats(),f1=v=>v==null?'—':fmtN(v,1);
-  if(st.pairs<5||st.withE<3)return `<p class="sm ink2" data-cnd-empty>Belum cukup data untuk membaca pola. Saat ini ada ${st.days} hari dengan check-in dan ${st.pairs} action yang bisa dipasangkan (${st.withE} dengan energi). Isi check-in beberapa kali sehari dan beri energi 1–5 pada action; sekitar dua minggu biasanya sudah cukup.</p>`;
+  if(st.pairs<5||st.withE<3)return `<p class="sm ink2" data-cnd-empty>Not enough data to read a pattern yet. So far: ${st.days} days with check-ins and ${st.pairs} actions that can be paired (${st.withE} with an energy rating). Check in a few times a day and give some actions an energy rating of 1–5; about two weeks is usually enough.</p>`;
   const lines=[];
-  CND_DIM.forEach(d=>{const g=st.res[d.id];if(g.low.eN>=2&&g.high.eN>=2){const lo=g.low.e/g.low.eN,hi=g.high.e/g.high.eN;lines.push({k:Math.abs(hi-lo),t:`Saat ${d.t.toLowerCase()} skor 4–5, energi action rata-rata ${f1(hi)} dibanding ${f1(lo)} saat skor 1–2.`})}});
+  CND_DIM.forEach(d=>{const g=st.res[d.id];if(g.low.eN>=2&&g.high.eN>=2){const lo=g.low.e/g.low.eN,hi=g.high.e/g.high.eN;lines.push({k:Math.abs(hi-lo),t:`When ${d.t.toLowerCase()} scores 4–5, average action energy is ${f1(hi)} compared with ${f1(lo)} when it scores 1–2.`})}});
   lines.sort((a,b)=>b.k-a.k);
-  const rowsH=CND_DIM.map(d=>{let first=true;return ['low','mid','high'].map(t=>{const c=st.res[d.id][t];if(!c.n)return '';const lab=first?esc(d.t):'';first=false;return `<tr><td data-l="Faktor">${lab}</td><td data-l="Skor">${CND_TIER[t]}</td><td data-l="Action" class="r">${c.n}</td><td data-l="Energi" class="r">${c.eN?f1(c.e/c.eN):'—'}</td><td data-l="Sesi fokus" class="r">${f1(c.f/c.n)}</td><td data-l="Selesai" class="r">${Math.round(c.done/c.n*100)}%</td></tr>`}).join('')}).join('');
-  const multi=ls.hi.length&&ls.lo.length?`<p class="sm" data-cnd-load style="margin-top:10px"><b>Hari yang padat berpindah tugas</b> (action bertumpuk atau banyak Activity berbeda): ${ls.hi.length} hari, suasana hati rata-rata ${f1(ls.av(ls.hi,'mood'))}, stres ${f1(ls.av(ls.hi,'stress'))}, fisik ${f1(ls.av(ls.hi,'body'))}. Hari yang lebih terfokus: ${ls.lo.length} hari, suasana hati ${f1(ls.av(ls.lo,'mood'))}, stres ${f1(ls.av(ls.lo,'stress'))}, fisik ${f1(ls.av(ls.lo,'body'))}.</p>`:`<p class="sm mut" style="margin-top:10px">Perbandingan hari padat dan hari terfokus muncul bila kedua jenis hari sudah ada.</p>`;
+  const rowsH=CND_DIM.map(d=>{let first=true;return ['low','mid','high'].map(t=>{const c=st.res[d.id][t];if(!c.n)return '';const lab=first?esc(d.t):'';first=false;return `<tr><td data-l="Factor">${lab}</td><td data-l="Score">${CND_TIER[t]}</td><td data-l="Actions" class="r">${c.n}</td><td data-l="Energy" class="r">${c.eN?f1(c.e/c.eN):'—'}</td><td data-l="Focus sessions" class="r">${f1(c.f/c.n)}</td><td data-l="Completed" class="r">${Math.round(c.done/c.n*100)}%</td></tr>`}).join('')}).join('');
+  const multi=ls.hi.length&&ls.lo.length?`<p class="sm" data-cnd-load style="margin-top:10px"><b>Busy task-switching days</b> (overlapping actions or many different Activities): ${ls.hi.length} days, average mood ${f1(ls.av(ls.hi,'mood'))}, stress ${f1(ls.av(ls.hi,'stress'))}, body ${f1(ls.av(ls.hi,'body'))}. More focused days: ${ls.lo.length} days, mood ${f1(ls.av(ls.lo,'mood'))}, stress ${f1(ls.av(ls.lo,'stress'))}, body ${f1(ls.av(ls.lo,'body'))}.</p>`:`<p class="sm mut" style="margin-top:10px">The comparison of busy and focused days appears once you have both kinds of day.</p>`;
   return `<div data-cnd-pattern>${lines.length?`<ul class="sm" style="margin:0 0 8px 18px">${lines.slice(0,3).map(l=>`<li>${esc(l.t)}</li>`).join('')}</ul>`:''}
-   <div class="tw"><table class="tbl stack"><thead><tr><th>Faktor</th><th>Skor</th><th class="r">Action</th><th class="r">Energi</th><th class="r">Sesi fokus/action</th><th class="r">Selesai</th></tr></thead><tbody>${rowsH}</tbody></table></div>${multi}
-   <p class="xs mut" style="margin-top:8px">Dibaca dari ${st.days} hari check-in dan ${st.pairs} action. Setiap action dipasangkan dengan check-in terdekat sebelum jam mulainya. Ini pola datamu sendiri: bisa kebetulan, dan dua hal yang bergerak bersama tidak berarti yang satu menyebabkan yang lain. Bukan diagnosis.</p></div>`}
-ACT.cndpattern=e=>{if(e&&e.preventDefault)e.preventDefault();openModal('Kondisi, energi dan fokus',`<p class="sm ink2">Bagaimana kondisimu, termasuk beban multitasking, bergerak bersama energi, sesi fokus dan penyelesaian action.</p>${condPatternHtml()}`,`<span class="sp"></span><button class="btn" data-act="closeModal">Tutup</button><button class="btn p" data-act="go" data-p="health" data-s="condition">Buka Kondisi Harian</button>`,'wide')};
-VIEWS['health/condition']=()=>hcSectionView('condition')+`<div class="card" style="margin-top:12px"><div class="ch"><h3>Pola: kondisi, energi dan fokus</h3></div>${condPatternHtml()}</div>`;
+   <div class="tw"><table class="tbl stack"><thead><tr><th>Factor</th><th>Score</th><th class="r">Actions</th><th class="r">Energy</th><th class="r">Focus sessions/action</th><th class="r">Completed</th></tr></thead><tbody>${rowsH}</tbody></table></div>${multi}
+   <p class="xs mut" style="margin-top:8px">Read from ${st.days} days of check-ins and ${st.pairs} actions. Each action is paired with the check-in closest before its start time. This is a pattern in your own data: it can be chance, and two things moving together does not mean one causes the other. Not a diagnosis.</p></div>`}
+ACT.cndpattern=e=>{if(e&&e.preventDefault)e.preventDefault();openModal('Condition, energy and focus',`<p class="sm ink2">How your condition, including multitasking load, moves with energy, focus sessions and finished actions.</p>${condPatternHtml()}`,`<span class="sp"></span><button class="btn" data-act="closeModal">Close</button><button class="btn p" data-act="go" data-p="health" data-s="condition">Open Daily Condition</button>`,'wide')};
+/* the Healthcare page: custom, in English */
+function cndListHtml(){const L=condRows().slice().reverse(),hide=!(S.hc&&S.hc.show);
+  return `<div class="card" style="margin-top:12px"><div class="ch"><h3>Your check-ins (${L.length})</h3></div>${L.length?`<div class="tw"><table class="tbl stack" data-cnd-list><thead><tr><th>Date</th><th>Time</th><th>Condition</th><th><span class="sr">Actions</span></th></tr></thead><tbody>${L.slice(0,60).map(r=>{const o=condParse(r);return `<tr><td data-l="Date">${esc(fmtD(r.rec_date))}</td><td data-l="Time">${esc(o.time||'—')}</td><td data-l="Condition">${hide?'<span class="mut" aria-label="hidden">••••</span>':condChips(o)+(r.cond_feel?`<div class="xs mut">${esc(String(r.cond_feel).split('|').join(', '))}</div>`:'')+(r.cond_ache?`<div class="xs mut">${esc(String(r.cond_ache).split('|').join(', '))}</div>`:'')+(r.notes?`<div class="sm mut">${esc(r.notes)}</div>`:'')}</td><td class="r"><button class="btn s" data-act="hcedit" data-id="${r.id}">Edit</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="sm mut">No check-ins yet.</p>'}</div>`}
+function cndPage(){
+  if(cndMissing())return missingCard('Daily Condition');
+  const s=hcSec('condition');
+  return `<div class="callout" role="note" data-cnd-note>${ic('info')}<div><b>Not reviewed by a professional.</b> ${esc(CND_NOTE)}</div></div>
+   <div class="callout err" role="note" data-cnd-emerg>${ic('alert')}<div>${esc(CND_EMERG)}</div></div>
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>${s.icon} ${esc(s.label)}</h3><span class="sp"></span><button class="btn s" data-act="hcshow" aria-pressed="${!!(S.hc&&S.hc.show)}">${S.hc&&S.hc.show?'Hide details':'Show details'}</button><button class="btn p" data-act="cndadd">${ic('plus',15)} Check in</button></div>
+   <p class="sm">${esc(s.intro)}</p><ul class="sm" style="margin:6px 0 0 18px">${s.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
+   ${cndListHtml()}
+   <div class="card" style="margin-top:12px"><div class="ch"><h3>Pattern: condition, energy and focus</h3></div>${condPatternHtml()}</div>${condGuide()}`}
+VIEWS['health/condition']=cndPage;
 (function(){const _s=VIEWS['health/summary'];VIEWS['health/summary']=function(){const h=_s.apply(this,arguments);if(cndMissing())return h;const L=condRows(todayS());
-  return h+`<div class="card" style="margin-top:12px" data-cnd-sum><div class="ch"><h3>Kondisi hari ini</h3><span class="sp"></span><button class="btn p" data-act="cndadd">${ic('plus',15)} Cek kondisi</button></div><p class="sm">${L.length?'Check-in terakhir '+esc(condParse(L[L.length-1]).time)+': '+condChips(condParse(L[L.length-1])):'Belum ada check-in hari ini.'}</p></div>`}})();
+  return h+`<div class="card" style="margin-top:12px" data-cnd-sum><div class="ch"><h3>Today’s condition</h3><span class="sp"></span><button class="btn p" data-act="cndadd">${ic('plus',15)} Check in</button></div><p class="sm">${L.length?'Last check-in '+esc(condParse(L[L.length-1]).time)+': '+condChips(condParse(L[L.length-1])):'No check-in yet today.'}</p></div>`}})();
 
 (function(){const st=document.createElement('style');st.textContent=`
 .cnd-g{border:0;margin:10px 0 0;padding:0}.cnd-g legend{font-weight:600;font-size:13px;padding:0;margin-bottom:4px}
@@ -21839,21 +21853,20 @@ VIEWS['health/condition']=()=>hcSectionView('condition')+`<div class="card" styl
 .cnd-clr{background:none;border:0;color:var(--mut);font-size:12px;cursor:pointer;padding:2px 0;text-decoration:underline}
 @media(max-width:480px){.cnd-o small{font-size:9.5px}}`;document.head.appendChild(st)})();
 
-/* ---------- guidance (Bahasa Indonesia, like the rest of Healthcare) ---------- */
+/* ---------- guidance ---------- */
 function condGuide(){
   const det=(t,li)=>`<details style="margin-top:8px"><summary class="b">${esc(t)}</summary><ul class="sm" style="margin:6px 0 0 18px">${li.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`;
-  return `<div class="card" style="margin-top:12px" data-cnd-guide><div class="ch"><h3>Panduan Kondisi Harian</h3><span class="sp"></span>${badge('Informasi umum · belum ditinjau profesional','amber')}</div>
-   <p class="sm">Panduan singkat agar catatanmu konsisten dan polanya bisa dibaca. ${esc(HC_NOTE)}</p>
-   ${det('Cara mengisi',['Tekan “Cek kondisi” (di Daily Actions atau di sini). Pilih angka 1–5 untuk yang ingin kamu catat; yang lain boleh kosong.','Isi pada jam yang kurang lebih sama, misalnya pagi sebelum mulai kerja dan sore sesudah makan siang. Dua kali sehari sudah cukup.','Angkanya adalah perasaanmu saat ini, bukan rata-rata hari. Tidak ada jawaban benar atau salah.','Catatan boleh ditambah di belakang hari: ubah tanggal dan jam di pop-up.'])}
-   ${det('Arti skala',['Suasana hati dan kondisi fisik: 1 = sangat rendah, 5 = sangat baik.','Mental: 1 = pikiran keruh dan sulit fokus, 5 = sangat jernih.','Stres: 1 = tenang, 5 = sangat tinggi. Di sini angka tinggi berarti lebih berat.','Multitasking: 1 = mengerjakan satu hal pada satu waktu, 5 = terus berpindah tugas, banyak yang terpotong.'])}
-   ${det('Multitasking dan rasa lelah',['Berpindah-pindah tugas membuat pikiran membawa “sisa” tugas sebelumnya, jadi terasa lebih lelah walau pekerjaannya tidak lebih banyak. Itu bisa ikut menurunkan suasana hati dan kondisi fisik.','Polaris One membandingkan skor multitasking-mu dengan Daily Actions hari itu (action yang waktunya bertumpuk dan jumlah Activity berbeda), lalu menunjukkan apakah hari yang padat berpindah tugas juga hari dengan suasana hati atau stres yang berbeda.','Yang bisa dicoba: satu blok fokus dengan satu tugas, kelompokkan email dan pesan pada jam tertentu, matikan notifikasi saat blok fokus, beri jeda 5 menit antar tugas.','Lihat sendiri hasilnya setelah dua minggu. Jika polanya tidak jelas, tidak apa-apa: itu juga informasi.'])}
-   ${det('Menghubungkan dengan energi dan sesi fokus',['Setiap action dipasangkan dengan check-in terdekat sebelum jam mulainya (tanpa jam: check-in pertama hari itu).','Pola dibaca dari energi 1–5 yang kamu beri pada action dan jumlah sesi fokus. Beri energi pada beberapa action setiap hari supaya datanya cukup.','Polanya memperlihatkan hubungan, bukan sebab-akibat. Tidur, makanan, cuaca dan beban kerja ikut berperan.','Detail action menampilkan “Kondisi saat action ini”. Tidak ada yang ditulis ke action itu, dan tidak ada yang dikirim ke Notion, AI atau API.'])}
-   ${det('Kapan mencari bantuan',['Jika suasana hati rendah atau stres tinggi berlangsung berhari-hari, atau mengganggu tidur, makan, kerja atau hubungan, bicarakan dengan orang yang kamu percaya atau tenaga profesional.','Aplikasi ini tidak mendiagnosis dan tidak memberi nasihat obat. Jika ada pikiran menyakiti diri atau keadaan darurat, hubungi layanan darurat atau orang terdekat sekarang.'])}
-   ${det('Privasi',['Hanya akunmu yang dapat membaca catatan ini. Admin tidak dapat membacanya.','Catatan masuk ke ekspor dan penghapusan Healthcare milikmu sendiri (Ringkasan → Datamu).'])}</div>`}
-(function(){const _c=VIEWS['health/condition'];VIEWS['health/condition']=function(){return _c.apply(this,arguments)+condGuide()}})();
-putFaq('What is the daily condition check-in?','Healthcare → Kondisi Harian, or the “Cek kondisi” button on Daily Actions (One day). A short pop-up: mood, body, mind, stress, how much you switched between tasks (multitasking), feelings and physical complaints. You can add several check-ins a day. It is private to your account and not shared. Closing or saving it brings you back to where you were.');
-putFaq('Does my mood affect my energy and focus sessions?','Polaris One shows your own pattern rather than a general claim. Each Daily Action is paired with the check-in closest before its start time, and the “Lihat pola” pop-up compares energy, focus sessions and completion for low, middle and high scores. It also compares busy, task-switching days (overlapping actions, many different activities) with the mood, stress and body you noted. It needs about two weeks of data, shows a relationship and not a cause, and is not a diagnosis.');
-putFaq('Why does switching between tasks make me tired?','Each switch leaves part of your attention on the previous task, so the same work feels heavier. Rate “Beban multitasking” in the check-in and open “Lihat pola” to see whether your busy, overlapping days also have lower mood or higher stress. The Kondisi Harian page has a short guide with ideas such as single-task focus blocks, batching messages and short breaks.');
+  return `<div class="card" style="margin-top:12px" data-cnd-guide><div class="ch"><h3>Daily Condition guide</h3><span class="sp"></span>${badge('General information · not professionally reviewed','amber')}</div>
+   <p class="sm">A short guide to keep your entries consistent so a pattern can be read. ${esc(CND_NOTE)}</p>
+   ${det('How to fill it in',['Press “Check in” (on Daily Actions or here). Pick a number from 1 to 5 for whatever you want to record; leave the rest empty.','Check in at about the same times, for example in the morning before work and in the afternoon after lunch. Twice a day is enough.','The number is how you feel right now, not the average of the day. There are no right or wrong answers.','You can add an entry afterwards: change the date and time in the pop-up.'])}
+   ${det('What the scales mean',['Mood and physical condition: 1 = very low, 5 = very good.','Mind: 1 = foggy and hard to focus, 5 = very clear.','Stress: 1 = calm, 5 = very high. Here a high number means heavier.','Multitasking: 1 = one thing at a time, 5 = constantly switching, with many interruptions.'])}
+   ${det('Multitasking and tiredness',['Switching between tasks leaves part of your attention on the previous one, so the same work feels heavier and more tiring. That can lower mood and physical condition too.','Polaris One compares your multitasking score with that day’s Daily Actions (overlapping actions and the number of different Activities) and shows whether busy task-switching days also have different mood or stress.','Things to try: one focus block for one task, batch email and messages at set times, silence notifications during focus blocks, take 5 minutes between tasks.','Check the result after two weeks. If no clear pattern shows up, that is information too.'])}
+   ${det('Linking it to energy and focus sessions',['Each action is paired with the check-in closest before its start time (without a time: the first check-in of that day).','The pattern is read from the 1–5 energy you give an action and its number of focus sessions. Rate a few actions every day so there is enough data.','It shows a relationship, not a cause. Sleep, food, weather and workload all play a part.','An action’s detail shows “Condition at this action”. Nothing is written to that action, and nothing is sent to Notion, AI or any API.'])}
+   ${det('When to ask for help',['If low mood or high stress lasts for days, or disturbs your sleep, eating, work or relationships, talk to someone you trust or a professional.','This app does not diagnose and does not give medication advice. If you have thoughts of harming yourself or an emergency, contact emergency services or someone close to you now.'])}
+   ${det('Privacy',['Only your account can read these entries. An admin cannot.','They are part of the export and deletion of your own Healthcare data (Summary → Your data).'])}</div>`}
+putFaq('What is the daily condition check-in?','Healthcare → Daily Condition, or the “Check in” button on Daily Actions (One day). A short pop-up: mood, body, mind, stress, how much you switched between tasks (multitasking), feelings and physical complaints. You can add several check-ins a day. It is private to your account and not shared. Closing or saving it brings you back to where you were.');
+putFaq('Does my mood affect my energy and focus sessions?','Polaris One shows your own pattern rather than a general claim. Each Daily Action is paired with the check-in closest before its start time, and the “See pattern” pop-up compares energy, focus sessions and completion for low, middle and high scores. It also compares busy, task-switching days (overlapping actions, many different activities) with the mood, stress and body you noted. It needs about two weeks of data, shows a relationship and not a cause, and is not a diagnosis.');
+putFaq('Why does switching between tasks make me tired?','Each switch leaves part of your attention on the previous task, so the same work feels heavier. Rate “Multitasking load” in the check-in and open “See pattern” to see whether your busy, overlapping days also have lower mood or higher stress. The Daily Condition page has a short guide with ideas such as single-task focus blocks, batching messages and short breaks.');
 
 /* ---- r14: 99_zzzzzzzz_aot.js ---- */
 /* =====================================================================
@@ -21874,7 +21887,7 @@ S.aot=S.aot||{on:false,win:null,timer:0};
 function aotButton(){
   if(!aotAvail())return '';
   const on=aotNative()?S.aot.on:!!(window.documentPictureInPicture&&documentPictureInPicture.window);
-  return `<button class="pill noprint" data-act="aot" aria-pressed="${on}" title="Jendela kecil yang selalu di atas aplikasi lain (hanya laptop dan komputer)">${ic('clock',14)} ${on?'Matikan selalu di atas':'Selalu di atas'}</button>`}
+  return `<button class="pill noprint" data-act="aot" aria-pressed="${on}" title="A small window that stays above other apps (laptops and computers only)">${ic('clock',14)} ${on?'Turn off always on top':'Always on top'}</button>`}
 
 function pipHtml(){
   const t=todayS(),rows=(D().daily_actions||[]).filter(x=>x.action_date===t&&!isLight(x)&&x.status!=='Cancelled').sort((a,b)=>(tm(a.start_time)||'99:99').localeCompare(tm(b.start_time)||'99:99'));
@@ -21882,11 +21895,11 @@ function pipHtml(){
   const nxt=rows.find(x=>x.status!=='Completed'&&(!x.start_time||tm(x.start_time)>=now))||rows.find(x=>x.status!=='Completed');
   const L=typeof condRows==='function'?condRows(t):[];const lastC=L.length?condParse(L[L.length-1]):null;
   return `<div class="pip"><div class="pip-h"><b>One day</b><span class="mut">${esc(fmtDay(t))}</span><span class="sp"></span><b data-pip-clock>${esc(now)}</b></div>
-   <div class="pip-p"><div style="width:${rows.length?Math.round(done/rows.length*100):0}%"></div></div><div class="xs mut">${done} dari ${rows.length} selesai</div>
-   ${nxt?`<div class="pip-n"><span class="xs mut">Berikutnya</span><br><b>${esc(tm(nxt.start_time)||'')} ${esc(trunc(nxt.title,60))}</b></div>`:`<div class="pip-n"><b>${rows.length?'Semua selesai 🎉':'Belum ada action hari ini'}</b></div>`}
+   <div class="pip-p"><div style="width:${rows.length?Math.round(done/rows.length*100):0}%"></div></div><div class="xs mut">${done} of ${rows.length} done</div>
+   ${nxt?`<div class="pip-n"><span class="xs mut">Next</span><br><b>${esc(tm(nxt.start_time)||'')} ${esc(trunc(nxt.title,60))}</b></div>`:`<div class="pip-n"><b>${rows.length?'All done 🎉':'No actions today'}</b></div>`}
    <ul class="pip-l">${rows.map(x=>`<li class="${x.status==='Completed'?'dn':''}"><label><input type="checkbox" data-pip-done="${x.id}" ${x.status==='Completed'?'checked':''}><span><span class="xs mut">${esc(tm(x.start_time)||'--:--')}</span> ${esc(trunc(x.title,70))}</span></label></li>`).join('')}</ul>
-   <div class="pip-m"><div class="xs mut">Suasana hati sekarang${lastC&&lastC.mood!=null?` (terakhir ${lastC.mood}${lastC.time?' · '+esc(lastC.time):''})`:''}</div><div class="pip-e">${['😞','🙁','😐','🙂','😄'].map((e,i)=>`<button type="button" data-pip-mood="${i+1}" aria-label="Suasana hati ${i+1}">${e}</button>`).join('')}</div></div>
-   <button type="button" class="btn s" data-pip-main style="width:100%;margin-top:8px">Buka jendela utama</button></div>`}
+   <div class="pip-m"><div class="xs mut">Mood right now${lastC&&lastC.mood!=null?` (last ${lastC.mood}${lastC.time?' · '+esc(lastC.time):''})`:''}</div><div class="pip-e">${['😞','🙁','😐','🙂','😄'].map((e,i)=>`<button type="button" data-pip-mood="${i+1}" aria-label="Mood ${i+1}">${e}</button>`).join('')}</div></div>
+   <button type="button" class="btn s" data-pip-main style="width:100%;margin-top:8px">Open main window</button></div>`}
 const PIP_CSS=`.pip{padding:12px;font:14px/1.35 system-ui,sans-serif}.pip-h{display:flex;gap:8px;align-items:baseline}.pip-h .sp{flex:1}
 .pip-p{height:6px;border-radius:99px;background:var(--line);margin:8px 0 4px;overflow:hidden}.pip-p div{height:100%;background:var(--brand)}
 .pip-n{margin:10px 0;padding:8px 10px;background:var(--soft);border-radius:10px}.pip-l{list-style:none;margin:0;padding:0;max-height:46vh;overflow:auto}
@@ -21908,17 +21921,17 @@ async function aotOpenPip(){
   pw.document.addEventListener('click',async e=>{const m=e.target.closest&&e.target.closest('[data-pip-mood]'),mn=e.target.closest&&e.target.closest('[data-pip-main]');
     if(mn){try{window.focus()}catch(x){}return}
     if(m&&typeof saveRow==='function'&&!cndMissing()){const v=+m.dataset.pipMood,o={time:condNow(),mood:v};
-      try{await saveRow('health_records',{section:'condition',kind:'Check-in kondisi',title:condTitle(o),rec_date:todayS(),value:v,unit:'skor',provenance:HC_PROV[0],cond_time:o.time,cond_mood:v});toast('Suasana hati tersimpan');renderView()}catch(x){toast('Belum tersimpan: '+((x&&x.message)||x),1)}pipRefresh()}});
+      try{await saveRow('health_records',{section:'condition',kind:'Condition check-in',title:condTitle(o),rec_date:todayS(),value:v,unit:'skor',provenance:HC_PROV[0],cond_time:o.time,cond_mood:v});toast('Mood saved');renderView()}catch(x){toast('Not saved: '+((x&&x.message)||x),1)}pipRefresh()}});
   clearInterval(S.aot.timer);S.aot.timer=setInterval(()=>{if(!documentPictureInPicture.window){clearInterval(S.aot.timer);return}pipRefresh()},20000);
   pw.addEventListener('pagehide',()=>{clearInterval(S.aot.timer);S.aot.win=null;try{renderView()}catch(e){}})}
 ACT.aot=async()=>{
-  if(!aotAvail()){toast('Selalu di atas hanya ada di laptop atau komputer, dengan aplikasi desktop Polaris One atau Chrome/Edge.',1);return}
+  if(!aotAvail()){toast('Always on top is only available on a laptop or computer, with the Polaris One desktop app or Chrome/Edge.',1);return}
   try{
     if(aotNative()){const on=await window.polarisNative.toggleMini();S.aot.on=!!on;if(on){S.ui.dayView='day';S.ui.day=todayS();go('execute','daily')}else renderView();return}
     const w=documentPictureInPicture.window;
     if(w){w.close();S.aot.win=null;renderView();return}
     await aotOpenPip();renderView()
-  }catch(e){toast('Jendela melayang tidak bisa dibuka: '+((e&&e.message)||e),1)}};
+  }catch(e){toast('The floating window could not be opened: '+((e&&e.message)||e),1)}};
 /* keep the floating window current whenever the app redraws */
 (function(){const _r=renderView;renderView=function(){const r=_r.apply(this,arguments);try{pipRefresh()}catch(e){}return r}})();
 
@@ -21926,20 +21939,20 @@ ACT.aot=async()=>{
 /* REV 30 · release notes */
 RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
  {t:'New',items:[
-  ['Daily condition check-in','A short pop-up for mood, feelings, body, mind, stress and how much you switched between tasks (multitasking). Open it from One day (“Cek kondisi”) or Healthcare → Kondisi Harian. It is private, like the rest of Healthcare, and linked to your Daily Actions only for reading.'],
-  ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “Lihat pola” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
-  ['Weekly summary, like a personal assistant','“Rangkuman minggu” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
+  ['Daily condition check-in','A short pop-up for mood, feelings, body, mind, stress and how much you switched between tasks (multitasking). Open it from One day (“Check in”) or Healthcare → Daily Condition. It is private, like the rest of Healthcare, and linked to your Daily Actions only for reading.'],
+  ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “See pattern” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
+  ['Weekly summary, like a personal assistant','“Weekly summary” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
   ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
   ['Always on top for One day','On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
  {t:'Changed',items:[
   ['Forms return to where you came from','A form opened from a pop-up (an Activity, a Goal, a Meeting …) now opens on top of it. Saving, deleting or cancelling takes you back to that pop-up, refreshed, not to the page behind.']]},
  {t:'For the admin',items:[
-  ['Run schema.sql once','schema.sql adds eight columns to health_records (cond_mood, cond_body, cond_mind, cond_stress, cond_multi, cond_time, cond_feel, cond_ache) and the table cv_entries, readable only by its owner (not by an admin). Until it is run, check-ins still save and keep their numbers in the title; the Biodata screens ask for schema.sql. Nothing else changed in the database.',null,null,null,1]]}
+  ['Run schema.sql once','schema.sql adds eight columns to health_records (cond_mood, cond_body, cond_mind, cond_stress, cond_multi, cond_time, cond_feel, cond_ache) and the table cv_entries, readable only by its owner (not by an admin). Until it is run, check-ins still save and keep their numbers in the title; the Biodata screens ask for biodata.sql (or schema.sql). Nothing else changed in the database.',null,null,null,1]]}
 ]});
 
-putFaq('What is the weekly summary?','A look back over a week, like a personal assistant: what you did, what is still open, your condition, and five areas of growth (potential, professional, knowledge, emotional, spiritual) compared with the week before, plus one step for next week. Open it with “Rangkuman minggu” on Daily Actions; from Friday 15:00 to Monday 12:00 a card on Home and the bell remind you once. It only reads what is already in Polaris One and describes it; it does not grade you.');
+putFaq('What is the weekly summary?','A look back over a week, like a personal assistant: what you did, what is still open, your condition, and five areas of growth (potential, professional, knowledge, emotional, spiritual) compared with the week before, plus one step for next week. Open it with “Weekly summary” on Daily Actions; from Friday 15:00 to Monday 12:00 a card on Home and the bell remind you once. It only reads what is already in Polaris One and describes it; it does not grade you.');
 putFaq('Who can see my Biodata (CV)?','Only you. Biodata (CV) is stored like Healthcare: an admin cannot read it either. Work experience, education, certifications, seminars and skills are read from Skills & Knowledge, hobbies and the short health summary from Healthcare, so nothing is entered twice. The health summary and personal details only appear in the printed CV if you tick them.');
-putFaq('Can I keep One day above my other windows?','On a laptop or computer, yes: the button “Selalu di atas” on One day. In the desktop app (Windows, Mac) the window becomes a small one that stays on top. In Chrome or Edge it opens a floating mini window with today’s list. It is not offered on phones and tablets, nor in Safari or Firefox.');
+putFaq('Can I keep One day above my other windows?','On a laptop or computer, yes: the button “Always on top” on One day. In the desktop app (Windows, Mac) the window becomes a small one that stays on top. In Chrome or Edge it opens a floating mini window with today’s list. It is not offered on phones and tablets, nor in Safari or Firefox.');
 
 /* ---- r14: 99_zzzzzzzzzz_weekly.js ---- */
 /* =====================================================================
@@ -21976,63 +21989,63 @@ function wkData(ws){
     actDone:act.filter(a=>a.completed_on&&inW(a.completed_on)),actOpen:act.filter(a=>!isClosed(a)&&a.planned_finish&&a.planned_finish<=we),
     prayDone:prayDone.length,prayTotal:prayAll.length,ibad:ibad.length,ibadMin:ibad.reduce((s,x)=>s+dMin(x),0),mood,feel,grat}}
 const wkF=(v,d)=>v==null?'—':fmtN(v,d==null?1:d);
-function wkDelta(c,p,unit,inv){if(c==null||p==null)return '';const d=c-p;if(Math.abs(d)<0.05)return '<span class="xs mut"> · sama dengan minggu lalu</span>';
-  const good=inv?d<0:d>0;return `<span class="xs ${good?'':'mut'}" style="${good?'color:var(--green,#1E7B54)':''}"> · ${d>0?'▲ +':'▼ '}${fmtN(d,Math.abs(d)<10&&!Number.isInteger(d)?1:0)}${unit||''} dari minggu lalu</span>`}
+function wkDelta(c,p,unit,inv){if(c==null||p==null)return '';const d=c-p;if(Math.abs(d)<0.05)return '<span class="xs mut"> · same as last week</span>';
+  const good=inv?d<0:d>0;return `<span class="xs ${good?'':'mut'}" style="${good?'color:var(--green,#1E7B54)':''}"> · ${d>0?'▲ +':'▼ '}${fmtN(d,Math.abs(d)<10&&!Number.isInteger(d)?1:0)}${unit||''} from last week</span>`}
 function wkNotes(c,p){
   const w=[],a=[],g=[];
-  if(c.rate!=null){const pct=Math.round(c.rate*100);w.push(`Kamu menyelesaikan ${c.done.length} dari ${c.total} action (${pct}%)${p.rate!=null?(c.rate>p.rate+.04?', naik dari minggu lalu':c.rate<p.rate-.04?', turun dari minggu lalu':', sama seperti minggu lalu'):''}.`)}
-  if(c.focus>0)w.push(`${c.focus} sesi fokus terkumpul.`);
-  if(c.actDone.length)w.push(`${c.actDone.length} Activity selesai: ${c.actDone.slice(0,2).map(x=>x.name).join(', ')}${c.actDone.length>2?' dan lainnya':''}.`);
-  if(c.prayTotal&&c.prayDone===c.prayTotal)w.push('Semua shalat yang tercatat minggu ini terlaksana.');
-  if(!w.length)w.push('Minggu ini belum banyak yang tercatat. Mulai dari satu action kecil hari ini.');
-  if(c.open.length)a.push(`${c.open.length} action belum selesai${c.open.length>3?'; pilih yang masih penting dan pindahkan ke minggu depan, sisanya boleh dilepas':''}.`);
-  if(c.actOpen.length)a.push(`${c.actOpen.length} Activity melewati target minggu ini.`);
-  if(c.mood&&(c.mood.stress>=3.5||c.mood.mood<=2.5||c.mood.multi>=4))a.push('Kondisimu terasa berat beberapa kali. Beri ruang untuk istirahat; kalau berlangsung lama, bicarakan dengan orang yang kamu percaya atau tenaga profesional.');
-  if(!c.mood)a.push('Belum ada check-in kondisi minggu ini, jadi pola energi dan suasana hati belum terbaca.');
-  if(c.prayTotal&&c.prayDone<c.prayTotal)a.push(`${c.prayTotal-c.prayDone} shalat belum ditandai selesai.`);
-  if(typeof cvComplete==='function'&&cvComplete()<60)a.push(`Biodata (CV) baru ${cvComplete()}% lengkap; lengkapi bila ada waktu.`);
-  if(!a.length)a.push('Tidak ada yang mendesak. Pertahankan ritme ini.');
-  if(c.mood&&c.mood.multi!=null&&c.mood.multi>=4)g.push('Banyak berpindah tugas: coba satu blok fokus tanpa notifikasi untuk satu tugas.');
-  else if(!c.mood)g.push('Isi “Cek kondisi” dua kali sehari minggu depan agar pola energi, fokus dan suasana hati terlihat.');
-  else if(c.open.length)g.push('Tetapkan tiga prioritas utama untuk Senin sebelum menutup minggu ini.');
-  else g.push('Tentukan satu hal kecil yang ingin kamu tingkatkan minggu depan.');
+  if(c.rate!=null){const pct=Math.round(c.rate*100);w.push(`You finished ${c.done.length} of ${c.total} actions (${pct}%)${p.rate!=null?(c.rate>p.rate+.04?', up from last week':c.rate<p.rate-.04?', down from last week':', the same as last week'):''}.`)}
+  if(c.focus>0)w.push(`${c.focus} focus sessions collected.`);
+  if(c.actDone.length)w.push(`${c.actDone.length} ${c.actDone.length>1?'Activities':'Activity'} completed: ${c.actDone.slice(0,2).map(x=>x.name).join(', ')}${c.actDone.length>2?' and more':''}.`);
+  if(c.prayTotal&&c.prayDone===c.prayTotal)w.push('Every prayer logged this week was done.');
+  if(!w.length)w.push('Not much was logged this week. Start with one small action today.');
+  if(c.open.length)a.push(`${c.open.length} action${c.open.length>1?'s are':' is'} not finished${c.open.length>3?'; pick the ones that still matter and move them to next week, and let the rest go':''}.`);
+  if(c.actOpen.length)a.push(`${c.actOpen.length} ${c.actOpen.length>1?'Activities':'Activity'} passed the target date this week.`);
+  if(c.mood&&(c.mood.stress>=3.5||c.mood.mood<=2.5||c.mood.multi>=4))a.push('Several times this week felt heavy. Make room to rest; if it lasts, talk to someone you trust or a professional.');
+  if(!c.mood)a.push('No condition check-in this week, so patterns of energy and mood cannot be read yet.');
+  if(c.prayTotal&&c.prayDone<c.prayTotal)a.push(`${c.prayTotal-c.prayDone} prayer${c.prayTotal-c.prayDone>1?'s are':' is'} not marked done.`);
+  if(typeof cvComplete==='function'&&cvComplete()<60)a.push(`Your Biodata (CV) is only ${cvComplete()}% complete; finish it when you have time.`);
+  if(!a.length)a.push('Nothing urgent. Keep this rhythm.');
+  if(c.mood&&c.mood.multi!=null&&c.mood.multi>=4)g.push('You switched tasks a lot: try one focus block without notifications for a single task.');
+  else if(!c.mood)g.push('Check in twice a day next week so the pattern of energy, focus and mood becomes visible.');
+  else if(c.open.length)g.push('Set your three top priorities for Monday before you close this week.');
+  else g.push('Choose one small thing you want to improve next week.');
   return {w,a,g}}
 function wkGrowth(c,p){
-  const hrs=m=>fmtN(m/60,1)+' jam',bh=typeof bestHour==='function'?bestHour():null;
+  const hrs=m=>fmtN(m/60,1)+' h',bh=typeof bestHour==='function'?bestHour():null;
   return [
-   {i:'🚀',t:'Potensi',v:`${c.focus} sesi fokus${wkDelta(c.focus,p.focus,'')}`,l:`Energi rata-rata ${wkF(c.energy)}${c.top3.length?` · Top 3 selesai ${c.top3done.length}/${c.top3.length}`:''}${bh?` · jam puncakmu sekitar ${pad(bh.h)}:00`:''}.`,q:'Kapan kamu terasa paling berenergi, dan apa yang kamu kerjakan saat itu?'},
-   {i:'💼',t:'Profesional',v:`${hrs(c.workMin)} kerja selesai${wkDelta(c.workMin/60,p.workMin/60,' jam')}`,l:`${c.actDone.length} Activity selesai${c.actOpen.length?` · ${c.actOpen.length} melewati target`:''}.`,q:'Hasil apa yang paling kamu banggakan minggu ini, dan apa buktinya?'},
-   {i:'📚',t:'Pengetahuan',v:`${c.learnN} sesi belajar (${hrs(c.learnMin)})${wkDelta(c.learnMin/60,p.learnMin/60,' jam')}`,l:`${c.notes} catatan baru ditulis minggu ini.`,q:'Apa satu hal baru yang kamu pelajari, dan di mana akan kamu pakai?'},
-   {i:'💛',t:'Emosional',v:c.mood?`Suasana hati ${wkF(c.mood.mood)}${wkDelta(c.mood.mood,p.mood&&p.mood.mood,'')}`:'Belum ada check-in',l:c.mood?`Stres ${wkF(c.mood.stress)} · fisik ${wkF(c.mood.body)}${c.mood.multi!=null?` · multitasking ${wkF(c.mood.multi)}`:''}${Object.keys(c.feel).length?' · paling sering: '+Object.entries(c.feel).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]).join(', '):''}${c.grat?` · ${c.grat} catatan syukur`:''}.`:'Satu check-in sehari sudah cukup untuk mulai melihat pola.',q:'Apa yang paling menguras dan paling mengisi tenagamu minggu ini?'},
-   {i:'🕌',t:'Spiritual',v:c.prayTotal?`Shalat tercatat ${c.prayDone}/${c.prayTotal}${wkDelta(c.prayDone,p.prayDone,'')}`:'Belum ada shalat tercatat',l:`${c.ibad} kegiatan ibadah lain selesai${c.ibadMin?` (${hrs(c.ibadMin)})`:''}${c.exMin?` · olahraga ${hrs(c.exMin)}`:''}.`,q:'Apa satu kebiasaan ibadah yang ingin kamu jaga atau tambah minggu depan?'}]}
+   {i:'🚀',t:'Potential',v:`${c.focus} focus sessions${wkDelta(c.focus,p.focus,'')}`,l:`Average energy ${wkF(c.energy)}${c.top3.length?` · Top 3 done ${c.top3done.length}/${c.top3.length}`:''}${bh?` · your peak hour is around ${pad(bh.h)}:00`:''}.`,q:'When do you feel most energetic, and what do you do then?'},
+   {i:'💼',t:'Professional',v:`${hrs(c.workMin)} of work done${wkDelta(c.workMin/60,p.workMin/60,' h')}`,l:`${c.actDone.length} ${c.actDone.length===1?'Activity':'Activities'} completed${c.actOpen.length?` · ${c.actOpen.length} past target`:''}.`,q:'Which result are you proudest of this week, and what is the proof?'},
+   {i:'📚',t:'Knowledge',v:`${c.learnN} learning sessions (${hrs(c.learnMin)})${wkDelta(c.learnMin/60,p.learnMin/60,' h')}`,l:`${c.notes} new notes written this week.`,q:'What is one new thing you learned, and where will you use it?'},
+   {i:'💛',t:'Emotional',v:c.mood?`Mood ${wkF(c.mood.mood)}${wkDelta(c.mood.mood,p.mood&&p.mood.mood,'')}`:'No check-ins yet',l:c.mood?`Stress ${wkF(c.mood.stress)} · body ${wkF(c.mood.body)}${c.mood.multi!=null?` · multitasking ${wkF(c.mood.multi)}`:''}${Object.keys(c.feel).length?' · most often: '+Object.entries(c.feel).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>x[0]).join(', '):''}${c.grat?` · ${c.grat} gratitude entries`:''}.`:'One check-in a day is enough to start seeing a pattern.',q:'What drained you most and what filled you up this week?'},
+   {i:'🕌',t:'Spiritual',v:c.prayTotal?`Prayers logged ${c.prayDone}/${c.prayTotal}${wkDelta(c.prayDone,p.prayDone,'')}`:'No prayers logged yet',l:`${c.ibad} other worship activities done${c.ibadMin?` (${hrs(c.ibadMin)})`:''}${c.exMin?` · exercise ${hrs(c.exMin)}`:''}.`,q:'Which worship habit do you want to keep or add next week?'}]}
 function wkOpen(ws){
   const t=todayS();ws=ws||S.wk.ws||weekStart(t);S.wk.ws=ws;const c=wkData(ws),p=wkData(addD(ws,-7)),n=wkNotes(c,p),gr=wkGrowth(c,p),cur=ws===weekStart(t);
   const li=a=>a.map(x=>`<li>${esc(x)}</li>`).join('');
   const body=`<div data-wk>
-   <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s" data-act="wkshift" data-n="-1" aria-label="Minggu sebelumnya">${ic('cl',14)}</button><b>${esc(fmtS(c.ws))} – ${esc(fmtD(c.we))}</b>${cur?'<span class="badge b-blue">minggu ini</span>':`<button class="btn s" data-act="wkshift" data-n="0">Minggu ini</button>`}<button class="btn s" data-act="wkshift" data-n="1" aria-label="Minggu berikutnya" ${addD(ws,7)>t?'disabled':''}>${ic('cr',14)}</button></div>
+   <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><button class="btn s" data-act="wkshift" data-n="-1" aria-label="Previous week">${ic('cl',14)}</button><b>${esc(fmtS(c.ws))} – ${esc(fmtD(c.we))}</b>${cur?'<span class="badge b-blue">this week</span>':`<button class="btn s" data-act="wkshift" data-n="0">This week</button>`}<button class="btn s" data-act="wkshift" data-n="1" aria-label="Next week" ${addD(ws,7)>t?'disabled':''}>${ic('cr',14)}</button></div>
    <div class="g g3" style="margin-top:10px">
-    <div class="card flat"><b>✅ Sudah dilakukan</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-done>${li(n.w)}</ul></div>
-    <div class="card flat"><b>⏳ Belum dilakukan</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-open>${li(n.a)}</ul>${c.open.length?`<div class="xs mut" style="margin-top:6px">${c.open.slice(0,5).map(x=>esc(trunc(x.title,38))).join(' · ')}${c.open.length>5?' …':''}</div>`:''}</div>
-    <div class="card flat"><b>🌱 Saran asisten</b><ul class="sm" style="margin:6px 0 0 18px">${li(n.g)}</ul></div></div>
+    <div class="card flat"><b>✅ Done</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-done>${li(n.w)}</ul></div>
+    <div class="card flat"><b>⏳ Not done yet</b><ul class="sm" style="margin:6px 0 0 18px" data-wk-open>${li(n.a)}</ul>${c.open.length?`<div class="xs mut" style="margin-top:6px">${c.open.slice(0,5).map(x=>esc(trunc(x.title,38))).join(' · ')}${c.open.length>5?' …':''}</div>`:''}</div>
+    <div class="card flat"><b>🌱 Assistant’s suggestion</b><ul class="sm" style="margin:6px 0 0 18px">${li(n.g)}</ul></div></div>
    <div class="g g3" style="margin-top:10px" data-wk-growth>${gr.map(x=>`<div class="card flat"><div><b>${x.i} ${esc(x.t)}</b></div><div class="sm" style="margin-top:4px">${x.v}</div><div class="xs mut" style="margin-top:2px">${esc(x.l)}</div><div class="xs" style="margin-top:6px"><i>${esc(x.q)}</i></div></div>`).join('')}</div>
-   <label class="sm b" for="wk_next" style="display:block;margin-top:12px">Satu langkah untuk minggu depan</label>
-   <input class="in" id="wk_next" style="width:100%" maxlength="140" placeholder="Misalnya: satu blok fokus 90 menit tanpa notifikasi setiap pagi">
-   <p class="xs mut" style="margin-top:8px">Dibaca dari Daily Actions, Activity, catatan, waktu ibadah dan Kondisi Harian milikmu. Hanya perbandingan dan gambaran; bukan penilaian dan bukan diagnosis. ${esc(HC_NOTE)}</p></div>`;
-  const d=openModal('Rangkuman mingguan',body,`<button class="btn" data-act="wkreview">${ic('edit',15)} Buat review mingguan</button><span class="sp"></span><button class="btn" data-act="closeModal">Tutup</button><button class="btn p" data-act="wkstep">${ic('plus',15)} Jadikan action Senin</button>`,'wide');
+   <label class="sm b" for="wk_next" style="display:block;margin-top:12px">One step for next week</label>
+   <input class="in" id="wk_next" style="width:100%" maxlength="140" placeholder="For example: one 90-minute focus block without notifications every morning">
+   <p class="xs mut" style="margin-top:8px">Read from your Daily Actions, Activities, notes, worship time and Daily Condition. Only comparisons and a picture of your week; not a judgement and not a diagnosis. ${esc(CND_NOTE)}</p></div>`;
+  const d=openModal('Weekly summary',body,`<button class="btn" data-act="wkreview">${ic('edit',15)} Create weekly review</button><span class="sp"></span><button class="btn" data-act="closeModal">Close</button><button class="btn p" data-act="wkstep">${ic('plus',15)} Make it Monday’s action</button>`,'wide');
   d._re=()=>wkOpen(S.wk.ws);if(cur||wkDue()===ws)wkMark(ws);return d}
 ACT.wkopen=()=>wkOpen(wkDue()||weekStart(todayS()));
 ACT.wkshift=el=>{const n=+el.dataset.n,t=todayS();S.wk.ws=n===0?weekStart(t):addD(S.wk.ws||weekStart(t),n*7);refreshTop()};
-ACT.wkstep=async el=>{const v=(($('#wk_next')||{}).value||'').trim();if(!v){toast('Tulis dulu satu langkahnya',1);const i=$('#wk_next');if(i)i.focus();return}
-  el.disabled=true;try{const mon=addD(weekStart(S.wk.ws||todayS()),7),day=mon<todayS()?todayS():mon;await saveRow('daily_actions',{action_date:day,title:trunc(v,140),priority:'High',time_cat:'Other',status:'Not Started',progress:0,pomodoros:0,is_top3:true,description:'Dari Rangkuman mingguan.'});toast('Ditambahkan ke '+fmtDay(day));el.disabled=false;$('#wk_next').value='';renderView()}
-  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+ACT.wkstep=async el=>{const v=(($('#wk_next')||{}).value||'').trim();if(!v){toast('Write the step first',1);const i=$('#wk_next');if(i)i.focus();return}
+  el.disabled=true;try{const mon=addD(weekStart(S.wk.ws||todayS()),7),day=mon<todayS()?todayS():mon;await saveRow('daily_actions',{action_date:day,title:trunc(v,140),priority:'High',time_cat:'Other',status:'Not Started',progress:0,pomodoros:0,is_top3:true,description:'From the weekly summary.'});toast('Added to '+fmtDay(day));el.disabled=false;$('#wk_next').value='';renderView()}
+  catch(e){el.disabled=false;toast('Not saved: '+((e&&e.message)||e),1)}};
 ACT.wkreview=()=>{const ws=S.wk.ws||weekStart(todayS()),c=wkData(ws),n=wkNotes(c,wkData(addD(ws,-7)));
   openForm('reviews',null,{review_type:'Weekly',period_start:ws,period_end:addD(ws,6),score:c.total?Math.round(c.done.length/c.total*100):70,wins:n.w.map(x=>'• '+x).join('\n'),gaps:n.a.map(x=>'• '+x).join('\n'),insights:n.g.join(' '),next_actions:(($('#wk_next')||{}).value||'').trim()})};
 
 /* where the assistant shows up */
 function wkCard(){const ws=wkDue();if(!ws||wkSeen(ws)||isKid&&isKid())return '';const c=wkData(ws);
-  return `<div class="card flat noprint" data-wk-card style="background:var(--soft);margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="font-size:22px" aria-hidden="true">🗓️</span><div style="flex:1;min-width:220px"><b>Rangkuman minggu ini siap</b><div class="sm ink2">${c.total?`${c.done.length} dari ${c.total} action selesai, ${c.open.length} belum. `:''}Lihat yang sudah dan belum dilakukan, kondisimu dan pertumbuhanmu.</div></div><button class="btn p" data-act="wkopen">Buka rangkuman</button></div>`}
+  return `<div class="card flat noprint" data-wk-card style="background:var(--soft);margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="font-size:22px" aria-hidden="true">🗓️</span><div style="flex:1;min-width:220px"><b>Your weekly summary is ready</b><div class="sm ink2">${c.total?`${c.done.length} of ${c.total} actions done, ${c.open.length} still open. `:''}See what is done and not done, your condition and your growth.</div></div><button class="btn p" data-act="wkopen">Open summary</button></div>`}
 (function(){const o=VIEWS['dashboard/overview'];if(!o)return;VIEWS['dashboard/overview']=function(){const h=o.apply(this,arguments);let c='';try{c=wkCard()}catch(e){console.error(e)}return c?c+h:h}})();
-(function(){const _a=alerts;alerts=function(){const out=_a.apply(this,arguments);try{const ws=wkDue();if(ws&&!wkSeen(ws)&&!(isKid&&isKid()))out.unshift({tone:'blue',t:'Rangkuman minggu ini siap',m:'Yang sudah dan belum dilakukan, kondisimu dan pertumbuhanmu',go:['execute','daily'],fn:'wkopen'})}catch(e){console.error(e)}return out}})();
+(function(){const _a=alerts;alerts=function(){const out=_a.apply(this,arguments);try{const ws=wkDue();if(ws&&!wkSeen(ws)&&!(isKid&&isKid()))out.unshift({tone:'blue',t:'Your weekly summary is ready',m:'What is done and not done, your condition and your growth',go:['execute','daily'],fn:'wkopen'})}catch(e){console.error(e)}return out}})();
 
 /* ---- r14: 99_zzzzzzzzzzz_cv.js ---- */
 /* =====================================================================
@@ -22044,22 +22057,22 @@ function wkCard(){const ws=wkDue();if(!ws||wkSeen(ws)||isKid&&isKid())return '';
      readable only by its owner: not even an admin can read it, and the audit trail records that something happened, never what.
    • The health summary and the personal details are only in the CV when you tick them in the preview. Nothing is uploaded.
    ===================================================================== */
-const CV_PROFILE=[['full_name','Nama lengkap'],['headline','Profesi atau judul singkat'],['birth_place','Tempat lahir'],['birth_date','Tanggal lahir','date'],['gender','Jenis kelamin','sel',['','Laki-laki','Perempuan']],['nationality','Kewarganegaraan'],['religion','Agama'],['address','Alamat','wide'],['city','Kota'],['phone','Telepon'],['email','Email','email'],['website','Situs web atau LinkedIn'],['summary','Tentang saya','area']];
+const CV_PROFILE=[['full_name','Full name'],['headline','Profession or short headline'],['birth_place','Place of birth'],['birth_date','Date of birth','date'],['gender','Gender','sel',['','Male','Female']],['nationality','Nationality'],['religion','Religion'],['address','Address','wide'],['city','City'],['phone','Phone'],['email','Email','email'],['website','Website or LinkedIn'],['summary','About me','area']];
 const CV_SEC={
- language:{t:'Bahasa',one:'bahasa',ph:'Misalnya: Inggris',lvl:['Dasar','Menengah','Lancar','Fasih atau bahasa ibu'],lvlL:'Tingkat',dt:'Catatan (misalnya skor tes)'},
- interest:{t:'Minat',one:'minat',ph:'Misalnya: Keselamatan penerbangan',lvl:null,dt:'Keterangan singkat'},
- value:{t:'Nilai hidup dan prinsip',one:'nilai',ph:'Misalnya: Jujur dan bertanggung jawab',lvl:null,dt:'Arti bagimu'},
- hobby:{t:'Hobi',one:'hobi',ph:'Misalnya: Bersepeda',lvl:null,dt:'Keterangan singkat'}};
+ language:{t:'Languages',one:'language',ph:'For example: English',lvl:['Basic','Intermediate','Fluent','Native or bilingual'],lvlL:'Level',dt:'Note (for example a test score)'},
+ interest:{t:'Interests',one:'interest',ph:'For example: Aviation safety',lvl:null,dt:'Short description'},
+ value:{t:'Values and principles',one:'value',ph:'For example: Honest and accountable',lvl:null,dt:'What it means to you'},
+ hobby:{t:'Hobbies',one:'hobby',ph:'For example: Cycling',lvl:null,dt:'Short description'}};
 MOD.cv_entries={t:'cv_entries',one:'Biodata',many:'Biodata (CV)',main:'title',sort:['sort_order','asc'],hiddenUI:1,placeholder:'biodata',
  fields:[
-  F('section','Bagian','hidden','',{sql:'text'}),
-  F('title','Judul','text','Isi judul.',{req:1,wide:1}),
-  F('level','Tingkat','hidden','',{sql:'text'}),
-  F('detail','Keterangan','textarea','Keterangan.',{wide:1,rows:3}),
+  F('section','Section','hidden','',{sql:'text'}),
+  F('title','Title','text','Fill in the title.',{req:1,wide:1}),
+  F('level','Level','hidden','',{sql:'text'}),
+  F('detail','Details','textarea','Details.',{wide:1,rows:3}),
   F('data','Data','hidden','',{sql:'jsonb'}),
-  F('sort_order','Urutan','hidden','',{sql:'int'})],cols:['section','title']};
+  F('sort_order','Order','hidden','',{sql:'int'})],cols:['section','title']};
 ORDER.push('cv_entries');NEWER_TABLES.push('cv_entries');
-NAV.splice(NAV.findIndex(n=>n.id==='health'),0,{id:'cv',label:'Biodata (CV)',ic:'user',subs:[['profile','Data diri'],['more','Bahasa, minat dan nilai'],['preview','CV lengkap']]});
+NAV.splice(NAV.findIndex(n=>n.id==='health'),0,{id:'cv',label:'Biodata (CV)',ic:'user',subs:[['profile','Personal details'],['more','Languages, interests and values'],['preview','Full CV']]});
 (function(){const _b=buildSQL;buildSQL=function(){return _b.apply(this,arguments)+`
 -- =====================================================================
 -- BIODATA (CV) PRIVACY (Rev 30): the owner alone. Not even an admin can read, change or delete cv_entries;
@@ -22089,41 +22102,41 @@ const cvRows=sec=>(D().cv_entries||[]).filter(r=>r.section===sec).sort((a,b)=>nu
 function cvProfile(){const r=cvRows('profile')[0],d=Object.assign({},r&&r.data||{});
   if(!d.full_name&&S.profile)d.full_name=S.profile.full_name||'';if(!d.email&&S.profile)d.email=S.profile.email||'';return {row:r,d}}
 const cvDate=s=>s?fmtD(s):'';
-const cvRange=(a,b,cur)=>{const x=a?fmtMY(a):'',y=b?fmtMY(b):(cur||!b?'sekarang':'');return x||y?(x+(x?' – ':'')+y):''};
+const cvRange=(a,b,cur)=>{const x=a?fmtMY(a):'',y=b?fmtMY(b):(cur||!b?'present':'');return x||y?(x+(x?' – ':'')+y):''};
 function fmtMY(s){const d=pd(s);return isNaN(d)?String(s):MON[d.getMonth()]+' '+d.getFullYear()}
 
 /* ---------- forms (pop-ups; closing returns to where you were) ---------- */
 function cvProfileForm(){
-  if(cvMissing()){toast('Biodata belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  if(cvMissing()){toast('Biodata is not set up in the database yet. Run biodata.sql (or the latest schema.sql) once.',1);return}
   const {row,d}=cvProfile();
   const f=CV_PROFILE.map(([k,l,t,o])=>{const v=esc(d[k]||'');
-    if(t==='area')return `<label class="sm b" style="grid-column:1/-1">${l}<textarea class="in" id="cvp_${k}" rows="4" style="width:100%;display:block" placeholder="Dua sampai empat kalimat tentang dirimu, keahlianmu dan arah kariermu">${v}</textarea></label>`;
+    if(t==='area')return `<label class="sm b" style="grid-column:1/-1">${l}<textarea class="in" id="cvp_${k}" rows="4" style="width:100%;display:block" placeholder="Two to four sentences about yourself, your skills and where your career is heading">${v}</textarea></label>`;
     if(t==='sel')return `<label class="sm b">${l}<select class="in" id="cvp_${k}" style="width:100%;display:block">${o.map(x=>`<option ${d[k]===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`;
     return `<label class="sm b" ${t==='wide'?'style="grid-column:1/-1"':''}>${l}<input class="in" id="cvp_${k}" type="${t==='date'?'date':t==='email'?'email':'text'}" value="${v}" style="width:100%;display:block"></label>`}).join('');
-  openModal('Data diri',`<p class="sm ink2">Hanya kamu yang dapat membaca ini; admin tidak. Isi seperlunya. Bagian ini baru masuk ke CV bila kamu mencentangnya di pratinjau.</p><div class="fgrid" style="margin-top:8px">${f}</div>`,`<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cvpsave">${ic('check',15)} Simpan</button>`,'wide')}
+  openModal('Personal details',`<p class="sm ink2">Only you can read this; an admin cannot. Fill in what you like. This part only goes into the CV if you tick it in the preview.</p><div class="fgrid" style="margin-top:8px">${f}</div>`,`<span class="sp"></span><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="cvpsave">${ic('check',15)} Save</button>`,'wide')}
 ACT.cvprofile=()=>cvProfileForm();
 ACT.cvpsave=async el=>{const d={};CV_PROFILE.forEach(([k])=>{const e=document.getElementById('cvp_'+k);if(e&&e.value.trim())d[k]=e.value.trim()});
-  el.disabled=true;try{const {row}=cvProfile();const r=await saveRow('cv_entries',{section:'profile',title:d.full_name||'Data diri',data:d,sort_order:0},row&&row.id);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Data diri tersimpan');renderView()}
-  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
+  el.disabled=true;try{const {row}=cvProfile();const r=await saveRow('cv_entries',{section:'profile',title:d.full_name||'Personal details',data:d,sort_order:0},row&&row.id);if(!r)throw new Error('Your account is not allowed to save this, or it is waiting for approval.');finishModal();toast('Personal details saved');renderView()}
+  catch(e){el.disabled=false;toast('Not saved: '+((e&&e.message)||e),1)}};
 function cvEntryForm(sec,rec){
-  if(cvMissing()){toast('Biodata belum aktif di database. Jalankan schema.sql terbaru satu kali.',1);return}
+  if(cvMissing()){toast('Biodata is not set up in the database yet. Run biodata.sql (or the latest schema.sql) once.',1);return}
   const s=CV_SEC[sec],r=rec||{};
-  openModal((rec?'Ubah ':'Tambah ')+s.one,`<label class="sm b" for="cve_t">${esc(s.t)}</label><input class="in" id="cve_t" value="${esc(r.title||'')}" placeholder="${esc(s.ph)}" style="width:100%">
+  openModal((rec?'Edit ':'Add ')+s.one,`<label class="sm b" for="cve_t">${esc(s.t)}</label><input class="in" id="cve_t" value="${esc(r.title||'')}" placeholder="${esc(s.ph)}" style="width:100%">
    ${s.lvl?`<label class="sm b" for="cve_l" style="display:block;margin-top:10px">${s.lvlL}</label><select class="in" id="cve_l" style="width:100%">${s.lvl.map(x=>`<option ${r.level===x?'selected':''}>${esc(x)}</option>`).join('')}</select>`:''}
    <label class="sm b" for="cve_d" style="display:block;margin-top:10px">${esc(s.dt)}</label><textarea class="in" id="cve_d" rows="3" style="width:100%">${esc(r.detail||'')}</textarea>`,
-   `${rec?`<button class="btn d" data-act="cvedel" data-id="${rec.id}">Hapus</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Batal</button><button class="btn p" data-act="cvesave" data-sec="${sec}" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Simpan</button>`)}
+   `${rec?`<button class="btn d" data-act="cvedel" data-id="${rec.id}">Delete</button>`:''}<span class="sp"></span><button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="cvesave" data-sec="${sec}" ${rec?`data-id="${rec.id}"`:''}>${ic('check',15)} Save</button>`)}
 ACT.cvadd=el=>cvEntryForm(el.dataset.sec);
 ACT.cvedit=el=>{const r=byId('cv_entries',el.dataset.id);if(r)cvEntryForm(r.section,r)};
-ACT.cvesave=async el=>{const t=(($('#cve_t')||{}).value||'').trim();if(!t){toast('Isi dulu isiannya',1);return}
+ACT.cvesave=async el=>{const t=(($('#cve_t')||{}).value||'').trim();if(!t){toast('Fill in the entry first',1);return}
   const l=$('#cve_l'),d={section:el.dataset.sec,title:t,level:l?l.value:null,detail:(($('#cve_d')||{}).value||'').trim()||null,sort_order:el.dataset.id?undefined:cvRows(el.dataset.sec).length+1};
   if(d.sort_order===undefined)delete d.sort_order;
-  el.disabled=true;try{const r=await saveRow('cv_entries',d,el.dataset.id||undefined);if(!r)throw new Error('Akunmu tidak diizinkan menyimpan, atau menunggu persetujuan.');finishModal();toast('Tersimpan');renderView()}
-  catch(e){el.disabled=false;toast('Belum tersimpan: '+((e&&e.message)||e),1)}};
-ACT.cvedel=async el=>{if(!(await ask('Hapus?','Tindakan ini tidak dapat dibatalkan.','Hapus',true)))return;
-  try{await removeRow('cv_entries',el.dataset.id);finishModal();toast('Dihapus');renderView()}catch(e){toast('Belum terhapus: '+((e&&e.message)||e),1)}};
+  el.disabled=true;try{const r=await saveRow('cv_entries',d,el.dataset.id||undefined);if(!r)throw new Error('Your account is not allowed to save this, or it is waiting for approval.');finishModal();toast('Saved');renderView()}
+  catch(e){el.disabled=false;toast('Not saved: '+((e&&e.message)||e),1)}};
+ACT.cvedel=async el=>{if(!(await ask('Delete?','This cannot be undone.','Delete',true)))return;
+  try{await removeRow('cv_entries',el.dataset.id);finishModal();toast('Deleted');renderView()}catch(e){toast('Not deleted: '+((e&&e.message)||e),1)}};
 
 /* ---------- screens ---------- */
-const cvBanner=()=>`<div class="callout" role="note">${ic('info')}<div><b>Privat.</b> Biodata hanya dapat dibaca akunmu; admin tidak dapat membacanya. Pengalaman kerja, pendidikan, sertifikasi, seminar dan keahlian diambil dari <a href="#" data-act="go" data-p="growth" data-s="workexp">Skills &amp; Knowledge</a>, jadi tidak perlu diisi dua kali.</div></div>`;
+const cvBanner=()=>`<div class="callout" role="note">${ic('info')}<div><b>Private.</b> Only your account can read your Biodata; an admin cannot. Work experience, education, certifications, seminars and skills are taken from <a href="#" data-act="go" data-p="growth" data-s="workexp">Skills &amp; Knowledge</a>, so nothing is entered twice.</div></div>`;
 function cvHealth(){const g=k=>(D().health_records||[]).filter(r=>r.section==='profile'&&r.kind===k).map(r=>r.title+(r.notes?' ('+r.notes+')':'')).filter(Boolean);
   return {blood:g('Golongan darah'),allergy:g('Alergi'),emergency:g('Kontak darurat')}}
 function cvHobbies(){const own=cvRows('hobby').map(r=>r.title),h=(D().health_records||[]).filter(r=>r.section==='active'&&r.kind==='Hobi yang aktif').map(r=>r.title);return [...new Set([...own,...h])]}
@@ -22133,57 +22146,57 @@ VIEWS['cv/profile']=()=>{
   if(cvMissing())return missingCard('Biodata (CV)');
   const {d}=cvProfile(),has=CV_PROFILE.some(([k])=>d[k]&&k!=='full_name'&&k!=='email'),hl=cvHealth(),hb=cvHobbies();
   return `${cvBanner()}
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Data diri</h3><span class="sp"></span>${badge('CV '+cvComplete()+'% lengkap','blue')}<button class="btn p" data-act="cvprofile">${ic('edit',15)} ${has?'Ubah':'Isi'} data diri</button></div>
-   ${has?`<dl class="kv" data-cv-profile>${CV_PROFILE.filter(([k])=>d[k]).map(([k,l,t])=>`<dt>${esc(l)}</dt><dd>${esc(t==='date'?cvDate(d[k]):d[k])}</dd>`).join('')}</dl>`:`<p class="sm mut">Belum diisi. Tekan “Isi data diri”.</p>`}</div>
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Ringkasan kesehatan</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="health" data-s="profile">Ubah di Healthcare</button></div>
-   <p class="sm ink2">Diambil dari Healthcare → Profil Kesehatan. Tidak disalin ke sini, dan baru masuk ke CV bila kamu mencentangnya di pratinjau.</p>
-   <ul class="sm" style="margin:6px 0 0 18px" data-cv-health>${[['Golongan darah',hl.blood],['Alergi',hl.allergy],['Kontak darurat',hl.emergency]].map(([l,a])=>`<li>${l}: ${a.length?(S.hc&&S.hc.show?esc(a.join('; ')):'<span class="mut" aria-label="disembunyikan">••••</span>'):'<span class="mut">belum dicatat</span>'}</li>`).join('')}</ul>
-   <p class="xs mut" style="margin-top:6px">Detail tampil di sini bila “Tampilkan detail” di Healthcare menyala. ${esc(HC_NOTE)}</p></div>
-  <div class="card" style="margin-top:12px"><div class="ch"><h3>Hobi</h3></div><p class="sm">${hb.length?esc(hb.join(', ')):'<span class="mut">Belum ada.</span>'}</p><p class="xs mut">Hobi dari Healthcare → Aktivitas Sehat &amp; Hobi ikut tampil. Tambahkan hobi lain di “Bahasa, minat dan nilai”.</p></div>`};
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Personal details</h3><span class="sp"></span>${badge('CV '+cvComplete()+'% complete','blue')}<button class="btn p" data-act="cvprofile">${ic('edit',15)} ${has?'Edit':'Fill in'} personal details</button></div>
+   ${has?`<dl class="kv" data-cv-profile>${CV_PROFILE.filter(([k])=>d[k]).map(([k,l,t])=>`<dt>${esc(l)}</dt><dd>${esc(t==='date'?cvDate(d[k]):d[k])}</dd>`).join('')}</dl>`:`<p class="sm mut">Not filled in yet. Press “Fill in personal details”.</p>`}</div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Health summary</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="health" data-s="profile">Edit in Healthcare</button></div>
+   <p class="sm ink2">Taken from Healthcare → Profil Kesehatan. It is not copied here, and only goes into the CV if you tick it in the preview.</p>
+   <ul class="sm" style="margin:6px 0 0 18px" data-cv-health>${[['Blood type',hl.blood],['Allergies',hl.allergy],['Emergency contact',hl.emergency]].map(([l,a])=>`<li>${l}: ${a.length?(S.hc&&S.hc.show?esc(a.join('; ')):'<span class="mut" aria-label="hidden">••••</span>'):'<span class="mut">not recorded yet</span>'}</li>`).join('')}</ul>
+   <p class="xs mut" style="margin-top:6px">Details show here when “Show details” is on in Healthcare. General information, not professionally reviewed.</p></div>
+  <div class="card" style="margin-top:12px"><div class="ch"><h3>Hobbies</h3></div><p class="sm">${hb.length?esc(hb.join(', ')):'<span class="mut">None yet.</span>'}</p><p class="xs mut">Hobbies from Healthcare → Aktivitas Sehat &amp; Hobi are included. Add other hobbies under “Languages, interests and values”.</p></div>`};
 VIEWS['cv/more']=()=>{
   if(cvMissing())return missingCard('Biodata (CV)');
   return cvBanner()+Object.keys(CV_SEC).map(sec=>{const s=CV_SEC[sec],L=cvRows(sec);
-   return `<div class="card" style="margin-top:12px" data-cv-sec="${sec}"><div class="ch"><h3>${esc(s.t)} (${L.length})</h3><span class="sp"></span><button class="btn p" data-act="cvadd" data-sec="${sec}">${ic('plus',15)} Tambah</button></div>
-   ${L.length?`<div class="list">${L.map(r=>`<div class="item" data-act="cvedit" data-id="${r.id}" style="cursor:pointer"><span class="t" style="flex:1"><b>${esc(r.title)}</b>${r.level?` · ${esc(r.level)}`:''}${r.detail?`<div class="sm mut">${esc(trunc(r.detail,120))}</div>`:''}</span></div>`).join('')}</div>`:'<p class="sm mut">Belum ada.</p>'}</div>`}).join('')};
+   return `<div class="card" style="margin-top:12px" data-cv-sec="${sec}"><div class="ch"><h3>${esc(s.t)} (${L.length})</h3><span class="sp"></span><button class="btn p" data-act="cvadd" data-sec="${sec}">${ic('plus',15)} Add</button></div>
+   ${L.length?`<div class="list">${L.map(r=>`<div class="item" data-act="cvedit" data-id="${r.id}" style="cursor:pointer"><span class="t" style="flex:1"><b>${esc(r.title)}</b>${r.level?` · ${esc(r.level)}`:''}${r.detail?`<div class="sm mut">${esc(trunc(r.detail,120))}</div>`:''}</span></div>`).join('')}</div>`:'<p class="sm mut">None yet.</p>'}</div>`}).join('')};
 /* ---- the document ---- */
 function cvDoc(inc){
   const {d}=cvProfile(),H=[];
   const sec=(t,b)=>b?`<section class="cvs"><h3>${esc(t)}</h3>${b}</section>`:'';
-  const head=`<header class="cvh"><div class="cvn">${esc(d.full_name||'Nama lengkap')}</div>${d.headline?`<div class="cvhl">${esc(d.headline)}</div>`:''}${inc.profile?`<div class="cvc">${[d.city,d.phone,d.email,d.website].filter(Boolean).map(esc).join(' · ')}</div>`:''}</header>`;
-  const personal=inc.profile?[['Tempat, tanggal lahir',[d.birth_place,d.birth_date?cvDate(d.birth_date):''].filter(Boolean).join(', ')],['Jenis kelamin',d.gender],['Kewarganegaraan',d.nationality],['Agama',d.religion],['Alamat',d.address]].filter(x=>x[1]):[];
+  const head=`<header class="cvh"><div class="cvn">${esc(d.full_name||'Full name')}</div>${d.headline?`<div class="cvhl">${esc(d.headline)}</div>`:''}${inc.profile?`<div class="cvc">${[d.city,d.phone,d.email,d.website].filter(Boolean).map(esc).join(' · ')}</div>`:''}</header>`;
+  const personal=inc.profile?[['Place and date of birth',[d.birth_place,d.birth_date?cvDate(d.birth_date):''].filter(Boolean).join(', ')],['Gender',d.gender],['Nationality',d.nationality],['Religion',d.religion],['Address',d.address]].filter(x=>x[1]):[];
   H.push(head);
-  if(personal.length)H.push(sec('Data pribadi',`<dl class="kv">${personal.map(x=>`<dt>${esc(x[0])}</dt><dd>${esc(x[1])}</dd>`).join('')}</dl>`));
-  if(inc.summary&&d.summary)H.push(sec('Tentang saya',`<p>${esc(d.summary)}</p>`));
+  if(personal.length)H.push(sec('Personal details',`<dl class="kv">${personal.map(x=>`<dt>${esc(x[0])}</dt><dd>${esc(x[1])}</dd>`).join('')}</dl>`));
+  if(inc.summary&&d.summary)H.push(sec('About me',`<p>${esc(d.summary)}</p>`));
   if(inc.work){const W=(D().work_experience||[]).slice().sort((a,b)=>String(b.date_start||'').localeCompare(String(a.date_start||'')));
-    H.push(sec('Pengalaman kerja',W.map(w=>`<div class="cvi"><div class="cvt"><b>${esc(w.position||'')}</b>${w.organization?' · '+esc(w.organization):''}<span class="cvd">${esc(cvRange(w.date_start,w.date_end))}</span></div>${w.location||w.employment_type?`<div class="xs mut">${esc([w.employment_type,w.location].filter(Boolean).join(' · '))}</div>`:''}${w.responsibilities?`<p>${esc(w.responsibilities)}</p>`:''}${w.achievements?`<p><i>Pencapaian:</i> ${esc(w.achievements)}</p>`:''}${w.skills?`<div class="xs mut">Keahlian: ${esc(w.skills)}</div>`:''}</div>`).join('')))}
+    H.push(sec('Work experience',W.map(w=>`<div class="cvi"><div class="cvt"><b>${esc(w.position||'')}</b>${w.organization?' · '+esc(w.organization):''}<span class="cvd">${esc(cvRange(w.date_start,w.date_end))}</span></div>${w.location||w.employment_type?`<div class="xs mut">${esc([w.employment_type,w.location].filter(Boolean).join(' · '))}</div>`:''}${w.responsibilities?`<p>${esc(w.responsibilities)}</p>`:''}${w.achievements?`<p><i>Achievements:</i> ${esc(w.achievements)}</p>`:''}${w.skills?`<div class="xs mut">Skills: ${esc(w.skills)}</div>`:''}</div>`).join('')))}
   const C=(D().competencies||[]).filter(c=>c.status!=='Planned');
   if(inc.edu){const E=C.filter(c=>c.type==='Academic').sort((a,b)=>String(b.date_end||'').localeCompare(String(a.date_end||'')));
-    H.push(sec('Pendidikan',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(cvRange(c.date_start,c.date_end))}</span></div>${c.notes?`<p>${esc(c.notes)}</p>`:''}</div>`).join('')))}
+    H.push(sec('Education',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(cvRange(c.date_start,c.date_end))}</span></div>${c.notes?`<p>${esc(c.notes)}</p>`:''}</div>`).join('')))}
   if(inc.cert){const E=C.filter(c=>['Certification','Training','Workshop'].includes(c.type)).sort((a,b)=>String(b.date_end||'').localeCompare(String(a.date_end||'')));
-    H.push(sec('Sertifikasi dan pelatihan',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(c.date_end?fmtMY(c.date_end):'')}</span></div><div class="xs mut">${esc([c.type,c.certificate_no?'No. '+c.certificate_no:'',c.hours?c.hours+' jam':'',c.expiry_date?'berlaku sampai '+fmtMY(c.expiry_date):''].filter(Boolean).join(' · '))}</div></div>`).join('')))}
+    H.push(sec('Certifications and training',E.map(c=>`<div class="cvi"><div class="cvt"><b>${esc(c.name)}</b>${c.provider?' · '+esc(c.provider):''}<span class="cvd">${esc(c.date_end?fmtMY(c.date_end):'')}</span></div><div class="xs mut">${esc([c.type,c.certificate_no?'No. '+c.certificate_no:'',c.hours?c.hours+' h':'',c.expiry_date?'valid until '+fmtMY(c.expiry_date):''].filter(Boolean).join(' · '))}</div></div>`).join('')))}
   if(inc.sem){const E=(D().seminars||[]).filter(e=>e.status!=='Cancelled'&&['Speaker','Keynote speaker','Panelist','Moderator','Trainer'].includes(e.role)).sort((a,b)=>String(b.date_start||'').localeCompare(String(a.date_start||'')));
-    H.push(sec('Pembicara, seminar dan konferensi',E.map(e=>`<div class="cvi"><div class="cvt"><b>${esc(e.title)}</b>${e.role?' · '+esc(e.role):''}<span class="cvd">${esc(e.date_start?fmtMY(e.date_start):'')}</span></div>${e.topic?`<div class="xs mut">${esc(e.topic)}</div>`:''}</div>`).join('')))}
+    H.push(sec('Speaking, seminars and conferences',E.map(e=>`<div class="cvi"><div class="cvt"><b>${esc(e.title)}</b>${e.role?' · '+esc(e.role):''}<span class="cvd">${esc(e.date_start?fmtMY(e.date_start):'')}</span></div>${e.topic?`<div class="xs mut">${esc(e.topic)}</div>`:''}</div>`).join('')))}
   if(inc.skills){const sk={};C.filter(c=>c.status==='Completed'||c.status==='In Progress').forEach(c=>String(c.skills||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(s=>{const k=s.toLowerCase(),o=sk[k]=sk[k]||{name:s,lvl:0};o.lvl=Math.max(o.lvl,num(c.level))}));
-    const lv=['','Pemula','Dasar','Kompeten','Mahir','Ahli'],L=Object.values(sk).sort((a,b)=>b.lvl-a.lvl);
-    H.push(sec('Keahlian',L.length?`<p>${L.map(o=>esc(o.name)+(o.lvl?' ('+lv[o.lvl]+')':'')).join(' · ')}</p>`:''))}
-  if(inc.lang){const L=cvRows('language');H.push(sec('Bahasa',L.length?`<p>${L.map(r=>esc(r.title)+(r.level?' ('+esc(r.level)+')':'')+(r.detail?' – '+esc(r.detail):'')).join(' · ')}</p>`:''))}
-  if(inc.interest){const L=cvRows('interest');H.push(sec('Minat',L.length?`<p>${L.map(r=>esc(r.title)).join(' · ')}</p>`:''))}
-  if(inc.value){const L=cvRows('value');H.push(sec('Nilai dan prinsip',L.length?`<p>${L.map(r=>esc(r.title)+(r.detail?' – '+esc(r.detail):'')).join('; ')}</p>`:''))}
-  if(inc.hobby){const L=cvHobbies();H.push(sec('Hobi',L.length?`<p>${L.map(esc).join(' · ')}</p>`:''))}
-  if(inc.health){const h=cvHealth(),L=[['Golongan darah',h.blood],['Alergi',h.allergy],['Kontak darurat',h.emergency]].filter(x=>x[1].length);H.push(sec('Kesehatan',L.length?`<p>${L.map(x=>esc(x[0])+': '+esc(x[1].join('; '))).join(' · ')}</p>`:''))}
+    const lv=['','Beginner','Basic','Competent','Advanced','Expert'],L=Object.values(sk).sort((a,b)=>b.lvl-a.lvl);
+    H.push(sec('Skills',L.length?`<p>${L.map(o=>esc(o.name)+(o.lvl?' ('+lv[o.lvl]+')':'')).join(' · ')}</p>`:''))}
+  if(inc.lang){const L=cvRows('language');H.push(sec('Languages',L.length?`<p>${L.map(r=>esc(r.title)+(r.level?' ('+esc(r.level)+')':'')+(r.detail?' – '+esc(r.detail):'')).join(' · ')}</p>`:''))}
+  if(inc.interest){const L=cvRows('interest');H.push(sec('Interests',L.length?`<p>${L.map(r=>esc(r.title)).join(' · ')}</p>`:''))}
+  if(inc.value){const L=cvRows('value');H.push(sec('Values and principles',L.length?`<p>${L.map(r=>esc(r.title)+(r.detail?' – '+esc(r.detail):'')).join('; ')}</p>`:''))}
+  if(inc.hobby){const L=cvHobbies();H.push(sec('Hobbies',L.length?`<p>${L.map(esc).join(' · ')}</p>`:''))}
+  if(inc.health){const h=cvHealth(),L=[['Blood type',h.blood],['Allergies',h.allergy],['Emergency contact',h.emergency]].filter(x=>x[1].length);H.push(sec('Health',L.length?`<p>${L.map(x=>esc(x[0])+': '+esc(x[1].join('; '))).join(' · ')}</p>`:''))}
   return `<article class="cvdoc" data-cv-doc>${H.join('')}</article>`}
-const CV_INC=[['profile','Data pribadi dan kontak'],['summary','Tentang saya'],['work','Pengalaman kerja'],['edu','Pendidikan'],['cert','Sertifikasi dan pelatihan'],['sem','Pembicara dan seminar'],['skills','Keahlian'],['lang','Bahasa'],['interest','Minat'],['value','Nilai dan prinsip'],['hobby','Hobi'],['health','Ringkasan kesehatan (sensitif)']];
+const CV_INC=[['profile','Personal details and contact'],['summary','About me'],['work','Work experience'],['edu','Education'],['cert','Certifications and training'],['sem','Speaking and seminars'],['skills','Skills'],['lang','Languages'],['interest','Interests'],['value','Values and principles'],['hobby','Hobbies'],['health','Health summary (sensitive)']];
 VIEWS['cv/preview']=()=>{
   if(cvMissing())return missingCard('Biodata (CV)');
   const inc=S.cv.inc;
-  return `<div class="card noprint"><div class="ch"><h3>CV lengkap</h3><span class="sp"></span><button class="btn" data-act="cvcopy">${ic('copy',15)} Salin sebagai teks</button><button class="btn p" data-act="print">${ic('print',15)} Cetak atau simpan PDF</button></div>
-   <p class="sm ink2">Pilih bagian yang ikut. Dokumen dibuat di perangkatmu dan tidak diunggah. Untuk PDF, pilih “Simpan sebagai PDF” di jendela cetak.</p>
+  return `<div class="card noprint"><div class="ch"><h3>Full CV</h3><span class="sp"></span><button class="btn" data-act="cvcopy">${ic('copy',15)} Copy as text</button><button class="btn p" data-act="print">${ic('print',15)} Print or save as PDF</button></div>
+   <p class="sm ink2">Choose which parts to include. The document is built on your device and is not uploaded. For a PDF, choose “Save as PDF” in the print window.</p>
    <div class="cvinc" data-cv-inc>${CV_INC.map(([k,l])=>`<label class="cnd-c"><input type="checkbox" data-change="cvinc" data-k="${k}" ${inc[k]?'checked':''}><span>${esc(l)}</span></label>`).join('')}</div></div>
    <div class="card cvpage" style="margin-top:12px">${cvDoc(inc)}</div>`};
 CHG.cvinc=el=>{S.cv.inc[el.dataset.k]=el.checked?1:0;renderView()};
 ACT.cvcopy=async()=>{const tmp=document.createElement('div');tmp.innerHTML=cvDoc(S.cv.inc);
   const txt=[...tmp.querySelectorAll('.cvh .cvn,.cvhl,.cvc,.cvs h3,.cvt,.cvi>p,.cvi .xs,.cvs>p,.cvs dt,.cvs dd')].map(e=>{const t=e.textContent.replace(/\s+/g,' ').trim();return e.matches('.cvn')?t.toUpperCase():e.matches('.cvs h3')?'\n'+t.toUpperCase():t}).join('\n');
-  try{await navigator.clipboard.writeText(txt);toast('CV disalin sebagai teks')}catch(e){toast('Tidak bisa menyalin otomatis; gunakan Cetak.',1)}};
+  try{await navigator.clipboard.writeText(txt);toast('CV copied as text')}catch(e){toast('Could not copy automatically; use Print.',1)}};
 (function(){const st=document.createElement('style');st.textContent=`
 .cvpage{background:#fff;color:#111}.cvdoc{max-width:780px;margin:0 auto;font-size:13px;line-height:1.45;color:#111}
 .cvh{border-bottom:2px solid #1F3A5F;padding-bottom:8px;margin-bottom:8px}.cvh .cvn{font-weight:700;font-size:24px;margin:0;color:#1F3A5F}.cvhl{font-size:14px;color:#333}.cvc{font-size:12px;color:#444;margin-top:2px}
