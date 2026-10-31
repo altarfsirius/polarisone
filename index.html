@@ -22475,6 +22475,19 @@ AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_co
   run:async()=>{let n=0;for(const c of (D().api_connections||[]).slice()){const m=/^(Groundwork|AutoPrima)/i.exec(c.name||'');if(!m)continue;
     try{await updConn(c.id,{name:c.name.replace(/^Groundwork/i,'Altair Project Management').replace(/^AutoPrima/i,'Altair Auto')});n++}catch(e){}}return n},
   txt:n=>n+' connection name'+(n>1?'s':'')+' updated'});
+/* Notion Daily Actions: every Polaris One field and the Notion property it is written to (same name, fixed type) */
+(function(){
+  const T={title:'Title',uuid:'Text',text:'Text',time:'Text',number:'Number',checkbox:'Checkbox',date:'Date',timestamp:'Date'};
+  const L={title:'Title',uuid:'id',time:'time'};
+  const G=[['Title','title','title'],['Ids','id owner activity_id src_id','uuid'],['Plan and result','description time_cat priority status result blocker next_action lesson_learned notes','text'],['Source and sync','ext_key src_table src_no src_path src_parent code notion_page_id notion_synced_at','text'],['Time','start_time end_time','time'],['Numbers','planned_min actual_min energy progress pomodoros logged_min reopen_count src_depth','number'],['Flags','is_top3 reopen_open share_with_altair share_with_notion share_with_engineering share_with_cura','checkbox'],['Dates','action_date reopened_at created_at updated_at','date']];
+  const body=()=>{const bad=S.nd&&S.nd.check&&S.nd.check.schema&&S.nd.check.schema.wrong||[];
+    const miss=new Set((bad||[]).map(x=>x.name||x.k||x.field||x).filter(x=>typeof x==='string'));
+    const rows=G.flatMap(g=>g[1].split(' ').map(f=>`<tr><td>${esc(g[0])}</td><td><code>${esc(f)}</code></td><td><code>${esc(f)}</code></td><td class="sm mut">${T[g[2]]}</td><td>${miss.has(f)?'<span class="badge b-red">check</span>':''}</td></tr>`));
+    return `<p class="sm ink2" style="margin-bottom:8px">One way, Polaris One → Notion. Each Daily Action field is written to the Notion property of the same name and type. Create any missing property in Notion, then press <b>Check with Notion</b> on the Connect tab. The names are matched exactly by the server, so they cannot be pointed at other names here.</p>
+    <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Group</th><th>Polaris One field</th><th>Notion property</th><th>Type</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`};
+  const app=connApp('notion-daily');
+  if(app&&!app.types.some(x=>x.id==='fields'))app.types.push({id:'fields',name:'Field map',sub:'Polaris One → Notion properties',title:'Notion Daily Actions field map',lead:'Which field goes to which Notion property',text:'The 42 Daily Action fields and the Notion property each one is written to.',uses:['Same names on both sides','One way: nothing is read back'],body,state:()=>'off'})
+})();
 
 
 /* =====================================================================
