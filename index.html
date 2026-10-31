@@ -1992,11 +1992,11 @@ VIEWS['plan/milestones']=()=>crud('milestones');
 /* =====================================================================
    EXECUTE — Activities
    ===================================================================== */
-function filteredRows(key){const m=MOD[key],fs=S.f[key]=S.f[key]||{q:''};let rows=(D()[m.t]||[]).slice();(m.filters||[]).forEach(k=>{if(fs[k])rows=rows.filter(r=>{const v=m.fval&&m.fval[k]?m.fval[k](r):r[k];return String(v==null?'':v)===fs[k]})});const q=(fs.q||'').toLowerCase().trim();if(q)rows=rows.filter(r=>searchText(m,r).includes(q));return rows}
+function filteredRows(key){const m=MOD[key],fs=S.f[key]=S.f[key]||{q:''};let rows=(D()[m.t]||[]).slice();if(key==='activities'&&window.actPeriodPre)rows=rows.filter(window.actPeriodPre);(m.filters||[]).forEach(k=>{if(fs[k])rows=rows.filter(r=>{const v=m.fval&&m.fval[k]?m.fval[k](r):r[k];return String(v==null?'':v)===fs[k]})});const q=(fs.q||'').toLowerCase().trim();if(q)rows=rows.filter(r=>searchText(m,r).includes(q));return rows}
 VIEWS['execute/activities']=()=>{
   const v=S.ui.actView;
   const tog=`<div class="pills noprint"><button class="pill ${v==='list'?'on':''}" data-act="setui" data-k="actView" data-v="list">${ic('list',14)} List</button><button class="pill ${v==='board'?'on':''}" data-act="setui" data-k="actView" data-v="board">${ic('board',14)} Board</button></div>`;
-  if(v==='list')return crud('activities',{tools:tog+backBtn('activities'),sortFn:(a,b)=>(isClosed(a)-isClosed(b))||String(a.planned_finish||'9999').localeCompare(String(b.planned_finish||'9999'))});
+  if(v==='list')return crud('activities',{tools:tog+backBtn('activities'),pre:r=>window.actPeriodPre?window.actPeriodPre(r):true,sortFn:(a,b)=>(isClosed(a)-isClosed(b))||String(a.planned_finish||'9999').localeCompare(String(b.planned_finish||'9999'))});
   const rows=filteredRows('activities'),cols=['Not Started','In Progress','On Hold','Completed'];
   const fs=S.f.activities;
   const filt=['status','priority','portfolio_id'].filter(k=>k!=='status').map(k=>{const f=MOD.activities.fields.find(x=>x.k===k);return `<select class="in" data-change="flt" data-k="activities" data-f="${k}" aria-label="Filter ${esc(f.l)}"><option value="">All ${esc(f.l.toLowerCase())}</option>${filterOpts(MOD.activities,k).map(x=>`<option value="${esc(x[0])}" ${String(fs[k]||'')===String(x[0])?'selected':''}>${esc(trunc(x[1],36))}</option>`).join('')}</select>`}).join('');
@@ -22552,6 +22552,40 @@ AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_co
   const _v=VIEWS['plan/planning'];VIEWS['plan/planning']=()=>{const h=_v();const i=h.indexOf('<div class="pills"');return i<0?cascade()+h:h.slice(0,i)+cascade()+h.slice(i)};
   AUTO_TASKS.push({id:'pln',need:'plans',on:()=>!!S.profile&&prefs().plansauto!==false&&!window.__noT3&&plansMissing().length>0,run:()=>plansCreate(150),txt:n=>n+' plan'+(n>1?'s':'')+' created'});
   window.plansTest={wanted,period};
+})();
+
+/* ---- r14: 99_zzzzzzzzzzzzzzz_week.js ---- */
+/* Week plan and period code: shown in One day and in Always on top, and as a period bar on Activities (like One day / All days).
+   Everything follows the calendar: the week, month, quarter and half-year change by themselves. */
+(function(){
+  const PT=window.plansTest,HZ=['Weekly','Monthly','Quarterly','Semi-Annual','Annual'],SH={Weekly:'Week',Monthly:'Month',Quarterly:'Quarter','Semi-Annual':'Half year',Annual:'Year'};
+  const per=(h,d)=>PT.period(h,h==='Weekly'?d:d);
+  const codes=d=>HZ.map(h=>[h,PT.period(h,d)]);
+  const chips=d=>codes(d).map(([h,p])=>`<span class="badge" title="${SH[h]}">${esc(p.label)}</span>`).join(' ');
+  const wkPlans=d=>{const w=PT.period('Weekly',d);return (D().plans||[]).filter(p=>p.horizon==='Weekly'&&p.start_date<=w.end&&p.end_date>=w.start&&p.status!=='Cancelled')};
+  window.weekCard=function(compact){
+    const t=todayS(),w=PT.period('Weekly',t),ps=wkPlans(t);
+    const rows=ps.map(p=>{const pr=Math.round(planProgress(p)),o=String(p.outcomes||'').split('\n').filter(Boolean).slice(0,3);
+      return `<div class="item" data-act="open" data-k="plans" data-id="${p.id}" style="flex-wrap:wrap"><span class="t" style="flex:1;min-width:0">${esc(trunc(p.title,48))}</span><span class="xs mut">${pr}%</span>${compact?'':o.length?`<div class="xs mut" style="flex-basis:100%">${o.map(x=>esc(trunc(x,70))).join(' · ')}</div>`:''}</div>`}).join('');
+    return `<div class="card pip-c" style="margin-bottom:12px"><div class="ch"><h3>Week plan</h3><span class="sp"></span><span class="xs mut">${esc(fmtS(w.start))} – ${esc(fmtS(w.end))}</span></div>
+     <div class="row" style="gap:4px;flex-wrap:wrap;margin-bottom:8px">${chips(t)}</div>
+     ${rows?`<div class="list">${rows}</div>`:`<p class="sm mut" style="margin:0">No weekly plan for this week yet. It is made when a Life Area has an Activity or Daily Action this week.</p>`}</div>`};
+  const _d=VIEWS['execute/daily'];
+  VIEWS['execute/daily']=()=>{const h=_d(),k='<div class="card"><div class="ch"><h3>Top 3 today</h3>',i=h.indexOf(k);return i<0?h:h.slice(0,i)+weekCard(false)+h.slice(i)};
+  const _p=window.pipTop3;if(typeof _p==='function')window.pipTop3=function(r,t){return _p(r,t)+weekCard(true)};
+  /* Activities: period bar */
+  const st=()=>S.ui.actP=S.ui.actP||{h:'All',o:0};
+  const cur=()=>{const u=st();if(u.h==='All')return null;let d=todayS();
+    for(let i=0;i<Math.abs(u.o);i++){const p=PT.period(u.h,d);d=u.o>0?addD(p.end,1):addD(p.start,-1)}return PT.period(u.h,d)};
+  window.actPeriodPre=a=>{const p=cur();if(!p)return true;const s=a.planned_start||a.planned_finish,f=a.planned_finish||a.planned_start;if(!s)return false;return s<=p.end&&f>=p.start};
+  window.actPeriodBar=()=>'';
+  const _a=VIEWS['execute/activities'];
+  VIEWS['execute/activities']=()=>{const u=st(),p=cur(),t=todayS();
+    const pills=['All','Weekly','Monthly','Quarterly','Semi-Annual','Annual'].map(h=>`<button class="pill ${u.h===h?'on':''}" data-act="actper" data-h="${h}">${h==='All'?'All':SH[h]}</button>`).join('');
+    const nav=p?`<button class="btn s" data-act="actperstep" data-n="-1" aria-label="Previous">‹</button><b>${esc(p.label)}</b><span class="xs mut">${esc(fmtS(p.start))} – ${esc(fmtS(p.end))}</span><button class="btn s" data-act="actperstep" data-n="1" aria-label="Next">›</button>${u.o?`<button class="btn s" data-act="actperstep" data-n="0">Now</button>`:''}`:`<span class="xs mut">Now: ${chips(t)}</span>`;
+    return `<div class="row noprint" style="gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><div class="pills">${pills}</div>${nav}</div>`+_a()};
+  ACT.actper=el=>{S.ui.actP={h:el.dataset.h,o:0};renderView()};
+  ACT.actperstep=el=>{const u=st(),n=+el.dataset.n;u.o=n===0?0:u.o+n;renderView()};
 })();
 
 
