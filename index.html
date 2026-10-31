@@ -22432,6 +22432,45 @@ if(typeof putFaq==='function'){
     if(ids.length){S.t3.q.push({id:ids[0],ids,why:'Moved to a later day'});setTimeout(t3Next,450)}}
     return r}})();
 
+/* ---- r14: 99_zzzzzzzzzzzzz_fmap.js ---- */
+/* Field map tab: which Polaris One field goes to which field of each connected app, shown and editable from the app's own pop-up */
+(function(){
+  const PL={name:'Activity name',start:'Planned start',end:'Planned finish',status:'Status',progress:'Progress',priority:'Priority',description:'Description',est_hours:'Estimated hours',
+    title:'Action title',date:'Action date',date_end:'Action end date',start_time:'Start time',end_time:'End time',hours:'Hours',notes:'Notes'};
+  const row=(a,b,c)=>`<tr><td>${esc(a)}</td><td>${b?`<code>${esc(b)}</code>`:'<span class="mut">not mapped</span>'}</td>${c!==undefined?`<td class="sm mut">${esc(c)}</td>`:''}</tr>`;
+  const tbl=(h,rows)=>`<div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  function importMap(cn){
+    const c=connFor(cn),app=gwApp(c||{name:cn});
+    if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → API &amp; server.</p>';
+    const cfg=c.hier&&c.hier.on?c.hier:(app&&GW_APPS[app]?GW_APPS[app].cfg:null);
+    let h=`<p class="sm ink2" style="margin-bottom:8px">Each Polaris One field and the ${esc(cn)} field it is read from. Press <b>Edit field map</b> to choose them yourself.</p>`;
+    if(cfg){
+      const P=cfg.pcols||{},S2=cfg.scols||{};
+      h+=`<p class="sm"><b>Table</b>: <code>${esc(c.pg_table||GW_APPS[app].table)}</code>${cfg.sub_table?` · sub items: <code>${esc(cfg.sub_table)}</code>`:''}</p>`;
+      h+='<h4 style="margin:10px 0 4px">Activities</h4>'+tbl(['Polaris One field',cn+' field'],Object.keys(PL).filter(k=>k in P).map(k=>row(PL[k],P[k])));
+      h+='<h4 style="margin:12px 0 4px">Daily Actions</h4>'+tbl(['Polaris One field',cn+' field'],Object.keys(PL).filter(k=>k in S2).map(k=>row(PL[k],S2[k])))}
+    else{const fm=c.field_map||{};h+=tbl(['Polaris One field',cn+' field'],Object.keys(fm).map(k=>row(k,fm[k])))}
+    return h+`<div class="cd-row" style="margin-top:12px"><button class="btn p" data-act="fmapedit" data-id="${c.id}">${ic('edit',15)} Edit field map</button></div>`}
+  /* open the manual mapping screen from the saved map, without reading any rows first */
+  ACT.fmapedit=async el=>{
+    const c=byId('api_connections',el.dataset.id);if(!c)return;
+    const app=gwApp(c);
+    if(!app)return c.target_table?ACT.apimap(el):toast('Choose a target module first.',1);
+    if(!c.pg_table){await updConn(c.id,{pg_table:GW_APPS[app].table});c.pg_table=GW_APPS[app].table}
+    const cfg=JSON.parse(JSON.stringify(c.hier&&c.hier.on?c.hier:GW_APPS[app].cfg));
+    const keys=[...new Set([...Object.values(cfg.pcols||{}),...Object.values(cfg.scols||{}),cfg.id,cfg.parent_ref,...Object.values(GW_APPS[app].cfg.pcols),...Object.values(GW_APPS[app].cfg.scols)].filter(Boolean))];
+    S.gw={cid:c.id,table:c.pg_table,keys,sample:[],cfg,detected:null,subKeys:keys,subSample:[],tables:[]};
+    openModal(GW_APPS[app].label+' field map',`<div data-gwbody>${gwBody(S.gw.cfg)}</div>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="gwpreview" data-id="${c.id}">${ic('search',15)} Preview</button>`,'wide')};
+  const hubMap=(k)=>{
+    const n=HUB_PEERS[k].name;
+    const F2=[['Name','name'],['Notes','description'],['Planned start','planned_start'],['Planned finish','planned_finish'],['Status','status'],['Progress','progress'],['Priority','priority'],['Daily Action title','title'],['Action date','action_date'],['Start time','start_time'],['End time','end_time']];
+    return `<p class="sm ink2" style="margin-bottom:8px">The field names are fixed by the contract <b>polaris-hub/1</b>, so ${esc(n)} sends and receives exactly these. Your own time, result and blocker never leave Polaris One.</p>`+tbl(['Polaris One field',n+' field','Direction'],F2.map(f=>row(f[0],f[1],'both ways')))};
+  const add=(id,spec)=>{const app=connApp(id);if(!app||app.types.some(x=>x.id===spec.id))return;app.types.push(spec)};
+  add('ordo',{id:'fields',name:'Field map',sub:'Polaris One ⇄ Altair Project Management',title:'Altair Project Management field map',lead:'Which field goes to which field',text:'See and set how Altair Project Management fields become Polaris One fields.',uses:['Choose the column for every Polaris One field','Nothing is written back to Altair Project Management'],body:()=>importMap('Altair Project Management'),state:()=>'off'});
+  add('cura',{id:'fields',name:'Field map',sub:'Polaris One ⇄ Altair Auto',title:'Altair Auto field map',lead:'Which field goes to which field',text:'See and set how Altair Auto fields become Polaris One fields.',uses:['Choose the column for every Polaris One field','Nothing is written back to Altair Auto'],body:()=>importMap('Altair Auto'),state:()=>'off'});
+  ['engineering','cura','ordo'].forEach(k=>{if(HUB_PEERS[k])add(k,{id:'hubfields',name:'Hub field contract',sub:'Fixed by polaris-hub/1',title:HUB_PEERS[k].name+' · hub fields',lead:'Fields shared both ways',text:'The fields that travel between Polaris One and '+HUB_PEERS[k].name+'.',uses:['Same names on both sides','Only items you share travel'],body:()=>hubMap(k),state:()=>'off'})});
+})();
+
 
 /* =====================================================================
    BOOT
