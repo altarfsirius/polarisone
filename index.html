@@ -22470,6 +22470,11 @@ if(typeof putFaq==='function'){
   add('cura',{id:'fields',name:'Field map',sub:'Polaris One ⇄ Altair Auto',title:'Altair Auto field map',lead:'Which field goes to which field',text:'See and set how Altair Auto fields become Polaris One fields.',uses:['Choose the column for every Polaris One field','Nothing is written back to Altair Auto'],body:()=>importMap('Altair Auto'),state:()=>'off'});
   ['engineering','cura','ordo'].forEach(k=>{if(HUB_PEERS[k])add(k,{id:'hubfields',name:'Hub field contract',sub:'Fixed by polaris-hub/1',title:HUB_PEERS[k].name+' · hub fields',lead:'Fields shared both ways',text:'The fields that travel between Polaris One and '+HUB_PEERS[k].name+'.',uses:['Same names on both sides','Only items you share travel'],body:()=>hubMap(k),state:()=>'off'})});
 })();
+/* Rows saved under the old partner names are renamed once, so the connections are found again */
+AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_connections||[]).some(c=>/^(Groundwork|AutoPrima)/i.test(c.name||'')),
+  run:async()=>{let n=0;for(const c of (D().api_connections||[]).slice()){const m=/^(Groundwork|AutoPrima)/i.exec(c.name||'');if(!m)continue;
+    try{await updConn(c.id,{name:c.name.replace(/^Groundwork/i,'Altair Project Management').replace(/^AutoPrima/i,'Altair Auto')});n++}catch(e){}}return n},
+  txt:n=>n+' connection name'+(n>1?'s':'')+' updated'});
 
 
 /* =====================================================================
