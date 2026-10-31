@@ -398,19 +398,6 @@ const store={
   del(k){delete mem[k];try{localStorage.removeItem(k)}catch(e){}}
 };
 const STORE_KEY='polaris.v1', CFG_KEY='polaris.cfg';
-/* Rev 29: the old names (Tuntas / VegaTempus) are gone. Data saved under the old storage keys ("tuntas.*") is moved once to
-   the new keys ("polaris.*"): copied, read back, and only then removed. Nothing is lost if the browser refuses to write. */
-(function migrateLegacyStorage(){
-  try{
-    const ls=window.localStorage,olds=[];
-    for(let i=0;i<ls.length;i++){const k=ls.key(i);if(k&&k.indexOf('tuntas.')===0)olds.push(k)}
-    olds.forEach(k=>{const nk='polaris.'+k.slice(7),v=ls.getItem(k);
-      if(v===null)return;
-      if(ls.getItem(nk)===null){ls.setItem(nk,v)}
-      if(ls.getItem(nk)!==null)ls.removeItem(k)});
-  }catch(e){}
-  try{const ss=window.sessionStorage;const v=ss.getItem('tuntas.ms');if(v!==null){if(ss.getItem('polaris.ms')===null)ss.setItem('polaris.ms',v);ss.removeItem('tuntas.ms')}}catch(e){}
-})();
 const safeUrl=u=>{u=String(u==null?'':u).trim();return /^https?:\/\//i.test(u)?u:'#'};
 function getCfg(){let c={};try{c=JSON.parse(store.get(CFG_KEY)||'{}')}catch(e){}return {url:c.url||BUILTIN.url,key:c.key||BUILTIN.key,demo:!!c.demo}}
 function setCfg(c){store.set(CFG_KEY,JSON.stringify(c))}
@@ -9683,10 +9670,6 @@ function hubSQL(){return `
 -- =====================================================================
 -- API HUB: lets the app see that this script was run after an update
 -- =====================================================================
-create or replace function public.tuntas_schema_rev() returns integer language sql stable as $$ select ${SCHEMA_REV} $$;
-revoke all on function public.tuntas_schema_rev() from public, anon;
-grant execute on function public.tuntas_schema_rev() to authenticated;
--- Rev 29: the same answer under the new name. The old name above stays, so an older app or a script that still asks for it keeps working.
 create or replace function public.polaris_schema_rev() returns integer language sql stable as $$ select ${SCHEMA_REV} $$;
 revoke all on function public.polaris_schema_rev() from public, anon;
 grant execute on function public.polaris_schema_rev() to authenticated;
@@ -9765,7 +9748,6 @@ async function schemaCheck(){
   S.hub.schema={state:'run'};
   if(DB.mode!=='supabase'){S.hub.schema={state:'demo'};return}
   try{let {data,error}=await DB.sb.rpc('polaris_schema_rev');
-    if(error&&/Could not find the function|does not exist|schema cache|PGRST202|42883/i.test((error.message||'')+(error.code||''))){const r2=await DB.sb.rpc('tuntas_schema_rev');if(!r2.error){data=r2.data;error=null}else error=r2.error}
     if(error){const old=/Could not find the function|does not exist|schema cache|PGRST202|42883/i.test((error.message||'')+(error.code||''));S.hub.schema={state:old?'old':'err',msg:error.message,at:Date.now()};return}
     S.hub.schema={state:(+data)>=SCHEMA_REV?'ok':'old',rev:+data,at:Date.now()}}
   catch(e){S.hub.schema={state:'err',msg:e.message,at:Date.now()}}}
@@ -14910,15 +14892,7 @@ ACT.bdgo=el=>{
    ===================================================================== */
 const HC_NOTE='General information, not yet reviewed by a health professional. It is not a diagnosis and does not replace a doctor or other health professional.';
 const HC_EMERGENCY='Emergency? Call the emergency service where you are now (Indonesia: 112 for general emergencies, 119 for medical emergencies; check the numbers that apply in your area) or ask someone close to take you to the emergency room.';
-/* Records saved before Rev 30 carry Indonesian kinds, statuses, sources and relations. The screens read them through these maps, so old notes keep working and new ones are saved in English. */
-const HC_LEGACY={'Golongan darah':'Blood type','Alergi':'Allergy','Kondisi yang saya miliki':'Conditions I have','Obat atau suplemen yang saya pakai':'Medicines or supplements I take','Pengukuran':'Measurement','Dokter atau fasilitas kesehatan':'Doctor or health facility','Kontak darurat':'Emergency contact',
- 'Olahraga':'Exercise','Jalan atau bersepeda':'Walking or cycling','Hobi yang aktif':'Active hobby','Relaksasi':'Relaxation','Tidur (jam)':'Sleep (hours)','Air minum (gelas)':'Water (glasses)','Langkah':'Steps','Makan':'Meals','Waktu layar (jam)':'Screen time (hours)','Catatan kebiasaan':'Habit note',
- 'Riwayat keluarga':'Family history','Pemeriksaan atau skrining terjadwal':'Scheduled check-up or screening','Imunisasi atau vaksin':'Immunization or vaccine','Hasil pemeriksaan':'Check-up result','Gejala':'Symptom','Kunjungan dokter':'Doctor visit','Rencana perawatan dari dokter':'Care plan from the doctor','Hasil tes':'Test result','Pengingat (sesuai resep)':'Reminder (as prescribed)',
- 'Rencana pemulihan':'Recovery plan','Latihan atau terapi':'Exercise or therapy','Istirahat':'Rest','Kemajuan':'Progress','Suasana hati (1–5)':'Mood (1–5)','Stres (1–5)':'Stress (1–5)','Syukur atau jurnal':'Gratitude or journal','Sumber bantuan':'Sources of help',
- 'Saya catat sendiri':'I recorded it myself','Dari perangkat atau alat ukur':'From a device or measuring tool','Diagnosis atau keterangan tenaga profesional':'Diagnosis or statement from a professional','Belum diverifikasi':'Not verified',
- 'Ayah':'Father','Ibu':'Mother','Saudara kandung':'Sibling','Kakek atau nenek':'Grandparent','Paman atau bibi':'Uncle or aunt','Anak':'Child','Lainnya':'Other',
- 'Sedang berlangsung':'Ongoing','Sudah membaik':'Improving','Sudah selesai':'Finished','Terjadwal':'Scheduled','Sudah dilakukan':'Done','Sesuai resep dokter':"As prescribed by a doctor",'Tanpa resep (saya catat sendiri)':'Without a prescription (I recorded it)','Sudah dihentikan':'Stopped','Pengingat saya':'My reminder','Saya catat sudah diminum':'I recorded that I took it','skor':'score'};
-const hcL=v=>v==null?v:(HC_LEGACY[v]||v);
+const hcL=v=>v;
 const HC_SECTIONS=[
  {id:'condition',label:'Daily Condition',icon:'🌤️',kinds:['Condition check-in'],unit:0,emergency:1,mood:1,custom:1,
   intro:'Record your mood, feelings, physical condition, mental clarity, stress and multitasking load in one short pop-up, as often as you like. It is linked to your energy and focus sessions in Daily Actions, so you can see your own pattern.',
@@ -20262,7 +20236,7 @@ const SYNC_SQL="-- =============================================================
 const SY_OK=['work','freelance'];
 const SY_PERSONAL_TC=['Family','Ibadah','Exercise','Hobby','Sleep'];
 const SY_FNS=['api-sync','vt-sync'];let SY_FN=SY_FNS[0];
-S.sync={ov:null,link:null,states:{},fails:[],conflicts:[],statesKnown:null,edge:{state:'idle'},busy:'',legacy:null,last:null};
+S.sync={ov:null,link:null,states:{},fails:[],conflicts:[],statesKnown:null,edge:{state:'idle'},busy:'',last:null};
 
 /* ---------- which Life Area does an item belong to (the same rule as the database) ---------- */
 function syAreaOf(table,row){
@@ -20414,12 +20388,8 @@ function syViewHtml(){
   const fails=`<div class="card"><div class="ch"><h3>Failed events</h3><span class="sp"></span>${fl.length?`<button class="btn s" data-act="syreplay" data-id="">Replay all</button>`:''}</div>${noTab}${fl.length?`<div class="tw"><table class="tbl"><thead><tr><th>What</th><th>State</th><th>Tries</th><th>Reason</th><th>Action</th></tr></thead><tbody>${fl.map(f=>`<tr><td>${esc(f.entity)} · ${esc(f.op)}</td><td>${badge(f.status,f.status==='dead'?'red':'amber')}</td><td>${f.attempts}</td><td class="sm">${esc(f.last_error||f.error||'')}</td><td><button class="btn s" data-act="syreplay" data-id="${f.event_id}">Replay</button></td></tr>`).join('')}</tbody></table></div>`:(S.sync.statesKnown===false?'':'<p class="sm mut">Nothing failed.</p>')}</div>`;
   const tbl={project:'projects',task:'activities',action:'daily_actions'};
   const confl=`<div class="card"><div class="ch"><h3>Conflicts</h3></div><p class="sm ink2" style="margin-bottom:8px">Field by field, the later edit wins on both sides (a tie goes to this app). Edits to different fields never conflict. When both sides changed the same field within 5 minutes it is listed here, and you can choose.</p>${cf.length?`<div class="tw"><table class="tbl"><thead><tr><th>Item</th><th>Field</th><th>Here</th><th>Altair Project Management</th><th>Winner</th><th>Choose</th></tr></thead><tbody>${cf.map(c=>{const r=byId(tbl[c.entity]||'activities',c.local_id);return `<tr><td>${esc(r?(r.name||r.title):'(removed)')}</td><td>${esc(c.field)}</td><td>${esc(c.local_value!==undefined?c.local_value:c.local)}</td><td>${esc(c.peer_value!==undefined?c.peer_value:c.peer)}</td><td>${badge(c.winner==='peer'?'Altair Project Management':'this app','slate')}</td><td><button class="btn s" data-act="syresolve" data-id="${c.id}" data-keep="mine">Keep mine</button> <button class="btn s" data-act="syresolve" data-id="${c.id}" data-keep="theirs">Keep theirs</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="sm mut">No open conflicts.</p>'}</div>`;
-  const lg=S.sync.legacy,leg=`<div class="card"><div class="ch"><h3>Previous link data</h3></div>
-   <p class="sm ink2" style="margin-bottom:8px">Rows left by the older Altair Project Management import (code <b>AO-…</b>, or a Synced-from-Altair Project Management project) get a Life Area and are marked as shared, without creating copies: Altair Project Management matches them by code. Rows with no Life Area go to <b>Work</b>; move the Freelance ones yourself afterwards.</p>
-   <div class="row"><button class="btn" data-act="sylegacy">Put previous AO-… rows in Work and share them</button></div>
-   ${lg?`<p class="sm" style="margin-top:8px" role="status">Done: <b>${lg.projects||0}</b> projects and <b>${lg.activities||0}</b> activities updated.</p>`:''}</div>`;
   const help=`<div class="card"><div class="ch"><h3>How the levels, progress and status work</h3></div><ul class="sm ink2" style="padding-left:18px;line-height:1.6"><li><b>Level 1</b> in Altair Project Management is an <b>Activity</b> here, <b>level 2</b> is a <b>sub-activity</b>, and <b>level 3 and deeper</b> are <b>daily actions</b> under their sub-activity. A daily action directly under a main activity is not sent: put it under a sub-activity.</li><li>A sub-activity is sent only when its main activity is shared; a daily action only when its sub-activity is. Un-sharing a parent cancels everything below it on the other side.</li><li>Title, notes, priority, dates, status and progress go both ways; the later edit of each field wins. Estimated hours, start and end time, actual time, result and blocker stay here.</li><li>An item that has children shows the mean progress of its children that are not cancelled; it is not overwritten from outside.</li><li>A delete on the other side cancels here; nothing is ever removed.</li></ul></div>`;
-  return head+ctl+fails+confl+leg+help}
+  return head+ctl+fails+confl+help}
 VIEWS['integrations/altair']=()=>{if(!S.sync.loadedOnce){S.sync.loadedOnce=true;syLoad().then(()=>syEdge()).then(()=>renderView())}return syViewHtml()};
 AFTER['integrations/altair']=()=>{};
 navP('integrations').subs.push(['altair','Altair Project Management link']);
@@ -20454,7 +20424,6 @@ ACT.sypause=async()=>{try{await syRpc('integration_set_status',{p_status:S.sync.
 ACT.syrevoke=async()=>{if(!await ask('Disconnect from Altair Project Management?','Sharing stops and the queue is kept for reference. Your activities stay as they are. You can connect again later.','Disconnect',true))return;try{await syRpc('integration_set_status',{p_status:'revoked'});await syLoad();renderView()}catch(e){syFail(e)}};
 ACT.syreplay=async el=>{try{const n=await syRpc('integration_replay',{p_event:el.dataset.id||null});toast(n+' event(s) back in the queue');await syLoad();renderView()}catch(e){syFail(e)}};
 ACT.syresolve=async el=>{try{await syRpc('integration_resolve_conflict',{p_conflict:el.dataset.id,p_keep:el.dataset.keep});toast(el.dataset.keep==='mine'?'Kept yours':'Kept theirs');try{await DB.loadAll()}catch(e){console.warn(e)}await syLoad();renderView()}catch(e){syFail(e)}};
-ACT.sylegacy=async()=>{if(!await ask('Share the previous AO-… rows?','Rows with the code AO-… (and projects synced from Altair Project Management) are put in Work when they have no Life Area, and marked as shared. Nothing is deleted.','Do it'))return;try{S.sync.legacy=await syRpc('integration_assign_legacy_areas');try{await DB.loadAll()}catch(e){console.warn(e)}await syLoad();renderView()}catch(e){syFail(e)}};
 
 /* ---------- a debounced nudge after edits to shared items ---------- */
 let syTimer=null;
@@ -21589,7 +21558,7 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
   ['The old names are fully replaced','Downloads start with “polaris-one”. Browser data moves to the new names automatically, and older backups, links and event types keep working.'],
   ['Partner apps have new names','AltairOrdo and Groundwork are now Altair Project Management, Altair Engineering is now Altair Aero Engineering, and AldebaranCura and AutoPrima are now Altair Auto. Connections, sharing and data are unchanged; connections you saved under the old names are still recognised.']]},
  {t:'For the admin',items:[
-  ['Run schema.sql once, and the new hub.sql','schema.sql adds the function polaris_schema_rev (the old tuntas_schema_rev stays). hub.sql replaces hub_area_ok with a version per application. api-proxy and the running link (vt-sync, vt_* functions, altair-vega/1) are unchanged on purpose. Old file names are listed in LEGACY-NAMES.md.',null,null,null,1]]}
+  ['Run schema.sql once, and the new hub.sql','schema.sql adds the function polaris_schema_rev. hub.sql replaces hub_area_ok with a version per application. api-proxy and the running link (vt-sync, vt_* functions, altair-vega/1) are unchanged on purpose. Old file names are listed in LEGACY-NAMES.md.',null,null,null,1]]}
 ]});
 
 /* ---- r14: 99_zzzzzy_schedule.js ---- */
@@ -22587,6 +22556,21 @@ AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_co
   ACT.actper=el=>{S.ui.actP={h:el.dataset.h,o:0};renderView()};
   ACT.actperstep=el=>{const u=st(),n=+el.dataset.n;u.o=n===0?0:u.o+n;renderView()};
 })();
+
+/* ---- r14: 99_zzzzzzzzzzzzzzzz_hcm.js ---- */
+/* Healthcare records saved before Rev 30 carry Indonesian kinds, statuses, sources and relations. They are renamed to English once, then the old names are gone. */
+const HC_OLD={'Golongan darah':'Blood type','Alergi':'Allergy','Kondisi yang saya miliki':'Conditions I have','Obat atau suplemen yang saya pakai':'Medicines or supplements I take','Pengukuran':'Measurement','Dokter atau fasilitas kesehatan':'Doctor or health facility','Kontak darurat':'Emergency contact',
+ 'Olahraga':'Exercise','Jalan atau bersepeda':'Walking or cycling','Hobi yang aktif':'Active hobby','Relaksasi':'Relaxation','Tidur (jam)':'Sleep (hours)','Air minum (gelas)':'Water (glasses)','Langkah':'Steps','Makan':'Meals','Waktu layar (jam)':'Screen time (hours)','Catatan kebiasaan':'Habit note',
+ 'Riwayat keluarga':'Family history','Pemeriksaan atau skrining terjadwal':'Scheduled check-up or screening','Imunisasi atau vaksin':'Immunization or vaccine','Hasil pemeriksaan':'Check-up result','Gejala':'Symptom','Kunjungan dokter':'Doctor visit','Rencana perawatan dari dokter':'Care plan from the doctor','Hasil tes':'Test result','Pengingat (sesuai resep)':'Reminder (as prescribed)',
+ 'Rencana pemulihan':'Recovery plan','Latihan atau terapi':'Exercise or therapy','Istirahat':'Rest','Kemajuan':'Progress','Suasana hati (1–5)':'Mood (1–5)','Stres (1–5)':'Stress (1–5)','Syukur atau jurnal':'Gratitude or journal','Sumber bantuan':'Sources of help',
+ 'Saya catat sendiri':'I recorded it myself','Dari perangkat atau alat ukur':'From a device or measuring tool','Diagnosis atau keterangan tenaga profesional':'Diagnosis or statement from a professional','Belum diverifikasi':'Not verified',
+ 'Ayah':'Father','Ibu':'Mother','Saudara kandung':'Sibling','Kakek atau nenek':'Grandparent','Paman atau bibi':'Uncle or aunt','Anak':'Child','Lainnya':'Other',
+ 'Sedang berlangsung':'Ongoing','Sudah membaik':'Improving','Sudah selesai':'Finished','Terjadwal':'Scheduled','Sudah dilakukan':'Done','Sesuai resep dokter':"As prescribed by a doctor",'Tanpa resep (saya catat sendiri)':'Without a prescription (I recorded it)','Sudah dihentikan':'Stopped','Pengingat saya':'My reminder','Saya catat sudah diminum':'I recorded that I took it','skor':'score'};
+AUTO_TASKS.push({id:'hcm',need:'health_records',on:()=>!!S.profile&&(D().health_records||[]).some(r=>['kind','status','provenance','relation','unit'].some(k=>HC_OLD[r[k]])),
+  run:async()=>{let n=0;for(const r of (D().health_records||[]).filter(r=>['kind','status','provenance','relation','unit'].some(k=>HC_OLD[r[k]])).slice(0,120)){
+    const patch={};['kind','status','provenance','relation','unit'].forEach(k=>{if(HC_OLD[r[k]])patch[k]=HC_OLD[r[k]]});
+    try{const row=await DB.update('health_records',r.id,patch);const i=D().health_records.findIndex(x=>x.id===r.id);if(i>=0)D().health_records[i]=row;n++}catch(e){}}return n},
+  txt:n=>n+' health record'+(n>1?'s':'')+' translated to English'});
 
 
 /* =====================================================================
