@@ -4050,8 +4050,7 @@ async function maHandle(ev,via){
 
 /* ---------- Automation page ---------- */
 const BUILTIN_BY={groundwork:'Altair Project Management',autoprima:'Altair Auto'};
-const LEGACY_CONN={'Altair Project Management':'Groundwork','Altair Auto':'AutoPrima'};   /* rows saved before Rev 29 carry the old names */
-const connFor=n=>(D().api_connections||[]).find(c=>c.name.indexOf(n)===0||(LEGACY_CONN[n]&&c.name.indexOf(LEGACY_CONN[n])===0));
+const connFor=n=>(D().api_connections||[]).find(c=>c.name.indexOf(n)===0);
 function connState(c){
   if(!c)return ['Missing','slate'];if(!c.pg_table)return ['Choose a table','amber'];
   if(!c.target_table||!Object.keys(c.field_map||{}).length)return ['Mapping needed','amber'];
@@ -4085,7 +4084,7 @@ ACT.autosetup=async el=>{
   const c=byId('api_connections',el.dataset.id);
   if(!c.pg_table)return ACT.apidiscover({dataset:{id:c.id}});
   let smp;try{smp=await apiSample(c)}catch(e){return toast(apiErr(e),1)}
-  if(!smp.records.length)return toast('The table returned no rows. On Supabase this usually means row-level security hides them from the publishable key.',1);
+  if(!smp.records.length)return toast('The table returned no rows. On Supabase this usually means row-level security hides them from the publishable key. Altair Auto: check its read policy or add a server sign-in under Keys & server.',1);
   const target=c.target_table||'activities',g=guessMap(target,smp.keys);
   if(target==='activities'&&!g.name){await updConn(c.id,{target_table:target});toast('No title-like column found. Choose the activity name yourself.');return ACT.apimap({dataset:{id:c.id}})}
   const idf=smp.keys.includes('id')?'id':(smp.keys.find(k=>/(^|_)id$/i.test(k))||'');
@@ -6073,7 +6072,7 @@ const GW_APPS={
    scols:{title:'judul',date:'created_at',date_end:'',start_time:'',end_time:'',status:'status',progress:'',hours:'',notes:'deskripsi'},
    area:'Automotive',multi:'start',derive:true,subs:false,name_vehicle:true,
    lookups:[{k:'vehicle',table:'kendaraan',key:'id',via:'kendaraan_id'}]}}};
-const gwApp=c=>c&&/^(Altair Project Management|Groundwork)/i.test(c.name||'')?'groundwork':c&&/^(Altair Auto|AutoPrima)/i.test(c.name||'')?'autoprima':'';
+const gwApp=c=>c&&/^Altair Project Management/i.test(c.name||'')?'groundwork':c&&/^Altair Auto/i.test(c.name||'')?'autoprima':'';
 const GW_NOTES={
  groundwork:'Altair Project Management → Polaris One (read only). Reads the table “tasks”. Level 1 (TSK-0001) becomes an Activity. Level 2 (TSK-0001.1) becomes a sub-Activity of it. Level 3 and deeper (TSK-0001.1.1) become Daily Actions under their level-2 sub-Activity; the full path, the depth and the immediate source parent are kept as data, never flattened. Status carries over as it is (Not Started, In Progress, On Hold, Completed, Cancelled). Priority rendah, sedang, tinggi and kritis become Low, Medium, High and Critical. Start date and due date become the planned start and finish; a sub item is planned on its start date, or on its due date when it has no start. Each record gets a text note with its Altair Project Management number, project and assignee. Whatever Altair Project Management leaves empty takes the Polaris One default. It refreshes every time you open Polaris One and never deletes anything. Altair Project Management keeps its data behind a sign-in: the server signs in with a Altair Project Management account (GROUNDWORK_EMAIL and GROUNDWORK_PASSWORD in api-secrets.txt).',
  autoprima:'Altair Auto → Polaris One (read only). Reads the table “work_order”. Each work order becomes an Activity in the Automotive life area, named with its vehicle. Status open, proses, selesai and batal become Not Started, In Progress, Completed and Cancelled. Priority rendah, normal and tinggi become Low, Medium and High. The created date becomes the planned start and the target date the planned finish. The vehicle, work order number, workshop, target km, parts, costs and remarks go into the activity’s Remarks as a text note. Job cards (table “job_card”) can also become Daily Actions: tick “Also import sub items” in the setup. Whatever Altair Auto leaves empty takes the Polaris One default. It refreshes every time you open Polaris One and never deletes anything.'};
@@ -6431,7 +6430,7 @@ ACT.gwimport=el=>busy(el,async()=>{
   catch(e){toast(apiErr(e),1)}});
 
 /* ---------- places where it shows up ---------- */
-const _autosetup0=ACT.autosetup;ACT.autosetup=async el=>{const c=byId('api_connections',el.dataset.id);return c&&/^Altair Project Management/.test(c.name)?ACT.gwsetup(el):_autosetup0(el)};
+const _autosetup0=ACT.autosetup;ACT.autosetup=async el=>{const c=byId('api_connections',el.dataset.id);return c&&gwApp(c)==='groundwork'?ACT.gwsetup(el):_autosetup0(el)};
 const _pick0=ACT.apipicktable;ACT.apipicktable=async el=>{const c=byId('api_connections',el.dataset.id);if(c&&/^Altair Project Management/.test(c.name)){await updConn(c.id,{pg_table:el.dataset.t});delete S.apiSample[c.id];closeModal(true);toast('Table “'+el.dataset.t+'” selected');render();return ACT.gwsetup({dataset:{id:c.id}})}return _pick0(el)};
 const _apipreview0=ACT.apipreview;ACT.apipreview=el=>{const c=byId('api_connections',el.dataset.id);return c&&c.hier&&c.hier.on?ACT.gwpreview(el):_apipreview0(el)};
 const _btnApi=BTNS.api_connections;
