@@ -2063,7 +2063,8 @@ function nudges(rows,day){
   return out}
 function timeBlocks(rows){
   const H0=5,H1=23,HH=44,bl0=rows.filter(x=>!isSoftAction(x)&&x.start_time&&(x.end_time||x.planned_min)).map(x=>{const s=mins(x.start_time),e=x.end_time?mins(x.end_time):s+num(x.planned_min);return {x,s,e:Math.max(e,s+34)}});
-  const bl=bl0.concat((typeof icsDayBlocks==='function'?icsDayBlocks(S.ui.day):[]).map(o=>({o,s:o.s,e:Math.max(o.e,o.s+34)}))).sort((a,b)=>a.s-b.s);
+  const mt0=(D().meetings||[]).filter(m=>m.meeting_date===S.ui.day&&m.status!=='Cancelled'&&/\d{1,2}:\d{2}/.test(String(m.start_time||''))).map(m=>{const s=mins(tm(m.start_time)),e=m.end_time&&mins(tm(m.end_time))>s?mins(tm(m.end_time)):s+60;return {m,s,e:Math.max(e,s+34)}});
+  const bl=bl0.concat(mt0,(typeof icsDayBlocks==='function'?icsDayBlocks(S.ui.day):[]).map(o=>({o,s:o.s,e:Math.max(o.e,o.s+34)}))).sort((a,b)=>a.s-b.s);
   /* lanes are worked out per group of overlapping blocks, so one overlap early in the day does not squeeze every other block */
   {let cEnd=-1,cur=null;const groups=[];bl.forEach(b=>{if(!cur||b.s>=cEnd){cur=[];groups.push(cur);cEnd=b.e}else cEnd=Math.max(cEnd,b.e);cur.push(b)});
    groups.forEach(g=>{const lanes=[];g.forEach(b=>{let i=lanes.findIndex(le=>le<=b.s);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=b.e;b.l=i});g.forEach(b=>{b.L=Math.max(1,lanes.length)})})}
@@ -2071,7 +2072,7 @@ function timeBlocks(rows){
   h+=(typeof workBands==='function'?workBands(H0,HH):'')+prayerLines(H0,HH,S.ui.day)+(typeof softBlocks==='function'?softBlocks(rows,H0,HH):'');
   const nowM=new Date().getHours()*60+new Date().getMinutes();
   const now=S.ui.day===todayS()&&nowM>=H0*60&&nowM<=H1*60?`<div style="position:absolute;left:-5px;right:0;top:${(nowM-H0*60)/60*HH}px;border-top:2px solid var(--red);z-index:3"></div>`:'';
-  return `<div class="tb" style="height:${(H1-H0+1)*HH}px;margin-bottom:6px">${h}${now}${bl.map(b=>{if(b.o){const t0=Math.max(0,(b.s-H0*60)/60*HH),h0=Math.max(24,(b.e-b.s)/60*HH-2);return `<div class="tbb tbo ${b.o.busy==='FREE'?'free':''}" data-act="icsopen" data-i="${b.o.i}" style="top:${t0}px;height:${h0}px;left:calc(${b.l*100/b.L}% + 3px);width:calc(${100/b.L}% - 6px)" title="${esc(b.o.title)}">${esc(trunc(b.o.title,40))}</div>`}const top=Math.max(0,(b.s-H0*60)/60*HH),ht=Math.max(24,(b.e-b.s)/60*HH-2),c=TIMECAT_COLOR[b.x.time_cat]||'#64748B';
+  return `<div class="tb" style="height:${(H1-H0+1)*HH}px;margin-bottom:6px">${h}${now}${bl.map(b=>{if(b.m){const t0=Math.max(0,(b.s-H0*60)/60*HH),h0=Math.max(24,(b.e-b.s)/60*HH-2);return `<div class="tbb tbm" data-act="open" data-k="meetings" data-id="${b.m.id}" style="top:${t0}px;height:${h0}px;left:calc(${b.l*100/b.L}% + 3px);width:calc(${100/b.L}% - 6px);background:#7C5CD6" title="Meeting: ${esc(b.m.title)}">${tm(b.m.start_time)} ${esc(trunc(b.m.title,40))}</div>`}if(b.o){const t0=Math.max(0,(b.s-H0*60)/60*HH),h0=Math.max(24,(b.e-b.s)/60*HH-2);return `<div class="tbb tbo ${b.o.busy==='FREE'?'free':''}" data-act="icsopen" data-i="${b.o.i}" style="top:${t0}px;height:${h0}px;left:calc(${b.l*100/b.L}% + 3px);width:calc(${100/b.L}% - 6px)" title="${esc(b.o.title)}">${esc(trunc(b.o.title,40))}</div>`}const top=Math.max(0,(b.s-H0*60)/60*HH),ht=Math.max(24,(b.e-b.s)/60*HH-2),c=TIMECAT_COLOR[b.x.time_cat]||'#64748B';
     return `<div class="tbb" data-act="open" data-k="daily_actions" data-id="${b.x.id}" style="top:${top}px;height:${ht}px;left:calc(${b.l*100/b.L}% + 3px);width:calc(${100/b.L}% - 6px);background:${c};${b.x.status==='Completed'?'text-decoration:line-through;filter:saturate(.6)':''}" title="${esc(b.x.title)}">${tm(b.x.start_time)} ${esc(trunc(b.x.title,40))}</div>`}).join('')}</div>`}
 VIEWS['execute/daily']=()=>{
   if(S.ui.dayView==='all')return dayTog()+crud('daily_actions',{add:{action_date:S.ui.day},tools:backBtn('daily_actions')});
@@ -2082,7 +2083,7 @@ VIEWS['execute/daily']=()=>{
   const nd=nudges(real,day),nudgeHtml=nd.length?`<div class="g g3 g1m" style="margin-bottom:14px">${nd.slice(0,3).map(n=>`<div class="card flat" style="display:flex;gap:10px;padding:12px;background:var(--soft)"><span style="color:var(--brand)">${ic(n[2])}</span><div><b>${esc(n[0])}</b><div class="sm ink2">${esc(n[1])}</div></div></div>`).join('')}</div>`:'';
   const showDone=!!S.ui.showDone,vis=showDone?rows:rows.filter(x=>!isClosed(x)),nFin=rows.length-rows.filter(x=>!isClosed(x)).length;
   const list=vis.length?`<div class="list">${vis.map(x=>`<div class="item" style="gap:12px"><input type="checkbox" style="width:20px;height:20px;accent-color:var(--brand)" data-act="toggleDone" data-id="${x.id}" ${x.status==='Completed'?'checked':''} aria-label="Done"><div style="flex:1;min-width:0" data-act="open" data-k="daily_actions" data-id="${x.id}"><div class="t" style="${x.status==='Completed'?'text-decoration:line-through;color:var(--mut)':''}">${esc(x.title)}</div>${x.description?`<div class="sm ink2" style="white-space:normal">${esc(trunc(x.description,140))}</div>`:''}<div class="sm mut">${x.start_time?tm(x.start_time)+(x.end_time?'–'+tm(x.end_time):'')+' · ':''}${esc(x.time_cat||'')}${x.activity_id?' · '+esc(trunc(refLabel('activities',x.activity_id),30)):''}${x.pomodoros?' · '+x.pomodoros+' focus':''}</div>${isSoftAction(x)?breakChips(x):''}</div>${isBack('daily_actions',x)?badge('Back-dated','slate'):''}${x.status!=='Completed'&&x.status!=='Not Started'?badge(x.status):''}${isSoftAction(x)?'':`<button class="iconbtn" style="border:0;color:${x.is_top3?'var(--saf,#F0A202)':'var(--mut)'}" data-act="toggleTop" data-id="${x.id}" aria-label="Top 3" title="Top 3">${ic('star',18)}</button>`}</div>`).join('')}</div>`:rows.length?`<div class="empty-mini">Everything on this day is done. Well done.</div>`:`<div class="empty"><b>No actions for this day</b>Plan the day: pick 3 priorities, then block time for them.<br><button class="btn p" data-act="new" data-k="daily_actions" data-add='${esc(JSON.stringify({action_date:day}))}'>${ic('plus')} Add first action</button></div>`;
-  const left=`<div class="card"><div class="ch"><h3>Plan · Do · Check</h3><span class="sp"></span><span class="badge b-green">${done}/${real.length} done</span>${nFin?`<button class="btn s noprint" data-act="togdone" aria-pressed="${showDone}">${showDone?'Hide':'Show'} completed (${nFin})</button>`:''}</div>${list}</div>${typeof icsDayList==='function'?icsDayList(day):''}<div class="card mt"><div class="ch"><h3>Time blocks</h3><span class="sm mut">05:00 – 23:00</span></div>${vis.some(x=>x.start_time)||(typeof icsDayBlocks==='function'&&icsDayBlocks(day).length)?timeBlocks(vis):`<div class="empty-mini">${rows.some(x=>x.start_time)?'Every timed action is done.':'Add a start and end time to an action to see it here.'}</div>`}</div>`;
+  const left=`<div class="card"><div class="ch"><h3>Plan · Do · Check</h3><span class="sp"></span><span class="badge b-green">${done}/${real.length} done</span>${nFin?`<button class="btn s noprint" data-act="togdone" aria-pressed="${showDone}">${showDone?'Hide':'Show'} completed (${nFin})</button>`:''}</div>${list}</div>${typeof icsDayList==='function'?icsDayList(day):''}<div class="card mt"><div class="ch"><h3>Time blocks</h3><span class="sm mut">05:00 – 23:00</span></div>${vis.some(x=>x.start_time)||(typeof icsDayBlocks==='function'&&icsDayBlocks(day).length)||(D().meetings||[]).some(m=>m.meeting_date===day&&m.status!=='Cancelled'&&/\d{1,2}:\d{2}/.test(String(m.start_time||'')))?timeBlocks(vis):`<div class="empty-mini">${rows.some(x=>x.start_time)?'Every timed action is done.':'Add a start and end time to an action to see it here.'}</div>`}</div>`;
   const top3=rows.filter(x=>x.is_top3&&(showDone||!isClosed(x))).slice(0,3),top3all=rows.filter(x=>x.is_top3).length;
   const cats={};rows.forEach(x=>{cats[x.time_cat||'Other']=(cats[x.time_cat||'Other']||0)+dMin(x)});const used=sum(Object.values(cats));
   const pieData=Object.keys(cats).map(c=>({label:c,value:cats[c],color:TIMECAT_COLOR[c]||'#94A3B8',fmt:fmtN(cats[c]/60,1)+' h'}));if(used<1440)pieData.push({label:'Free time',value:1440-used,color:'#E3E8EE',fmt:fmtN((1440-used)/60,1)+' h'});
@@ -4066,7 +4067,7 @@ VIEWS['integrations/automation']=()=>{
   return `<div class="g g2">
   ${autoCard('flag','Holidays → Daily Actions',`Every public holiday and joint-leave day in the next ${a.holDays} days becomes a Daily Action on that date (marked done, so it never counts against your progress).`,`<label class="chk"><input type="checkbox" data-change="autotoggle" data-k="holidays" ${a.holidays?'checked':''}> Add holidays automatically</label><div class="row" style="margin:6px 0"><select class="in" style="width:auto" data-change="autoset" data-k="holDays" aria-label="Look ahead">${[60,120,365].map(n=>`<option value="${n}" ${a.holDays===n?'selected':''}>Next ${n} days</option>`).join('')}</select><button class="btn" data-act="autorun">${ic('refresh',15)} Run now</button></div><p class="xs mut">${hol.length} created · ${last}</p>`,a.holidays?badge('On','green'):badge('Off','slate'))}
   ${autoCard('clock','Prayer times → Daily Actions',`The five prayer times become 15-minute Ibadah blocks for the next days (time from Aladhan, Kemenag method, at your saved location).`,`<label class="chk"><input type="checkbox" data-change="autotoggle" data-k="prayer" ${a.prayer?'checked':''}> Add prayer blocks automatically</label><div class="row" style="margin:6px 0"><select class="in" style="width:auto" data-change="autoset" data-k="prayerDays" aria-label="Days ahead">${[1,3,7].map(n=>`<option value="${n}" ${a.prayerDays===n?'selected':''}>${n===1?'Today only':'Next '+n+' days'}</option>`).join('')}</select><button class="btn" data-act="autorun">${ic('refresh',15)} Run now</button><button class="btn" data-act="go" data-p="settings" data-s="feeds">Location</button></div><p class="xs mut">${pr.length} created · ${last}. A day is only filled once, so deleting a block keeps it deleted.</p>`,a.prayer?badge('On','green'):badge('Off','slate'))}
-  ${conn('Altair Project Management')}${conn('Altair Auto')}
+  
   ${autoCard('target','Market Analysis → Daily Actions',`Each analysis you run in the Market Analysis tab (Dapatkan rekomendasi / Hitung …) is logged as a completed Daily Action under the activity “Market analysis”.`,`<label class="chk"><input type="checkbox" data-change="maon" ${m.on?'checked':''}> Capture activity automatically</label><div class="row" style="margin:6px 0"><button class="btn p" data-act="go" data-p="market" data-s="analysis">${ic('link',15)} Open Market Analysis</button></div><p class="xs mut">${ma.length} captured. It works by itself: the analysis tool is part of Polaris One, nothing to install.</p>`,m.on?badge('On','green'):badge('Off','slate'))}
   ${autoCard('trash','Clean up',`Everything created automatically can be removed in one step. Your own entries are never touched.`,`<p class="sm">Auto-created items: <b>${hol.length+pr.length+ma.length}</b> daily actions.</p><div class="row" style="margin-top:8px"><button class="btn d" data-act="autoclean">${ic('trash',15)} Remove all auto-created items</button><button class="btn" data-act="autoforget">${ic('refresh',15)} Reset memory</button></div><p class="xs mut" style="margin-top:6px">Reset memory lets Polaris One fill in days and meetings you deleted before. Run it after a clean-up, or when you changed your hours.</p>`)}</div>`};
 AFTER['integrations/automation']=()=>{};
@@ -21592,6 +21593,27 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
   ['Run schema.sql once, and the new hub.sql','schema.sql adds the function polaris_schema_rev (the old tuntas_schema_rev stays). hub.sql replaces hub_area_ok with a version per application. api-proxy and the running link (vt-sync, vt_* functions, altair-vega/1) are unchanged on purpose. Old file names are listed in LEGACY-NAMES.md.',null,null,null,1]]}
 ]});
 
+/* ---- r14: 99_zzzzzy_schedule.js ---- */
+/* The Schedule import of Altair Project Management (tasks → Activities and Daily Actions) lives in the Altair Project Management pop-up,
+   next to its other parts, and no longer as a separate card on the Automation page. */
+const SCH_NAME='Altair Project Management';
+const schConn=(n)=>connFor(n||SCH_NAME);
+function schBody(n){
+  const c=schConn(n);if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → API &amp; server.</p>';
+  const st=connState(c);
+  return `<div class="cd-box"><div class="row" style="gap:8px;align-items:center">${badge(st[0],st[1])}</div>
+   <div class="sm" style="margin:8px 0">${c.pg_table?`Table: <b>${esc(c.pg_table)}</b>`:'No table chosen yet.'}${c.target_table&&Object.keys(c.field_map||{}).length?` · mapped ${Object.keys(c.field_map).length} fields`:''}${c.last_run_at?` · last run ${ago(Date.parse(c.last_run_at))}`:''}</div>
+   <div class="cd-row"><button class="btn p" data-act="autosetup" data-id="${c.id}">${ic('bolt',15)} ${st[0]==='Active'||st[0]==='Manual only'?'Re-run setup':'Set up automatically'}</button><button class="btn" data-act="open" data-k="api_connections" data-id="${c.id}">Open connection</button>${st[0]==='Active'?`<button class="btn" data-act="autopause" data-id="${c.id}">Pause</button>`:st[0]==='Paused'?`<button class="btn" data-act="autopause" data-id="${c.id}">Resume</button>`:''}</div></div>`}
+(function(){
+  const add=(id,spec)=>{const app=connApp(id);if(!app||app.types.some(x=>x.id===spec.id))return;spec.body=()=>schBody(spec.cn);spec.state=()=>{const c=schConn(spec.cn);return c&&['Active','Manual only'].includes(connState(c)[0])?'on':'off'};app.types.splice(1,0,spec)};
+  add('ordo',{id:'schedule',cn:'Altair Project Management',name:'Schedule import',sub:'Tasks → Activities and actions',title:'Altair Project Management → Activities and Daily Actions',lead:'Parent items become Activities, sub items become Daily Actions',
+    text:'In the Schedule Task, each <b>parent item</b> becomes an Activity and each <b>sub item</b> becomes a Daily Action under it (updated, never duplicated) every time you open Polaris One.',
+    uses:['Read only: nothing is ever written back or deleted in Altair Project Management','Updated every time you open Polaris One, never duplicated','Pause it at any time; re-run the setup to map the fields again']});
+  add('cura',{id:'orders',cn:'Altair Auto',name:'Work order import',sub:'Work orders → Activities',title:'Altair Auto → Activities',lead:'Work orders become Activities in Automotive',
+    text:'Each <b>work order</b> becomes an Activity in the Automotive life area, with the vehicle, costs and remarks in a text note (updated, never duplicated) every time you open Polaris One. Job cards can become Daily Actions.',
+    uses:['Read only: nothing is written back or deleted in Altair Auto','Updated every time you open Polaris One, never duplicated','Tick “Also import sub items” in the setup to turn job cards into Daily Actions']})})();
+['autosetup','autopause'].forEach(k=>{const o=ACT[k];if(typeof o==='function')ACT[k]=async function(){const r=await o.apply(this,arguments);try{cdRefresh()}catch(e){}return r}});
+
 /* ---- r14: 99_zzzzzz_pick.js ---- */
 /* REV 29 · searchable option box. Every <select> in the app opens a small box with a search field: type to filter, no scrolling.
    The real <select> stays in the page and keeps its value; choosing sets it and fires input + change, so every existing handler works unchanged. */
@@ -21798,7 +21820,7 @@ function condStrip(day){
   return `<div class="card flat noprint" data-cnd-strip style="background:var(--soft);margin-bottom:12px"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><span style="color:var(--brand)">${ic('heart')}</span><b>Condition${L.length>1?` (${L.length} check-ins)`:''}</b><span class="sm mut">${esc(last.time)}</span>${condChips(last)}<span class="sp"></span><button class="btn s" data-act="cndpattern">${ic('chart',14)} See pattern</button><button class="btn s" data-act="cndadd" data-d="${day}">${ic('plus',14)} Check in again</button></div>${low?`<p class="sm ink2" style="margin:8px 0 0">You seem to be running low. If you can, start with lighter tasks, switch between tasks less and take breaks. This is general advice, not an assessment.</p>`:''}</div>`}
 (function(){const _v=VIEWS['execute/daily'];if(!_v)return;
   VIEWS['execute/daily']=function(){const h=_v.apply(this,arguments);if(S.ui.dayView==='all')return h;const i=h.indexOf('</div>');if(i<0)return h;
-    const bar=`<button class="pill noprint" data-act="wkopen">${ic('clock',14)} Weekly summary</button>`+(typeof aotButton==='function'?aotButton():'');return h.slice(0,i)+bar+h.slice(i,i+6)+condStrip(S.ui.day)+h.slice(i+6)}})();
+    const bar=(cndMissing()?'':`<button class="btn p noprint" data-act="cndadd" data-d="${S.ui.day}" data-cnd-top>${ic('plus',15)} Check in</button>`)+`<button class="pill noprint" data-act="wkopen">${ic('clock',14)} Weekly summary</button>`+(typeof aotButton==='function'?aotButton():'');return h.slice(0,i)+bar+h.slice(i,i+6)+condStrip(S.ui.day)+h.slice(i+6)}})();
 /* the check-in that applies to an action, shown in its detail */
 (function(){const _e=EXTRA.daily_actions;EXTRA.daily_actions=x=>{let h=_e?_e(x):'';if(cndMissing())return h;const r=condAt(x.action_date,x.start_time);
   if(r){const o=condParse(r);h+=`<p class="sm ink2" style="margin-top:12px" data-cnd-link><b>Condition at this action</b> (check-in ${esc(o.time||'that day')}): ${condChips(o)}${x.energy?` · action energy ${x.energy}`:''}${num(x.pomodoros)?` · ${x.pomodoros} focus sessions`:''} <a href="#" data-act="cndpattern">See pattern</a></p>`}
@@ -21980,6 +22002,8 @@ RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
   ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “See pattern” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
   ['Weekly summary, like a personal assistant','“Weekly summary” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
   ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
+  ['Top 3 picked for you, in the free time','On every working day (Monday to Friday, not a holiday, joint leave or day off) the first time you open Polaris One it picks up to 3 actions, Critical first, and places them one after another in the time that no meeting, Outlook event, prayer, lunch or break blocks. Meetings with a start time now show in Time blocks. The rest wait for the next working day. The strip “Top 3 planner” on One day lets you plan again or switch it off.','execute','daily','Open One day'],
+  ['The reason for a postponed action','Move an action to a later date, put it on hold, cancel it, or close a late Top 3 that is not finished, and a window asks why. The reason goes into the Time log with 0 hours, so the Time log tells what held you up.','execute','timelog','Open Time log'],
   ['Always on top for One day','In the desktop app it now turns on by itself when Polaris One opens, and a Startup button can also open Polaris One when Windows or Mac starts. On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
  {t:'Changed',items:[
   ['Forms return to where you came from','A form opened from a pop-up (an Activity, a Goal, a Meeting …) now opens on top of it. Saving, deleting or cancelling takes you back to that pop-up, refreshed, not to the page behind.']]},
@@ -22241,6 +22265,173 @@ ACT.cvcopy=async()=>{const tmp=document.createElement('div');tmp.innerHTML=cvDoc
 .cvi{margin-bottom:8px}.cvt{display:flex;gap:6px;flex-wrap:wrap}.cvd{margin-left:auto;color:#444;font-size:12px}.cvdoc p{margin:2px 0}.cvdoc .xs{font-size:11.5px;color:#555}.cvdoc .kv{margin:0}
 .cvinc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 @media print{.cvpage{border:0;box-shadow:none;padding:0}}`;document.head.appendChild(st)})();
+
+/* ---- r14: 99_zzzzzzzzzzzz_top3.js ---- */
+/* =====================================================================
+   REV 30 · AUTOMATIC TOP 3, FREE-TIME PLANNING AND THE REASON FOR A POSTPONED ACTION
+   • Blocked time: Meetings (with a start time), Outlook events, timed Daily Actions, prayer times, lunch and breaks.
+   • On every working day (Monday to Friday; not a public holiday, not a joint leave, not a day off you booked) the first time Polaris One
+     is opened it picks up to 3 actions: Critical before High before Medium before Low, then the one that has waited longest.
+     They are starred, moved to today and placed one after another in the time that is not blocked. It happens once a day:
+     finishing all 3 early does not bring 3 more the same day. What is left waits its turn for the next working day.
+   • Not done or postponed: a window asks for the reason (required). The reason is written in the Time log with 0 hours.
+   ===================================================================== */
+const T3_REASONS=['A meeting or an interruption took the time','Waiting for someone or something','It took longer than planned','Low energy or not feeling well','The priority changed','Not enough time today','Still working on it','Other (write it below)'];
+const T3_PRI={Critical:0,High:1,Medium:2,Low:3};
+S.t3=S.t3||{q:[],busy:false,last:null};
+const t3On=()=>prefs().top3auto!==false&&!window.__noT3;
+const t3Rank=x=>T3_PRI[x.priority]!=null?T3_PRI[x.priority]:2;
+const t3Soft=x=>isLight(x)||x.time_cat==='Break'||x.time_cat==='Ibadah'||String(x.ext_key||'').indexOf('auto:')===0;
+/* a working day: Monday to Friday (your work settings), no holiday of any kind, no full day of leave */
+function t3Workday(d){
+  if(!isWorkDay(d))return false;
+  if(typeof holidayOn==='function'&&holidayOn(d).length)return false;
+  if(typeof leavesOn==='function'&&leavesOn(d).some(l=>!l.half_day))return false;
+  return true}
+function t3NextWorkday(from){let d=addD(from,1);for(let i=0;i<14&&!t3Workday(d);i++)d=addD(d,1);return d}
+/* everything that blocks the day, in minutes from midnight: [start,end,label] */
+function t3Busy(day,ignoreId){
+  const out=[],w=workSlots();
+  out.push([w.ls,w.le,'Lunch']);
+  (D().meetings||[]).filter(m=>m.meeting_date===day&&m.status!=='Cancelled'&&/\d{1,2}:\d{2}/.test(String(m.start_time||''))).forEach(m=>{const s=mins(tm(m.start_time)),e=m.end_time&&mins(tm(m.end_time))>s?mins(tm(m.end_time)):s+60;out.push([s,e,'Meeting: '+m.title])});
+  if(typeof icsDayBlocks==='function')icsDayBlocks(day).filter(b=>b.busy!=='FREE').forEach(b=>out.push([b.s,b.e,b.title]));
+  (D().daily_actions||[]).filter(x=>x.action_date===day&&x.id!==ignoreId&&x.status!=='Cancelled'&&x.start_time&&(x.end_time||x.planned_min)).forEach(x=>{const s=mins(tm(x.start_time)),e=x.end_time&&mins(tm(x.end_time))>s?mins(tm(x.end_time)):s+num(x.planned_min);if(e>s)out.push([s,e,x.title])});
+  const p=typeof prayerFor==='function'?prayerFor(day):null;
+  if(p)PRAYER_NAMES.forEach(([k,n])=>{const m=mins(p[k]);if(m!=null)out.push([m,m+15,'Prayer: '+n])});
+  return out.filter(b=>b[1]>b[0]).sort((a,b)=>a[0]-b[0])}
+/* the free time inside working hours; today starts from now (rounded up to 5 minutes) */
+function t3Free(day,ignoreId){
+  const w=workSlots(),busy=t3Busy(day,ignoreId);let from=w.s;
+  if(day===todayS()){const n=new Date(),m=n.getHours()*60+n.getMinutes();from=Math.max(from,Math.ceil((m+1)/5)*5)}
+  const free=[];let cur=from;
+  busy.forEach(b=>{if(b[1]<=cur)return;if(b[0]>cur&&b[0]>=from)free.push([cur,Math.min(b[0],w.e)]);cur=Math.max(cur,b[1])});
+  if(cur<w.e)free.push([cur,w.e]);
+  return free.filter(f=>f[1]-f[0]>=15)}
+function t3Take(free,dur){
+  for(const f of free){if(f[1]-f[0]>=dur){const s=f[0];f[0]=s+dur;return [s,s+dur]}}
+  return null}
+/* open actions that may become a Top 3 */
+function t3Candidates(day){
+  const act=id=>id?byId('activities',id):null;
+  return (D().daily_actions||[]).filter(x=>x.action_date<=day&&!isClosed(x)&&x.status!=='On Hold'&&!t3Soft(x)).sort((a,b)=>{
+    const ar=t3Rank(a),br=t3Rank(b);if(ar!==br)return ar-br;
+    const as=a.is_top3?0:1,bs=b.is_top3?0:1;if(as!==bs)return as-bs;
+    const af=(act(a.activity_id)||{}).planned_finish||'9999',bf=(act(b.activity_id)||{}).planned_finish||'9999';if(af!==bf)return af<bf?-1:1;
+    if(a.action_date!==b.action_date)return a.action_date<b.action_date?-1:1;
+    return String(a.created_at||'').localeCompare(String(b.created_at||''))})}
+const t3Backlog=day=>t3Candidates(day).filter(x=>!(x.action_date===day&&x.is_top3))
+/* a reason was already written for this action today */
+const t3Asked=(id,day)=>(D().time_logs||[]).some(l=>l.source==='Postponed'&&l.daily_action_id===id&&l.log_date===day);
+async function t3Pick(day,force){
+  if(!t3Workday(day))return {n:0,why:'not a working day'};
+  const keys=seenSet();if(!force&&keys.has('t3:'+day))return {n:0,why:'done today'};
+  const DA=D().daily_actions||[],have=DA.filter(x=>x.action_date===day&&x.is_top3&&!t3Soft(x));
+  const need=3-have.length,out=[];
+  S.t3.silent=true;
+  try{
+    /* yesterday's (last working day's) Top 3 that stayed open: ask why, one at a time */
+    const stale=DA.filter(x=>x.is_top3&&x.action_date<day&&!isClosed(x)&&!t3Asked(x.id,x.action_date)&&!t3Asked(x.id,day));
+    if(need>0){
+      const free=t3Free(day);have.forEach(x=>{});
+      const cands=t3Candidates(day).filter(x=>!have.some(h=>h.id===x.id)).slice(0,need);
+      for(const x of cands){
+        const carried=x.action_date<day,dur=clamp(num(x.planned_min)||60,15,120),patch={action_date:day,is_top3:true};
+        const keep=x.action_date===day&&x.start_time&&!t3Busy(day,x.id).some(b=>{const s=mins(tm(x.start_time)),e=x.end_time?mins(tm(x.end_time)):s+dur;return s<b[1]&&e>b[0]});
+        if(!keep){const slot=t3Take(free,dur);if(slot){patch.start_time=hhmm(slot[0]);patch.end_time=hhmm(slot[1]);patch.planned_min=dur}else{patch.start_time=null;patch.end_time=null}}
+        if(carried)patch.notes=((x.notes?x.notes+'\n':'')+'Carried over from '+fmtD(x.action_date)).slice(0,2000);
+        await patchRow('daily_actions',x.id,patch);out.push(byId('daily_actions',x.id))}
+    }
+    await seenAdd(['t3:'+day]);
+    if(stale.length)S.t3.q.push(...stale.map(x=>({id:x.id,why:'Not finished on '+fmtD(x.action_date)})));
+  }finally{S.t3.silent=false}
+  S.t3.last={day,n:out.length,at:Date.now()};
+  if(S.t3.q.length)setTimeout(t3Next,900);
+  return {n:out.length,items:out}}
+async function t3Auto(){const r=await t3Pick(todayS(),false);return r.n}
+(function(){
+  const _ens=typeof ensureHolidays==='function'?ensureHolidays:null;
+  AUTO_TASKS.push({id:'t3',need:'daily_actions',on:()=>t3On()&&!!S.profile,run:async()=>{try{if(_ens)await _ens([+todayS().slice(0,4)])}catch(e){}return t3Auto()},txt:n=>'today\'s Top 3 ('+n+')'})})();
+/* ---------- the reason window ---------- */
+function t3Next(){
+  if(S.t3.busy)return;const q=S.t3.q;
+  while(q.length){const it=q[0],x=byId('daily_actions',it.id);if(!x||isClosed(x)||t3Asked(x.id,todayS())){q.shift();continue}break}
+  if(!q.length)return;const it=q[0],x=byId('daily_actions',it.id);S.t3.busy=true;
+  const more=it.ids&&it.ids.length>1?it.ids.length-1:0;
+  const body=`<div data-t3-reason><p class="sm"><b>${esc(trunc(x.title,90))}</b>${more?` and ${more} more`:''}<br><span class="mut">${esc(it.why||'')}</span></p>
+   <p class="sm ink2">Write why, so the Time log can tell the story. It takes a few seconds, and the question is not asked again today for this action.</p>
+   ${T3_REASONS.map((r,i)=>`<label class="chk" style="padding:5px 0"><input type="radio" name="t3r" value="${i}" data-change="t3pick"><span>${esc(r)}</span></label>`).join('')}
+   <label class="sm b" for="t3_note" style="display:block;margin-top:8px">Details (required for “Other”)</label><textarea class="in" id="t3_note" rows="2" style="width:100%"></textarea>
+   <p class="xs" id="t3_err" role="alert" style="color:var(--redt);min-height:16px;margin-top:6px"></p></div>`;
+  const d=openModal('Why was this not done?',body,`<span class="sp"></span><button class="btn p" data-act="t3save" data-id="${x.id}">Save the reason</button>`);d._t3reason=true}
+CHG.t3pick=()=>{const e=$('#t3_err');if(e)e.textContent=''};
+ACT.t3save=async el=>{
+  const r=document.querySelector('input[name="t3r"]:checked'),note=(document.getElementById('t3_note')||{}).value||'',err=$('#t3_err'),x=byId('daily_actions',el.dataset.id);
+  if(!r){if(err)err.textContent='Choose a reason.';return}
+  const reason=T3_REASONS[+r.value];
+  if(/^Other/.test(reason)&&!note.trim()){if(err)err.textContent='Write the reason in the box.';return}
+  el.disabled=true;
+  try{
+    const ids=(S.t3.q[0]&&S.t3.q[0].ids)||[el.dataset.id];
+    for(const aid of ids){const y=byId('daily_actions',aid);if(!y||t3Asked(aid,todayS()))continue;
+      await saveRow('time_logs',{activity_id:y.activity_id||null,daily_action_id:aid,log_date:todayS(),hours:0,source:'Postponed',note:(trunc(y.title,80)+' · '+reason+(note.trim()?': '+note.trim():'')).slice(0,1000)})}
+    S.t3.q.shift();S.t3.busy=false;finishModal();toast('Reason saved in the Time log');renderView();setTimeout(t3Next,300)}
+  catch(e){el.disabled=false;if(err)err.textContent='Not saved: '+((e&&e.message)||e)}};
+const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('daily_actions',id);if(!x||t3Soft(x)||t3Asked(id,todayS()))return;if(!S.t3.q.some(q=>q.id===id))S.t3.q.push({id,why});setTimeout(t3Next,450)};
+/* postponed: moved to a later date, put on hold, or cancelled */
+(function(){
+  const _s=saveRow,_p=patchRow;
+  const watch=async(call,key,id,args)=>{
+    const old=key==='daily_actions'&&id?byId('daily_actions',id):null,was=old?{status:old.status,date:old.action_date,closed:isClosed(old)}:null;
+    const row=await call.apply(null,args);
+    try{if(was&&row&&!S.t3.silent&&!was.closed){
+      if(row.status==='On Hold'&&was.status!=='On Hold')t3Defer(id,'Put on hold');
+      else if(row.status==='Cancelled')t3Defer(id,'Cancelled');
+      else if(row.action_date&&was.date&&row.action_date>was.date&&row.status!=='Completed')t3Defer(id,'Moved from '+fmtD(was.date)+' to '+fmtD(row.action_date))}}catch(e){console.warn(e)}
+    return row};
+  saveRow=function(key,d,id,opts){return watch(_s,key,id,arguments)};
+  patchRow=function(key,id,patch,opts){return watch(_p,key,id,arguments)}})();
+/* closing a Top 3 that is late and not finished */
+(function(){
+  const _o=openDetail;openDetail=function(key,id){const r=_o.apply(this,arguments);try{const top=$('#layer').lastElementChild;if(top&&key==='daily_actions')top._t3={id}}catch(e){}return r};
+  const _c=closeModal;closeModal=function(all){
+    let id=null;try{const top=$('#layer').lastElementChild;if(!all&&top&&top._t3)id=top._t3.id}catch(e){}
+    const r=_c.apply(this,arguments);
+    try{if(id){const x=byId('daily_actions',id),t=todayS();
+      if(x&&x.is_top3&&!isClosed(x)&&x.status!=='On Hold'&&!t3Soft(x)&&x.action_date<=t){
+        const n=new Date(),cur=n.getHours()*60+n.getMinutes(),late=x.action_date<t||(x.end_time?mins(tm(x.end_time))<cur:cur>workSlots().e);
+        if(late)t3Defer(id,x.action_date<t?'Not finished on '+fmtD(x.action_date):'Its planned time has passed')}}}catch(e){console.warn(e)}
+    return r}})();
+/* ---------- the strip on One day ---------- */
+function t3Strip(day){
+  const t=todayS(),work=t3Workday(day);
+  const picks=(D().daily_actions||[]).filter(x=>x.action_date===day&&x.is_top3&&!t3Soft(x));
+  const back=t3Backlog(day).filter(x=>x.action_date<=day);
+  const blocked=t3Busy(day).filter(b=>b[2]!=='Lunch'&&!/^Prayer/.test(b[2]));
+  const free=t3Free(day),fmin=free.reduce((a,f)=>a+f[1]-f[0],0);
+  const line=!work?`<span class="mut">${isWorkDay(day)?'A holiday or a day off: no automatic Top 3.':'Weekend: no automatic Top 3.'}</span>`
+    :`${picks.length} of 3 chosen · ${blocked.length} blocked slot${blocked.length===1?'':'s'}${blocked.length?' ('+esc(blocked.slice(0,3).map(b=>hhmm(b[0])+'–'+hhmm(b[1])).join(', '))+(blocked.length>3?'…':'')+')':''} · ${fmtN(fmin/60,1)} h free`;
+  const nxt=back.slice(0,4);
+  return `<div class="card flat noprint" data-t3-strip style="margin-bottom:12px;background:var(--soft)"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Top 3 planner</b><span class="sm">${line}</span><span class="sp"></span>
+   ${day===t&&work?`<button class="btn s" data-act="t3replan">Plan my Top 3 now</button>`:''}<label class="sm" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-change="t3auto" ${t3On()?'checked':''}> Pick automatically on working days</label></div>
+   ${nxt.length?`<div class="xs mut" style="margin-top:6px" data-t3-back>Waiting for their turn (${back.length}): ${nxt.map(x=>`<a href="#" data-act="open" data-k="daily_actions" data-id="${x.id}">${esc(trunc(x.title,34))}</a> <span class="mut">(${esc(x.priority||'Medium')}, ${esc(fmtS(x.action_date))})</span>`).join(' · ')}${back.length>4?' …':''}</div>`:''}</div>`}
+(function(){const _v=VIEWS['execute/daily'];if(!_v)return;
+  VIEWS['execute/daily']=function(){const h=_v.apply(this,arguments);if(S.ui.dayView==='all')return h;
+    const i=h.indexOf('</div>');if(i<0)return h;return h.slice(0,i+6)+t3Strip(S.ui.day)+h.slice(i+6)}})();
+ACT.t3replan=async()=>{
+  const t=todayS();if(!t3Workday(t))return toast('Today is not a working day.',1);
+  const have=(D().daily_actions||[]).filter(x=>x.action_date===t&&x.is_top3&&!isClosed(x)&&!t3Soft(x));
+  if(have.length&&!await ask('Plan the Top 3 again?',`Today already has ${have.length} open Top 3 action${have.length>1?'s':''}. They stay. Only the free places are filled, in the order Critical, High, Medium, Low.`,'Plan'))return;
+  try{const r=await t3Pick(t,true);toast(r.n?r.n+' action'+(r.n>1?'s':'')+' added to today\'s Top 3':'Nothing to add: there are already 3, or no open action is waiting.');renderView()}catch(e){toast('Not planned: '+((e&&e.message)||e),1)}};
+CHG.t3auto=async el=>{try{await setPrefs({top3auto:!!el.checked});toast(el.checked?'Top 3 will be picked automatically on working days':'Automatic Top 3 is off');renderView()}catch(e){toast('Not saved: '+((e&&e.message)||e),1)}};
+if(typeof putFaq==='function'){
+  putFaq('How are my Top 3 picked, and when are they not?','On every working day (Monday to Friday, not a public holiday, a joint leave or a day off you booked) the first time you open Polaris One it chooses up to 3 open actions: Critical first, then High, Medium and Low, and the one that has waited longest first. They are starred, moved to today and placed one after another in the time that is not blocked by a meeting, an Outlook event, a prayer, lunch, a break or another timed action. It happens once a day: when you finish all 3 early, 3 more do not appear the same day. The rest wait their turn for the next working day. Switch it off, or plan again by hand, in the “Top 3 planner” strip on One day.');
+  putFaq('Why does a window ask me for a reason?','When an action is postponed (moved to a later date, put on hold or cancelled), or you close a Top 3 that is late and not finished, Polaris One asks for the reason and writes it in the Time log with 0 hours. It is asked once a day for an action. The reasons build a picture of what really holds you up.')}
+
+/* several actions moved at once (“Move all to today”): one window for the whole group */
+(function(){const o=ACT.dgmoveall;if(typeof o!=='function')return;
+  ACT.dgmoveall=async function(){S.t3.bulk=[];let r;try{r=await o.apply(this,arguments)}finally{const ids=S.t3.bulk.filter((v,i,a)=>a.indexOf(v)===i);S.t3.bulk=null;
+    if(ids.length){S.t3.q.push({id:ids[0],ids,why:'Moved to a later day'});setTimeout(t3Next,450)}}
+    return r}})();
 
 
 /* =====================================================================
