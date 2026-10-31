@@ -22489,6 +22489,71 @@ AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_co
   if(app&&!app.types.some(x=>x.id==='fields'))app.types.push({id:'fields',name:'Field map',sub:'Polaris One → Notion properties',title:'Notion Daily Actions field map',lead:'Which field goes to which Notion property',text:'The 42 Daily Action fields and the Notion property each one is written to.',uses:['Same names on both sides','One way: nothing is read back'],body,state:()=>'off'})
 })();
 
+/* ---- r14: 99_zzzzzzzzzzzzzz_plans.js ---- */
+/* Plans per Life Area, made from the calendar.
+   Titles:  <Life Area> YYYY · <Life Area> Hn YYYY · <Life Area> Qn YYYY · <Life Area> Mmm YYYY · <Life Area> Wn YYYY
+   A Life Area gets plans only for the periods in which it has an Activity (start or finish date) or a Daily Action (action date).
+   A Life Area with nothing in it gets nothing. Each plan sits under its parent (Week → Month → Quarter → Half → Year). */
+(function(){
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],HZ=['Annual','Semi-Annual','Quarterly','Monthly','Weekly'];
+  const U=(y,m,d)=>new Date(Date.UTC(y,m,d)),F=d=>d.toISOString().slice(0,10),P=s=>{const [y,m,d]=s.split('-').map(Number);return U(y,m-1,d)};
+  const thu=s=>{const d=P(s),w=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-w+3);return F(d)};
+  const isoWeek=s=>{const t=P(thu(s)),y=t.getUTCFullYear(),j=U(y,0,4),w=1+Math.round(((t-j)/864e5-3+((j.getUTCDay()+6)%7))/7);return [y,w]};
+  function period(h,s){
+    const d=P(s),y=d.getUTCFullYear(),m=d.getUTCMonth();
+    if(h==='Annual')return {label:''+y,start:y+'-01-01',end:y+'-12-31'};
+    if(h==='Semi-Annual'){const n=m<6?1:2;return {label:'H'+n+' '+y,start:F(U(y,(n-1)*6,1)),end:F(U(y,n*6,0))}}
+    if(h==='Quarterly'){const n=Math.floor(m/3)+1;return {label:'Q'+n+' '+y,start:F(U(y,(n-1)*3,1)),end:F(U(y,n*3,0))}}
+    if(h==='Monthly')return {label:MON[m]+' '+y,start:F(U(y,m,1)),end:F(U(y,m+1,0))};
+    const [wy,wn]=isoWeek(s),mo=P(thu(s));mo.setUTCDate(mo.getUTCDate()-3);return {label:'W'+wn+' '+wy,start:F(mo),end:F(new Date(mo.getTime()+6*864e5))}}
+  const rep=(h,s)=>h==='Weekly'?thu(s):s;
+  /* every dated item of every Life Area: {area, date} */
+  function items(){
+    const D0=D(),acts=D0.activities||[],byA=new Map(acts.map(a=>[a.id,a])),out=[];
+    acts.forEach(a=>{if(!a.portfolio_id)return;[a.planned_start,a.planned_finish].forEach(x=>{if(/^\d{4}-\d\d-\d\d$/.test(x||''))out.push([a.portfolio_id,x])})});
+    (D0.daily_actions||[]).forEach(d=>{const a=byA.get(d.activity_id);if(a&&a.portfolio_id&&/^\d{4}-\d\d-\d\d$/.test(d.action_date||''))out.push([a.portfolio_id,d.action_date])});
+    return out}
+  const nameOf=id=>{const p=byId('portfolios',id);return p?p.name:''};
+  /* what should exist: key area|horizon|start → {area,h,period,parentKey} */
+  function wanted(){
+    const W=new Map(),seen=new Set();
+    items().forEach(([area,date])=>{const k0=area+'|'+date;if(seen.has(k0))return;seen.add(k0);
+      const add=(h,s,par)=>{const p=period(h,rep(h,s)),k=area+'|'+h+'|'+p.start;if(!W.has(k))W.set(k,{area,h,p,par});return k};
+      const chain=(s)=>{let par=null;for(const h of HZ.slice(0,4))par=add(h,s,par);return par};
+      chain(date);
+      const mk=chain(thu(date));          /* the month that owns the week */
+      const wk=period('Weekly',date),wkey=area+'|Weekly|'+wk.start;if(!W.has(wkey))W.set(wkey,{area,h:'Weekly',p:wk,par:mk})});
+    return W}
+  const have=()=>{const M=new Map();(D().plans||[]).forEach(p=>{if(p.portfolio_id)M.set(p.portfolio_id+'|'+p.horizon+'|'+p.start_date,p)});return M};
+  window.plansMissing=()=>{const H=have();return [...wanted()].filter(([k])=>!H.has(k))};
+  window.plansCreate=async function(limit){
+    const W=wanted(),H=have(),made=[];let n=0;
+    for(let i=0;i<HZ.length;i++)for(const [k,w] of W){
+      if(w.h!==HZ[i]||H.has(k))continue;if(n>=(limit||150))break;
+      const parent=w.par?H.get(w.par):null;
+      const row=await saveRow('plans',{horizon:w.h,title:nameOf(w.area)+' '+w.p.label,period_label:w.p.label,portfolio_id:w.area,start_date:w.p.start,end_date:w.p.end,parent_id:parent?parent.id:null,status:'Not Started',progress:0},null,{auto:1});
+      if(row){H.set(k,row);n++}}
+    return n};
+  /* cascade table: per Life Area, how many periods have items and how many of them already have a plan */
+  function cascade(){
+    const W=wanted(),H=have(),areas=new Map();
+    W.forEach((w,k)=>{const a=areas.get(w.area)||{n:0,h:{}};a.h[w.h]=a.h[w.h]||[0,0];a.h[w.h][0]++;if(H.has(k))a.h[w.h][1]++;areas.set(w.area,a)});
+    const cnt=new Map();items().forEach(([a])=>cnt.set(a,(cnt.get(a)||0)+1));
+    const all=(D().portfolios||[]).slice().sort((a,b)=>String(a.name).localeCompare(b.name));
+    const rows=all.map(p=>{const a=areas.get(p.id);
+      return `<tr><td><b>${esc(p.name)}</b></td><td>${cnt.get(p.id)||0}</td>${HZ.map(h=>{const c=a&&a.h[h];return `<td>${c?`${c[1]}/${c[0]}`:'<span class="mut">–</span>'}</td>`}).join('')}</tr>`}).join('');
+    return `<div class="card" style="margin-bottom:12px"><div class="ch">${ic('layers',18)}<h3>Life Area cascade</h3><span class="sp"></span>${plansMissing().length?badge(plansMissing().length+' to create','amber'):badge('Up to date','green')}</div>
+     <p class="sm ink2" style="margin:0 0 8px">A plan is made for a Life Area only in a period in which it has an Activity or a Daily Action: <b>&lt;Life Area&gt; YYYY</b>, <b>Hn YYYY</b>, <b>Qn YYYY</b>, <b>Mmm YYYY</b>, <b>Wn YYYY</b>. A Life Area with nothing in it gets no plan. Each cell shows plans that exist / periods that have items.</p>
+     <div style="overflow-x:auto"><table class="tbl" style="width:100%"><thead><tr><th>Life Area</th><th>Items</th>${HZ.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="7" class="mut">No Life Areas yet.</td></tr>'}</tbody></table></div>
+     <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn p" data-act="plmake" ${plansMissing().length?'':'disabled'}>${ic('bolt',15)} Create missing plans</button>
+     <label class="chk"><input type="checkbox" data-change="plauto" ${prefs().plansauto!==false?'checked':''}> Create them automatically when I open Polaris One</label></div></div>`}
+  ACT.plmake=el=>busy(el,async()=>{const n=await plansCreate(400);toast(n?n+' plan'+(n>1?'s':'')+' created':'Nothing to create');render()});
+  CHG.plauto=async el=>{await setPrefs({plansauto:el.checked});toast(el.checked?'Plans are created automatically':'Automatic plans are off')};
+  const _v=VIEWS['plan/planning'];VIEWS['plan/planning']=()=>{const h=_v();const i=h.indexOf('<div class="pills"');return i<0?cascade()+h:h.slice(0,i)+cascade()+h.slice(i)};
+  AUTO_TASKS.push({id:'pln',need:'plans',on:()=>!!S.profile&&prefs().plansauto!==false&&!window.__noT3&&plansMissing().length>0,run:()=>plansCreate(150),txt:n=>n+' plan'+(n>1?'s':'')+' created'});
+  window.plansTest={wanted,period};
+})();
+
 
 /* =====================================================================
    BOOT
