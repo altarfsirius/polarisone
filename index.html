@@ -2485,7 +2485,7 @@ VIEWS['settings/data']=()=>`<div class="g g2"><div class="card"><div class="ch">
  <div class="card"><div class="ch"><h3>Sample data</h3></div><p class="sm ink2">Fill your account with example life areas, goals, plans, activities, KPIs, meetings and more to explore the app.</p><div class="row" style="margin-top:10px">${canSeed()?`<button class="btn" data-act="sample">${ic('refresh')} Load sample data</button>`:'<span class="sm mut">Not available for your account.</span>'}</div></div>
  <div class="card"><div class="ch"><h3>Danger zone</h3></div><p class="sm ink2">Permanently delete everything you have entered in this account. Your login stays.</p><div class="row" style="margin-top:10px">${canWipe()?`<button class="btn d" data-act="wipe">${ic('trash')} Delete all my data</button>`:'<span class="sm mut">Not available for your account.</span>'}${DB.mode==='demo'&&isAdmin()?`<button class="btn d" data-act="resetdemo">Reset demo (all demo users)</button>`:''}</div></div></div>`;
 ACT.export=()=>{const o={app:'polaris-one',version:1,exported_at:nowISO(),user:S.profile.email};ORDER.forEach(t=>o[t]=(D()[t]||[]).map(r=>{if(r.auth_value===undefined)return r;const x=Object.assign({},r);delete x.auth_value;return x}));download(`polaris-one-backup-${todayS()}.json`,JSON.stringify(o,null,1),'application/json')};
-CHG.importfile=async el=>{const f=el.files[0];if(!f)return;if(!canImport()){el.value='';return toast('Importing a backup is switched off for your account. Ask an admin.',1)}try{const o=JSON.parse(await f.text());if(!['polaris-one','vegatempus','vega-tempus','tuntas'].includes(o.app))throw new Error('This is not a Polaris One backup file.');let n=0,skipped=0;
+CHG.importfile=async el=>{const f=el.files[0];if(!f)return;if(!canImport()){el.value='';return toast('Importing a backup is switched off for your account. Ask an admin.',1)}try{const o=JSON.parse(await f.text());if(!o.app==='polaris-one')throw new Error('This is not a Polaris One backup file.');let n=0,skipped=0;
   for(const t of ORDER){if(canDo(t,'create')!=='allow'){skipped+=(o[t]||[]).length;continue}const have=new Set((D()[t]||[]).map(r=>r.id)),twin=t==='api_connections'?new Set((D()[t]||[]).map(r=>r.name+'|'+r.url)):null,rows=(o[t]||[]).filter(r=>r&&typeof r==='object'&&!have.has(r.id)&&!(twin&&twin.has(r.name+'|'+r.url))).map(r=>{const x=Object.assign({},r);delete x.owner;return x});if(rows.length){const ins=await DB.insertMany(t,rows);D()[t]=(D()[t]||[]).concat(ins);n+=ins.length}}
   toast(n+' records imported'+(skipped?`. ${skipped} were skipped because your account may not add them.`:''));render()}catch(e){toast(e.message||'Import failed',1)}el.value=''};
 ACT.wipe=async()=>{if(!await ask('Delete all your data?','Every life area, goal, plan, activity, KPI, meeting and more in your account will be removed. This cannot be undone. Export a backup first if unsure.','Delete everything',true))return;
@@ -4011,7 +4011,7 @@ async function runAutomations(){
 
 /* ---------- Market Analysis → Daily Action per analysis ---------- */
 const sanitizeMA=d=>{
-  if(!d||typeof d!=='object'||(d.type!=='polaris-activity'&&d.type!=='tuntas-activity')||d.v!==1)return null;
+  if(!d||typeof d!=='object'||(d.type!=='polaris-activity')||d.v!==1)return null;
   const s=(v,n)=>String(v==null?'':v).replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,n);
   const ev={id:s(d.id,60)||('x'+hash36(JSON.stringify(d))),ts:Number.isFinite(+d.ts)?+d.ts:Date.now(),section:s(d.section,80),ticker:s(d.ticker,40),detail:s(d.detail,600)};
   return ev.section||ev.ticker?ev:null};
@@ -5381,7 +5381,7 @@ const edgeVals=()=>{const v=n=>(document.getElementById('sk_'+n)?document.getEle
   if(v('apiindonesia'))o.APIINDONESIA_KEY=v('apiindonesia');if(v('gnews'))o.GNEWS_KEY=v('gnews');
   if(v('msid'))o.MS_CLIENT_ID=v('msid');if(v('mssecret'))o.MS_CLIENT_SECRET=v('mssecret');if(v('msredirects'))o.MS_REDIRECT_URIS=v('msredirects');
   if(v('openai'))o.OPENAI_API_KEY=v('openai');
-  if(v('gwemail')&&v('gwpass')){const gc=(D().api_connections||[]).find(x=>/^(Altair Project Management|Groundwork)/i.test(x.name));o.GROUNDWORK_EMAIL=v('gwemail');o.GROUNDWORK_PASSWORD=v('gwpass');if(gc){o.GROUNDWORK_URL=gc.url;const k=gc.auth_value||(BUILTIN_CONNECTIONS.find(b=>b.id==='groundwork')||{}).key;if(k)o.GROUNDWORK_KEY=k}}
+  if(v('gwemail')&&v('gwpass')){const gc=(D().api_connections||[]).find(x=>/^Altair Project Management/i.test(x.name));o.GROUNDWORK_EMAIL=v('gwemail');o.GROUNDWORK_PASSWORD=v('gwpass');if(gc){o.GROUNDWORK_URL=gc.url;const k=gc.auth_value||(BUILTIN_CONNECTIONS.find(b=>b.id==='groundwork')||{}).key;if(k)o.GROUNDWORK_KEY=k}}
   return o};
 ACT.dltemplate=()=>{download('api-secrets.txt',secretsTxt(null),'text/plain');toast('Template downloaded: api-secrets.txt')};
 ACT.secretstxt=()=>{const g=n=>(document.getElementById('sk_'+n)||{value:''}).value.trim();if(!!g('gwemail')!==!!g('gwpass'))return toast('Altair Project Management needs both the account e-mail and its password.',1);const o=edgeVals();if(!Object.keys(o).length)return toast('Type at least one key, or download the empty template.',1);download('api-secrets.txt',secretsTxt(o),'text/plain');toast('Downloaded api-secrets.txt. Delete the file after running the command.')};
@@ -21248,7 +21248,7 @@ ACT.hubdry=el=>hubRun(el.dataset.peer,true);
 ACT.hubpause=async el=>{const k=el.dataset.peer,p=hubPeer(k);try{await syRpc('hub_set_status',{p_peer:k,p_status:p&&p.status==='active'?'paused':'active'})}catch(e){toast(e.message,1)}await hubLoad();cdRefresh()};
 ACT.hubresend=async el=>{try{const n=await syRpc('hub_resend',{p_peer:el.dataset.peer});toast(n+' items will be sent again')}catch(e){toast(e.message,1)}await hubLoad();cdRefresh()};
 ACT.hubrevoke=async el=>{const k=el.dataset.peer;if(!await ask('Disconnect '+HUB_PEERS[k].name+'?','Nothing is deleted on either side. Sharing stops.','Disconnect'))return;try{await syRpc('hub_set_status',{p_peer:k,p_status:'revoked'})}catch(e){toast(e.message,1)}await hubLoad();cdRefresh()};
-[['engineering','Altair Aero Engineering','Ae','#243B8C','Engineering work. Activities and actions sync both ways.'],['cura','Altair Auto','Au','#C2410C','Care work. Activities and actions sync both ways.']].forEach(([k,name,mono,tint,desc])=>connAdd({id:k,group:'apps',name,mono,tint,admin:true,desc,open:()=>polarisLoad(),state:()=>hubOn(k)?'on':'off',types:[
+[['engineering','Altair Aero Engineering','Ae','#243B8C','Engineering work. Activities and actions sync both ways.'],['cura','Altair Auto','Au','#C2410C','Automotive work. Activities and actions sync both ways.']].forEach(([k,name,mono,tint,desc])=>connAdd({id:k,group:'apps',name,mono,tint,admin:true,desc,open:()=>polarisLoad(),state:()=>hubOn(k)?'on':'off',types:[
   {id:'link',name:'Activities & actions',sub:'Two-way · contract polaris-hub/1',title:name,lead:'Activities and actions, both ways',text:`Switch on <b>Share with ${esc(name)}</b> on an Activity or Daily Action in your <b>${HUB_PEERS[k].areas.map(x=>x[0].toUpperCase()+x.slice(1)).join('</b> or <b>')}</b> Life Area. Name, notes, priority, dates, status and progress then travel both ways; the later edit of each field wins. Your own time, result and blocker never leave this app, and no other Life Area ever does (${esc(name)} receives only ${HUB_PEERS[k].areaText}).`,uses:['Update status, dates and progress here and see it there, and the other way round','Only items you switch on are shared','Pause or disconnect at any time, nothing is deleted'],state:()=>hubOn(k)?'on':'off',body:()=>hubBody(k)}]}));
 
 RELEASE_NOTES.unshift({rev:28,date:'2026-10-24',groups:[
@@ -21555,8 +21555,8 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
   ['Search in every option box','Open any option box and start typing: the list narrows to what matches, so you do not have to scroll. Use the arrow keys and Enter, or tap an item. Esc closes it.'],
   ['Life Areas per application','Altair Project Management receives all Life Areas, Altair Auto only Automotive, Altair Aero Engineering only Work, Freelance and Project. Only items you switch on are shared.']]},
  {t:'Changed',items:[
-  ['The old names are fully replaced','Downloads start with “polaris-one”. Browser data moves to the new names automatically, and older backups, links and event types keep working.'],
-  ['Partner apps have new names','AltairOrdo and Groundwork are now Altair Project Management, Altair Engineering is now Altair Aero Engineering, and AldebaranCura and AutoPrima are now Altair Auto. Connections, sharing and data are unchanged; connections you saved under the old names are still recognised.']]},
+  ['The old names are fully replaced','Downloads start with “polaris-one”. Only three partner apps remain: Altair Project Management, Altair Aero Engineering and Altair Auto. Backups from before Rev 30 are no longer accepted, so keep the app until you have exported a new backup.'],
+  ]},
  {t:'For the admin',items:[
   ['Run schema.sql once, and the new hub.sql','schema.sql adds the function polaris_schema_rev. hub.sql replaces hub_area_ok with a version per application. api-proxy and the running link (vt-sync, vt_* functions, altair-vega/1) are unchanged on purpose. Old file names are listed in LEGACY-NAMES.md.',null,null,null,1]]}
 ]});
@@ -22454,11 +22454,6 @@ if(typeof putFaq==='function'){
   add('cura',{id:'fields',name:'Field map',sub:'Polaris One ⇄ Altair Auto',title:'Altair Auto field map',lead:'Which field goes to which field',text:'See and set how Altair Auto fields become Polaris One fields.',uses:['Choose the column for every Polaris One field','Nothing is written back to Altair Auto'],body:()=>importMap('Altair Auto'),state:()=>'off'});
   ['engineering','cura','ordo'].forEach(k=>{if(HUB_PEERS[k])add(k,{id:'hubfields',name:'Field map',sub:'Polaris One ⇄ '+HUB_PEERS[k].name,title:HUB_PEERS[k].name+' · field map',lead:'Which field goes to which field',text:'The fields that travel between Polaris One and '+HUB_PEERS[k].name+', and the name each side gives them.',uses:['Rename a field when the other app calls it something else','Only items you share travel'],body:()=>hubMap(k),state:()=>'off'})});
 })();
-/* Rows saved under the old partner names are renamed once, so the connections are found again */
-AUTO_TASKS.push({id:'cnm',need:'api_connections',on:()=>!!S.profile&&(D().api_connections||[]).some(c=>/^(Groundwork|AutoPrima)/i.test(c.name||'')),
-  run:async()=>{let n=0;for(const c of (D().api_connections||[]).slice()){const m=/^(Groundwork|AutoPrima)/i.exec(c.name||'');if(!m)continue;
-    try{await updConn(c.id,{name:c.name.replace(/^Groundwork/i,'Altair Project Management').replace(/^AutoPrima/i,'Altair Auto')});n++}catch(e){}}return n},
-  txt:n=>n+' connection name'+(n>1?'s':'')+' updated'});
 /* Notion Daily Actions: every Polaris One field and the Notion property it is written to (same name, fixed type) */
 (function(){
   const T={title:'Title',uuid:'Text',text:'Text',time:'Text',number:'Number',checkbox:'Checkbox',date:'Date',timestamp:'Date'};
