@@ -16869,7 +16869,15 @@ function pdfRecompute(markSim){
   p.rows.forEach((r,i)=>{
     if(vt&&vt.keyOf){const h=vt.keyOf(recs[i],p);occ[h]=(occ[h]||0)+1;r.ext=prefix+'b'+hash36(h)+(occ[h]>1?'.'+occ[h]:'');recs[i].__x=r.ext.slice(prefix.length)}
     else r.ext=prefix+'h'+hash36(JSON.stringify(recs[i]));
-    r.have=haveKeys.has(r.ext);r.eff=recs[i].__eff||null});
+    r.have=haveKeys.has(r.ext);r.eff=recs[i].__eff||null;r.haveNote=''});
+  /* the same bank line read a second time in another way (text, OCR, a CSV, another layout) has another description and so another key. Lines on the same day,
+     with the same amount, in the same account are matched to what is already in the ledger, one for one, so nothing is added twice */
+  if(p.t==='bank'){
+    const ledger=new Map(),tk=(d,c,a)=>String(d).slice(0,10)+'|'+c+'|'+String(a||'').trim().toLowerCase();
+    (D().finance_entries||[]).forEach(e=>{if(!(e.source==='bank'||/^pdf:finance_entries:b/.test(String(e.ext_key||''))))return;const c=Math.round(Math.abs(num(e.amount))*100);if(!c||!e.account)return;const k=tk(e.entry_date,c,e.account);ledger.set(k,(ledger.get(k)||0)+1)});
+    const tup=i=>{const rc=recs[i],a=String(rc.account||st.account||'');if(!rc.entry_date||!rc.__amt||!a)return '';return tk(rc.entry_date,Math.round(rc.__amt*100),a)};
+    p.rows.forEach((r,i)=>{if(r.have){const k=tup(i);if(k&&ledger.get(k))ledger.set(k,ledger.get(k)-1)}});
+    p.rows.forEach((r,i)=>{if(r.have)return;const k=tup(i);if(k&&(ledger.get(k)||0)>0){ledger.set(k,ledger.get(k)-1);r.have=true;r.haveNote='Already in your ledger (same day, amount and account)'}})}
   const vsim=vt&&vt.sim?vt.sim(recs,p):null;
   /* rows that look like something you already have (same name and date) are not ticked at first */
   if(markSim){
@@ -16883,7 +16891,7 @@ function pdfRecompute(markSim){
         if(p.t==='daily_actions'&&!row.action_date&&st.action_date)row.action_date=st.action_date;
         r.sim=!!row[pdfM(p.t).main]&&likes.has(pdfSimKey(p.t,row))}
       if(!r.touched)r.on=!r.have&&!r.sim&&!r.weak&&!p.prose})}
-  const sel=[];p.rows.forEach((r,i)=>{if(r.on)sel.push(i)});p.sel=sel;
+  const sel=[];p.rows.forEach((r,i)=>{if(r.on&&!r.haveNote)sel.push(i)});p.sel=sel;
   const nHaveAll=p.rows.filter(r=>r.have).length;
   if(!sel.length||(!Object.keys(fm).length&&!Object.keys(st).length)){p.sum={n:0,have:nHaveAll,dup:0,bad:0,sel:sel.length};return}
   const c=pdfConn(p,fmx,st);
@@ -16943,7 +16951,7 @@ function pdfBody(){
 function pdfPickHtml(){
   const p=S.pdf,mt=pdfM(p.t);
   return `${pdfIntoSel(p)?`<div style="max-width:340px;margin-bottom:12px">${pdfIntoSel(p)}</div>`:''}
-  <div class="pdfdrop" id="pdfdrop"><div class="pdfpickw"><label class="btn p pdfpick" for="pdf_file">${ic('up',15)} Choose a PDF or CSV file</label><input class="sr" id="pdf_file" type="file" accept="application/pdf,.pdf,.csv,.tsv,.txt,text/csv,text/plain" data-change="pdffile"></div><p class="sm ink2" style="margin-top:10px">or drop the file here</p></div>
+  <div class="pdfdrop" id="pdfdrop"><div class="pdfpickw"><label class="btn p pdfpick" for="pdf_file">${ic('up',15)} Choose a PDF, picture or CSV file</label><input class="sr" id="pdf_file" type="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.csv,.tsv,.txt,text/csv,text/plain" data-change="pdffile"></div><p class="sm ink2" style="margin-top:10px">or drop the file here</p></div>
   <p class="sm ink2" style="margin-top:12px">Polaris One reads the table or the list in your file and shows it to you before anything is saved. You can correct the cells, choose which column is which, and untick rows. A <b>PDF</b> is read from the text stored in it; a <b>CSV</b> file (from Excel, Google Sheets or any spreadsheet) is the most reliable way to bring in a long list.</p>
   <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn s" data-act="pdftpl">${ic('down',14)} CSV template for ${esc(mt.many.toLowerCase())}</button><span class="sm mut">Column titles and an example row to fill in Excel or Google Sheets.</span></div>
   <details style="margin-top:8px"><summary class="sm b" style="cursor:pointer">Tips for the best result</summary><ul class="sm ink2" style="padding-left:20px;line-height:1.7;margin:6px 0 0"><li>PDF: one saved from Word, Excel, Google Docs, a website or an HR / training system works best, because its text can be selected.</li><li>A scan or a photo of a page has no text. Make it a searchable PDF first (for example with your phone's scanner app or Adobe's Recognize Text).</li><li>CSV: put the column titles in the first row. In Excel use File → Save As → “CSV UTF-8”. Commas, semicolons and tabs are all understood, and so is a file you exported from Polaris One.</li><li>Tables: English and Indonesian column titles are understood (Kegiatan, Mulai, Selesai, Jabatan, Sertifikat …). If a title is not recognised, choose the field yourself above the column.</li><li>Lists (PDF only): one item per line. A date line (for example “Senin, 12 Oktober 2026”) sets the day for the lines below it.</li><li>Importing the same file twice does not add the rows twice.</li></ul></details>`}
@@ -16969,6 +16977,7 @@ function pdfReviewHtml(){
   if(doc.readPages<doc.numPages)warn.push(`Only the first ${doc.readPages} of ${doc.numPages} pages were read.`);
   if(blank)warn.push(`${blank} page${blank>1?'s have':' has'} no readable text (a picture or a scan). Those pages are skipped.`);
   if(p.capped)warn.push(`Only the first ${PDF_MAXROWS} rows are shown. Split the file to import the rest.`);
+  if(p.fileSeen)warn.push('This exact file was already imported on '+String(p.fileSeen.at||'').slice(0,10)+(p.fileSeen.n?' ('+p.fileSeen.n+' lines added)':'')+'. Lines that are already in your ledger are left alone, so importing it again adds nothing new.');
   if(doc.ocr)warn.push('This file is a picture, so its text was recognised by OCR (Tesseract, on this device). OCR can misread a digit: check every amount against the original before you import.');
   if(doc.rotated)warn.push('Some sideways or upside-down text was ignored.');
   if(p.prose)warn.push('This looks like running text, not a table or a list, so every line would become a record. Nothing is ticked yet: tick the lines you really want, or choose a table above.');
@@ -17083,6 +17092,7 @@ CHG.pdffile=el=>{const f=el.files&&el.files[0];el.value='';if(f)pdfStart(f)};
 const pdfKindOf=f=>{const n=String(f.name||'').toLowerCase(),t=String(f.type||'').toLowerCase();
   if(/\.pdf$/.test(n)||t==='application/pdf')return 'pdf';
   if(/\.(csv|tsv|tab|txt)$/.test(n)||/^text\/(csv|tab-separated-values|plain)/.test(t)||t==='application/csv')return 'csv';
+  if(/\.(jpe?g|png|webp)$/.test(n)||/^image\/(jpeg|png|webp)$/.test(t))return 'image';
   if(/\.(xlsx|xlsm|xlsb|xls|ods|numbers)$/.test(n))return 'sheet';
   if(/\.(docx?|odt|rtf|pages)$/.test(n))return 'doc';
   return ''};
@@ -17090,16 +17100,24 @@ function pdfDecode(u){
   if(u[0]===0xFF&&u[1]===0xFE)return new TextDecoder('utf-16le').decode(u.subarray(2));
   if(u[0]===0xFE&&u[1]===0xFF)return new TextDecoder('utf-16be').decode(u.subarray(2));
   try{return new TextDecoder('utf-8',{fatal:true}).decode(u)}catch(e){return new TextDecoder('windows-1252').decode(u)}}
+/* a short fingerprint of the file itself: the same file chosen twice is recognised even if it was renamed */
+async function pdfFileHash(file){const b=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());return [...new Uint8Array(b)].slice(0,12).map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function pdfFileRemember(p,n){
+  if(!p.fhash)return;
+  const cur=Object.assign({},prefs().pdf_files||{});cur[p.fhash]={at:nowISO(),name:trunc(p.name||'',60),n:(p.fileSeen?p.fileSeen.n:0)+n,t:p.t};
+  const keys=Object.keys(cur).sort((a,b)=>String(cur[b].at).localeCompare(String(cur[a].at))).slice(0,300),o={};keys.forEach(k=>{o[k]=cur[k]});
+  await setPrefs({pdf_files:o})}
 async function pdfStart(file,password){
   const p=S.pdf;if(!p)return;
   const fail=m=>{p.stage='error';p.err=esc(m);pdfPaint()};
   const kind=pdfKindOf(file);
   if(kind==='sheet')return fail('A spreadsheet file (Excel, Numbers, OpenDocument) cannot be read directly. In Excel choose File → Save As → “CSV UTF-8 (Comma delimited)”; in Google Sheets choose File → Download → Comma-separated values (.csv). Then choose that file here. A PDF of the sheet works too.');
   if(kind==='doc')return fail('A word-processor document cannot be read directly. Save or export it as a PDF (File → Save As → PDF), then choose the PDF here. A table copied into Excel and saved as CSV works too.');
-  if(!kind)return fail('That file is not a PDF or a CSV file. Choose a file whose name ends in .pdf or .csv.');
+  if(!kind)return fail('That file is not a PDF, a picture or a CSV file. Choose a file whose name ends in .pdf, .jpg, .png or .csv.');
   if(file.size>PDF_MAXBYTES)return fail('That file is larger than 40 MB. Split it into smaller files and import them one by one.');
   if(canDo(pdfTbl(p.t),'create')==='deny')return fail('Your account is not allowed to add '+pdfNice(p.t).toLowerCase()+'.');
-  p.file=file;p.name=file.name;p.stage='reading';p.pct=kind==='csv'?100:0;p.msg=kind==='csv'?'Reading the file…':'Opening the PDF…';p.usedTables=[];pdfPaint();
+  try{p.fhash=await pdfFileHash(file);const fs0=(prefs().pdf_files||{})[p.fhash];p.fileSeen=fs0||null}catch(e){p.fhash='';p.fileSeen=null}
+  p.file=file;p.name=file.name;p.stage='reading';p.pct=kind==='csv'?100:0;p.msg=kind==='csv'?'Reading the file…':kind==='image'?'Opening the picture…':'Opening the PDF…';p.usedTables=[];pdfPaint();
   if(kind==='csv'){
     try{
       const u=new Uint8Array(await file.arrayBuffer());
@@ -17115,7 +17133,7 @@ async function pdfStart(file,password){
     catch(e){if(S.pdf!==p)return;console.warn('csv',e);return fail('The file could not be read: '+(e&&e.message||e))}
     pdfPaint();return}
   try{
-    let doc=await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
+    let doc=kind==='image'?{chars:0,pages:[],tables:[],numPages:1,readPages:1}:await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
     if(S.pdf!==p)return;
     p.doc=doc;
     let ocrErr=null;
@@ -17125,7 +17143,7 @@ async function pdfStart(file,password){
         if(S.pdf!==p)return;
         if(od&&od.chars>=12){doc=od;p.doc=od;p.ocr=true}}
       catch(e){if(S.pdf!==p)return;ocrErr=e;console.warn('ocr',e)}}
-    if(doc.chars<12){p.stage='error';p.err=`<b>No text found in this PDF.</b> It looks like a scan or a picture of a page. Polaris One reads the text that is stored in a PDF; it cannot recognise letters inside a picture (OCR).<br>Make a searchable PDF first, for example with your phone’s scanner app (“save as searchable PDF”), Adobe Acrobat’s <i>Recognize Text</i>, or by opening the file with Google Docs. Then import that file.<br>Mandiri Livin’ e-Statement saved as pictures? Use the monthly <i>Rekening Koran / Statement of Account</i> PDF instead: it has the same lines as text and is recognised automatically. A BNI “Laporan Mutasi Rekening” that is a picture needs a text version (m-Banking or BNI Direct export) or CSV.`+(ocrErr?'<br><b>Reading the picture (OCR) did not work:</b> '+esc((ocrErr&&ocrErr.message)||String(ocrErr)):'')}
+    if(doc.chars<12){p.stage='error';p.err=`<b>No text found in this file.</b> It is a scan or a picture, and Polaris One could not read the letters in it with OCR.<br>Try a sharper, straight-on picture, or make a searchable PDF first, for example with your phone’s scanner app (“save as searchable PDF”), Adobe Acrobat’s <i>Recognize Text</i>, or by opening the file with Google Docs. Then import that file.<br>Mandiri Livin’ e-Statement saved as pictures? Use the monthly <i>Rekening Koran / Statement of Account</i> PDF instead: it has the same lines as text and is recognised automatically. A BNI “Laporan Mutasi Rekening” that is a picture needs a text version (m-Banking or BNI Direct export) or CSV.`+(ocrErr?'<br><b>Reading the picture (OCR) did not work:</b> '+esc((ocrErr&&ocrErr.message)||String(ocrErr)):'')}
     else{
       const tp=pdfTplDetect(doc);
       if(tp&&tp.empty){p.stage='error';p.err='<b>'+esc(tp.label)+'</b>: '+esc(tp.extra)+'. There is nothing to import.';pdfPaint();return}
@@ -17149,11 +17167,11 @@ CHG.pdfmap=el=>{
   pdfRepaintMain('select[data-c="'+cid+'"]')};
 CHG.pdfov=el=>{const p=S.pdf,r=p.rows[+el.dataset.r];if(!r)return;r.ov=el.value||'';r.ovTouched=true;pdfRefresh()};
 CHG.pdfopt=el=>{const p=S.pdf;p.opt=p.opt||{};p.opt[el.dataset.k]=el.type==='checkbox'?el.checked:el.value;const vx=PDF_VT[p.t];if(vx&&typeof vx.onopt==='function')vx.onopt(p,el.dataset.k);pdfRepaintMain('#pdf_o_'+el.dataset.k)};
-CHG.pdfrow=el=>{const p=S.pdf,r=p.rows[+el.dataset.r];r.on=el.checked;r.touched=true;pdfRefresh()};
+CHG.pdfrow=el=>{const p=S.pdf,r=p.rows[+el.dataset.r];if(r.haveNote&&el.checked){el.checked=false;toast(r.haveNote+'. It is not added twice.',1);return}r.on=el.checked;r.touched=true;pdfRefresh()};
 CHG.pdfcell=el=>{const p=S.pdf,r=p.rows[+el.dataset.r];r.v[el.dataset.c]=el.value;pdfRefresh()};
 ACT.pdftick=el=>{
   const p=S.pdf,v=el.dataset.v;
-  p.rows.forEach(r=>{r.touched=true;r.on=v==='all'?true:v==='none'?false:(!r.have&&!r.sim&&!r.weak)});
+  p.rows.forEach(r=>{r.touched=true;r.on=!r.haveNote&&(v==='all'?true:v==='none'?false:(!r.have&&!r.sim&&!r.weak))});
   pdfRepaintMain()};
 ACT.pdfpg=el=>{const p=S.pdf;p.pg=(p.pg||0)+(+el.dataset.d);const t=$('#pdftbl');if(t){t.innerHTML=pdfTableHtml();a11yPass(t)}};
 
@@ -17171,6 +17189,7 @@ ACT.pdfgo=el=>busy(el,async()=>{
     p.usedTables=(p.usedTables||[]).concat(p.tableIdx>=0?[p.tableIdx]:[]);
     p.result={created:res.created,have:sum.have,dup:sum.dup,bad:sum.bad,left,ids:res.ids};
     await pdfHistAdd(p,res);
+    try{await pdfFileRemember(p,res.created||0)}catch(e){console.warn(e)}
     p.stage='done';pdfPaint();renderView()}
   catch(e){toast(typeof apiErr==='function'?apiErr(e):(e.message||'Could not save the rows'),1)}});
 
@@ -22727,24 +22746,32 @@ function pdfOcrLib(){
     document.head.appendChild(s)});
   OCR.p.catch(()=>{OCR.p=null});return OCR.p}
 async function pdfOcr(file,password,onProgress){
-  const c=OCR_CFG(),T=await pdfOcrLib(),lib=await pdfLoadLib(),data=new Uint8Array(await file.arrayBuffer());
-  const doc=await lib.getDocument({data,password:password||undefined,isEvalSupported:false,disableFontFace:true,useSystemFonts:false,disableAutoFetch:true,disableStream:true,disableRange:true,verbosity:0}).promise;
-  const total=doc.numPages,n=Math.min(total,c.maxPages),pages=[],numLines=[],dateLines=[];let worker=null;
+  const c=OCR_CFG(),T=await pdfOcrLib(),isImg=pdfKindOf(file)==='image';
+  let doc=null,bmp=null;
+  if(isImg){try{bmp=await createImageBitmap(file)}catch(e){throw new Error('This picture could not be opened. Use a JPG, PNG or WebP file.')}}
+  else{const lib=await pdfLoadLib(),data=new Uint8Array(await file.arrayBuffer());
+    doc=await lib.getDocument({data,password:password||undefined,isEvalSupported:false,disableFontFace:true,useSystemFonts:false,disableAutoFetch:true,disableStream:true,disableRange:true,verbosity:0}).promise}
+  const total=isImg?1:doc.numPages,n=Math.min(total,c.maxPages),pages=[],numLines=[],dateLines=[];let worker=null;
   try{
     if(onProgress)onProgress(0,n,'Loading the OCR reader…');
     worker=await T.createWorker('eng',1,{workerPath:c.workerPath,corePath:c.corePath,langPath:c.langPath,gzip:true});
     try{await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'})}catch(e){}
     for(let i=1;i<=n;i++){
-      if(onProgress)onProgress(i-1,n,'Reading the picture on page '+i+' of '+n+'…');
-      const pg=await doc.getPage(i),vp=pg.getViewport({scale:c.scale}),cv=document.createElement('canvas');
-      cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
-      const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
-      await pg.render({canvasContext:cx,viewport:vp}).promise;
+      if(onProgress)onProgress(i-1,n,(isImg?'Reading the picture…':'Reading the picture on page '+i+' of '+n+'…'));
+      let pg=null,vp,sc=c.scale;const cv=document.createElement('canvas');
+      if(isImg){
+        /* a photo or screenshot is scaled to about 2400 px wide, the size at which the reader works best; the layout works in page points (595 wide) */
+        const k=Math.min(3200,Math.max(2000,bmp.width))/bmp.width;cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);vp={width:cv.width,height:cv.height};sc=cv.width/595;
+        const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);cx.imageSmoothingQuality='high';cx.drawImage(bmp,0,0,cv.width,cv.height)}
+      else{pg=await doc.getPage(i);vp=pg.getViewport({scale:c.scale});
+        cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+        const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
+        await pg.render({canvasContext:cx,viewport:vp}).promise}
       const r=await worker.recognize(cv,{},{blocks:true,text:true}),d=r.data||{};
       let words=d.words;if(!words&&d.blocks){words=[];d.blocks.forEach(b=>(b.paragraphs||[]).forEach(pp=>(pp.lines||[]).forEach(l=>(l.words||[]).forEach(w=>words.push(w)))))}
       const items=[];(words||[]).forEach(w=>{const t=String(w.text||'').trim(),b=w.bbox;if(!t||!b||(w.confidence!=null&&w.confidence<25))return;
-        items.push({s:t,x:b.x0/c.scale,y:b.y1/c.scale,w:(b.x1-b.x0)/c.scale,fs:Math.max(4,(b.y1-b.y0)/c.scale*0.9)})});
-      pages.push({n:i,w:vp.width/c.scale,h:vp.height/c.scale,items,rotated:0});
+        items.push({s:t,x:b.x0/sc,y:b.y1/sc,w:(b.x1-b.x0)/sc,fs:Math.max(4,(b.y1-b.y0)/sc*0.9)})});
+      pages.push({n:i,w:vp.width/sc,h:vp.height/sc,items,rotated:0});
       /* second, quiet pass over the right half of the page with only digits allowed: columns of amounts and balances come out much cleaner */
       try{
         const x0=Math.floor(cv.width*0.45),c2=document.createElement('canvas');c2.width=cv.width-x0;c2.height=Math.floor(cv.height*0.92);
@@ -22761,8 +22788,8 @@ async function pdfOcr(file,password,onProgress){
         const r3=await worker.recognize(c3);dateLines.push(String((r3.data||{}).text||'').split('\n').map(x=>x.trim()).filter(Boolean));
         await worker.setParameters({tessedit_char_whitelist:''});c3.width=c3.height=0}
       catch(e){dateLines.push([])}
-      cv.width=cv.height=0;pg.cleanup();await tick()}
-  }finally{try{if(worker)await worker.terminate()}catch(e){}try{await doc.destroy()}catch(e){}}
+      cv.width=cv.height=0;if(pg)pg.cleanup();await tick()}
+  }finally{try{if(worker)await worker.terminate()}catch(e){}try{if(doc)await doc.destroy()}catch(e){}try{if(bmp&&bmp.close)bmp.close()}catch(e){}}
   const L=PDFI_L.layout(pages);L.numPages=total;L.readPages=n;L.ocr=true;L.ocrNums=numLines;L.ocrDates=dateLines;return L}
 
 (function(){if(typeof putFaq==='function')putFaq('Can I import a statement that is only a picture?','Yes. When a PDF has no text (a scan, or a statement saved as an image), Polaris One draws each page and reads it with OCR (Tesseract) on this device. The first time it downloads the OCR reader (about 6 MB) from the internet; the picture itself is never uploaded. For BNI Laporan Mutasi Rekening and Mandiri Livin’ e-Statement the lines are checked against the running balance, so a misread amount is flagged. OCR can still misread a letter or a date, so check the rows on the review screen before you import.')})();
