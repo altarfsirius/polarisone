@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#041E41">
 <link rel="manifest" href="manifest.webmanifest">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src https: data: blob:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src https: data: blob:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16966,9 +16966,10 @@ function pdfReviewHtml(){
   if(doc.readPages<doc.numPages)warn.push(`Only the first ${doc.readPages} of ${doc.numPages} pages were read.`);
   if(blank)warn.push(`${blank} page${blank>1?'s have':' has'} no readable text (a picture or a scan). Those pages are skipped.`);
   if(p.capped)warn.push(`Only the first ${PDF_MAXROWS} rows are shown. Split the file to import the rest.`);
+  if(doc.ocr)warn.push('This file is a picture, so its text was recognised by OCR (Tesseract, on this device). OCR can misread a digit: check every amount against the original before you import.');
   if(doc.rotated)warn.push('Some sideways or upside-down text was ignored.');
   if(p.prose)warn.push('This looks like running text, not a table or a list, so every line would become a record. Nothing is ticked yet: tick the lines you really want, or choose a table above.');
-  const info=doc.csv?`<b>${esc(p.name||'')}</b> · CSV file · ${doc.tables[0]?doc.tables[0].cols.length:0} columns`:`<b>${esc(p.name||'')}</b> · ${doc.numPages} page${doc.numPages>1?'s':''}${doc.removed?` · ${doc.removed} header/footer line${doc.removed>1?'s':''} ignored`:''}`;
+  const info=doc.tpl?`<b>${esc(p.name||'')}</b> · ${esc(doc.tpl.label)} · ${doc.tpl.rows.length} lines`:doc.csv?`<b>${esc(p.name||'')}</b> · CSV file · ${doc.tables[0]?doc.tables[0].cols.length:0} columns`:`<b>${esc(p.name||'')}</b> · ${doc.numPages} page${doc.numPages>1?'s':''}${doc.removed?` · ${doc.removed} header/footer line${doc.removed>1?'s':''} ignored`:''}`;
   return `<p class="sm ink2" style="margin:0 0 10px">${info}</p>
   ${warn.map(w=>`<div class="callout warn" style="background:var(--ambersoft);color:#6B4400;margin-bottom:8px">${ic('alert')}<div>${esc(w)}</div></div>`).join('')}
   <div id="pdfsugg">${pdfSuggestHtml(p)}</div>
@@ -17111,11 +17112,22 @@ async function pdfStart(file,password){
     catch(e){if(S.pdf!==p)return;console.warn('csv',e);return fail('The file could not be read: '+(e&&e.message||e))}
     pdfPaint();return}
   try{
-    const doc=await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
+    let doc=await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
     if(S.pdf!==p)return;
     p.doc=doc;
-    if(doc.chars<12){p.stage='error';p.err=`<b>No text found in this PDF.</b> It looks like a scan or a picture of a page. Polaris One reads the text that is stored in a PDF; it cannot recognise letters inside a picture (OCR).<br>Make a searchable PDF first, for example with your phone’s scanner app (“save as searchable PDF”), Adobe Acrobat’s <i>Recognize Text</i>, or by opening the file with Google Docs. Then import that file.`}
-    else{pdfAuto(p);pdfBuild(p);pdfAcctInit(p);pdfRecompute(true);p.stage='review'}
+    let ocrErr=null;
+    if(doc.chars<12){
+      try{
+        const od=await pdfOcr(file,password,(i,n,m)=>{if(S.pdf!==p)return;p.pct=n?Math.round(i/n*100):0;p.msg=m||'';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
+        if(S.pdf!==p)return;
+        if(od&&od.chars>=12){doc=od;p.doc=od;p.ocr=true}}
+      catch(e){if(S.pdf!==p)return;ocrErr=e;console.warn('ocr',e)}}
+    if(doc.chars<12){p.stage='error';p.err=`<b>No text found in this PDF.</b> It looks like a scan or a picture of a page. Polaris One reads the text that is stored in a PDF; it cannot recognise letters inside a picture (OCR).<br>Make a searchable PDF first, for example with your phone’s scanner app (“save as searchable PDF”), Adobe Acrobat’s <i>Recognize Text</i>, or by opening the file with Google Docs. Then import that file.<br>Mandiri Livin’ e-Statement saved as pictures? Use the monthly <i>Rekening Koran / Statement of Account</i> PDF instead: it has the same lines as text and is recognised automatically. A BNI “Laporan Mutasi Rekening” that is a picture needs a text version (m-Banking or BNI Direct export) or CSV.`+(ocrErr?'<br><b>Reading the picture (OCR) did not work:</b> '+esc((ocrErr&&ocrErr.message)||String(ocrErr)):'')}
+    else{
+      const tp=pdfTplDetect(doc);
+      if(tp&&tp.empty){p.stage='error';p.err='<b>'+esc(tp.label)+'</b>: '+esc(tp.extra)+'. There is nothing to import.';pdfPaint();return}
+      if(tp){const cd=PDFI_L.csvToDoc(tp.csv,tp.label);cd.tpl=tp;cd.ocr=doc.ocr;cd.numPages=doc.numPages;cd.readPages=doc.readPages;p.doc=cd;p.tpl=tp;p.t=tp.t;p.def=pdfDef0(tp.t);if(tp.platform)p.def.platform=tp.platform}
+      pdfAuto(p);pdfBuild(p);pdfAcctInit(p);pdfRecompute(true);p.stage='review'}
   }catch(e){
     if(S.pdf!==p)return;
     const r=pdfReadError(e);
@@ -17562,6 +17574,7 @@ function acctNewName(p){
   return (base+(l4?' '+l4:'')).trim()}
 /* a file opened under "bank statement" may really be a loan schedule or a trade history: the columns, and the words at the top, decide */
 function pdfAcctRetarget(p){
+  if(p.tpl)return;
   const g=pdfGroup(p);if(!g||p.tableIdx<0||!['bank','finance_entries','trade','loan'].includes(p.t))return;
   const tb=p.doc.tables[p.tableIdx];if(!tb)return;
   const boost=t=>({Loan:'loan','Brokerage / securities':'trade','Crypto exchange':'trade'}[(p.info&&p.info.kind)||'']===t?3:0);
@@ -17573,11 +17586,13 @@ function pdfAcctRetarget(p){
   p.t=best;p.def=pdfDef0(best);pdfBuild(p)}
 function pdfAcctInit(p){
   p.info=stmtInfo(p.doc,p.name);p.autoNote='';
+  if(p.tpl){Object.assign(p.info,p.tpl.info);p.autoNote='Recognised: '+p.tpl.label+'. '+(p.tpl.extra?p.tpl.extra+'. ':'')+'Check the rows, then import.'}
   try{pdfAcctRetarget(p)}catch(e){console.warn('retarget',e)}
   if(!pdfAcctOn(p))return;
   let a=acctFind(p.info.number,'',p.info.institution),how=a?'number':'';
   /* no number in the file (a broker's CSV, say): if you have just one account of this kind at this bank or broker, it is chosen, and the screen says why */
   if(!a&&!p.info.number&&p.info.institution){const kd=acctKindFor(p),h=acctList().filter(x=>acctSame(x.institution,p.info.institution)&&x.kind===kd);if(h.length===1){a=h[0];how='institution'}}
+  if(p.tpl&&p.tpl.multi){a=null;how=''}
   p.acctHow=how;
   p.acctSel=a?a.id:(p.preAcct&&byId('money_accounts',p.preAcct)?p.preAcct:(p.info.number?'__new':''));
   p.newKind=acctKindFor(p);p.newName=acctNewName(p);
@@ -18317,7 +18332,7 @@ CHG.pkms=async el=>{
        on Daily Action with a button that explains what will be removed and what is kept.
      · schema.sql adds a trigger (vt_prayer_once) so a second device or an API cannot add a duplicate either. It never fails on old data.
    ===================================================================== */
-const PRAY_WORDS={Fajr:'subuh|shubuh|fajr|fajar',Dhuhr:'dzuhur|dhuhur|dzuhr|dhuhr|zuhur|zhuhur|zuhr|duhur',Asr:'ashar|asar|asr|ashr',Maghrib:'maghrib|magrib|maghreb',Isha:'isya|isha|isyak|esya'};
+const PRAY_WORDS={Fajr:'subuh|shubuh|fajr|fajar',Dhuhr:'dzuhur|dhuhur|dzuhr|dhuhr|zuhur|zhuhur|zuhr|duhur|jumat|jum.at|jumuah|jumah',Asr:'ashar|asar|asr|ashr',Maghrib:'maghrib|magrib|maghreb',Isha:'isya|isha|isyak|esya'};
 const PRAY_RES=Object.keys(PRAY_WORDS).map(k=>[k,new RegExp('^(?:(?:shalat|sholat|salat|solat|prayer)\\s+(?:fardhu\\s+|fardu\\s+|wajib\\s+)?(?:'+PRAY_WORDS[k]+')\\b|(?:'+PRAY_WORDS[k]+')(?:\\s+(?:berjamaah|di masjid|tepat waktu))?$)')]);
 const _prayMemo=new Map();
 function prayerOf(title){
@@ -18328,7 +18343,8 @@ function prayerOf(title){
   let r='';for(const [k,re] of PRAY_RES){if(re.test(s)){r=k;break}}
   if(_prayMemo.size>4000)_prayMemo.clear();_prayMemo.set(raw,r);return r}
 const prayDay=d=>String(d||'').slice(0,10);
-const prayName=k=>{const p=PRAYER_NAMES.find(x=>x[0]===k);return 'Shalat '+(p?p[1]:k)};
+/* on a Friday the noon prayer is the Friday prayer (Shalat Jumat); it keeps the Dhuhr key, so it still counts once a day and ticks the same habit */
+const prayName=(k,d)=>{const p=PRAYER_NAMES.find(x=>x[0]===k);if(k==='Dhuhr'&&d&&pd(prayDay(d)).getDay()===5)return 'Shalat Jumat';return 'Shalat '+(p?p[1]:k)};
 /* what a day already has: the keys of the prayers on it, from this screen's data and, in a connected database, from the database */
 S.prayServer=S.prayServer||{};
 function prayerHave(day,exceptId){
@@ -18348,7 +18364,7 @@ async function prayerClash(day,title,exceptId){
   const k=prayerOf(title);if(!k)return '';
   const d=prayDay(day);if(!d)return '';
   if(typeof DB!=='undefined'&&DB.mode==='supabase')await prayerFresh([d]);
-  return prayerHave(d,exceptId).has(k)?'There is already “'+prayName(k)+'” on '+fmtD(d)+'. A prayer can be on the list only once a day: open the existing one instead of adding a second.':''}
+  return prayerHave(d,exceptId).has(k)?'There is already “'+prayName(k,d)+'” on '+fmtD(d)+'. A prayer can be on the list only once a day: open the existing one instead of adding a second.':''}
 
 /* ---------- the guard, in the database layer ---------- */
 (function(){
@@ -18383,7 +18399,7 @@ const prayInsert=async rows=>{
     const ok=[];                                                   /* another device was faster: add what is still missing, one by one */
     for(const r of rows){try{ok.push(...await DB.insertMany('daily_actions',[r]))}catch(x){if(!/already|duplicate|23505/i.test(String(x&&x.message||'')+String(x&&x.code||'')))throw x}}
     return ok}};
-const prayRow=(d,k,s)=>({action_date:d,title:prayName(k),time_cat:'Ibadah',priority:'Medium',start_time:s,end_time:hhmm(mins(s)+15),planned_min:15,status:'Not Started',progress:0,pomodoros:0,ext_key:'auto:pray:'+d+':'+k});
+const prayRow=(d,k,s)=>({action_date:d,title:prayName(k,d),time_cat:'Ibadah',priority:'Medium',start_time:s,end_time:hhmm(mins(s)+15),planned_min:15,status:'Not Started',progress:0,pomodoros:0,ext_key:'auto:pray:'+d+':'+k});
 autoPrayer=async function(a){
   if(S.prayBusy)return 0;S.prayBusy=true;
   try{
@@ -18393,6 +18409,7 @@ autoPrayer=async function(a){
     dates.forEach(d=>{const p=prayerFor(d);if(!p||seen.has('pray:'+d))return;keys.push('pray:'+d);
       const have=prayerHave(d);
       PRAYER_NAMES.forEach(([k])=>{const s=p[k];if(!s||have.has(k))return;rows.push(prayRow(d,k,s))})});
+    try{for(const r of (D().daily_actions||[])){if(!prayAuto(r)||prayerOf(r.title)!=='Dhuhr'||prayTouched(r))continue;const nn=prayName('Dhuhr',r.action_date);if(r.title!==nn){r.title=nn;try{await patchRow('daily_actions',r.id,{title:nn})}catch(e){console.warn('friday rename',e)}}}}catch(e){console.warn(e)}
     const ins=await prayInsert(rows);
     if(ins.length)D().daily_actions=(D().daily_actions||[]).concat(ins);
     await seenAdd(keys);
@@ -18439,7 +18456,7 @@ function prayerCleanHtml(){
 ACT.prayclean=()=>{
   const g=prayerDupes();if(!g.length)return toast('No duplicate prayers found.');
   const one=r=>`${esc(tm(r.start_time)||'no time')}${r.end_time?'–'+esc(tm(r.end_time)):''}${r.status&&r.status!=='Not Started'?' · '+esc(r.status):''}${prayAuto(r)?' · automatic':''}`;
-  const rows=g.map(x=>`<tr><td data-l="Day"><b>${esc(fmtD(x.d))}</b><div class="sm mut">${esc(prayName(x.k))}</div></td><td data-l="Kept">${one(x.keep)}</td><td data-l="Removed">${x.remove.length?x.remove.map(one).map(s=>'<div>'+s+'</div>').join(''):'<span class="mut">—</span>'}${x.stay.length?`<div class="sm" style="color:var(--amber,#9A6200)">${x.stay.length} with notes or progress stay: <a href="#" data-act="open" data-k="daily_actions" data-id="${x.stay[0].id}">open</a></div>`:''}</td></tr>`).join('');
+  const rows=g.map(x=>`<tr><td data-l="Day"><b>${esc(fmtD(x.d))}</b><div class="sm mut">${esc(prayName(x.k,x.d))}</div></td><td data-l="Kept">${one(x.keep)}</td><td data-l="Removed">${x.remove.length?x.remove.map(one).map(s=>'<div>'+s+'</div>').join(''):'<span class="mut">—</span>'}${x.stay.length?`<div class="sm" style="color:var(--amber,#9A6200)">${x.stay.length} with notes or progress stay: <a href="#" data-act="open" data-k="daily_actions" data-id="${x.stay[0].id}">open</a></div>`:''}</td></tr>`).join('');
   const rem=sum(g.map(x=>x.remove.length));
   openModal('Duplicate prayers',`<p class="sm ink2" style="margin-bottom:8px">One block is kept for each prayer and day: the one with progress or notes, otherwise the automatic one, otherwise the oldest. Blocks that only repeat it are removed. A duplicate that has progress, a result or notes is never removed here.</p><div class="tw"><table class="tbl stack"><thead><tr><th scope="col">Day</th><th scope="col">Kept</th><th scope="col">Removed</th></tr></thead><tbody>${rows}</tbody></table></div>`,
    `<button class="btn" data-act="closeModal">Close</button>${rem?`<button class="btn p" data-act="prayclean2">${ic('trash',15)} Remove ${rem} duplicate${rem===1?'':'s'}</button>`:''}`)};
@@ -21992,8 +22009,8 @@ RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
   ['Condition, energy and focus together','Each action is paired with the check-in closest before its start time. “See pattern” compares energy, focus sessions and completion by condition, and busy task-switching days with the mood, stress and body you noted. A guide is on the Kondisi Harian page.'],
   ['Weekly summary, like a personal assistant','“Weekly summary” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
   ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
-  ['Top 3 picked for you, in the free time','On every working day (Monday to Friday, not a holiday, joint leave or day off) the first time you open Polaris One it picks up to 3 actions, Critical first, and places them one after another in the time that no meeting, Outlook event, prayer, lunch or break blocks. Meetings with a start time now show in Time blocks. The rest wait for the next working day. The strip “Top 3 planner” on One day lets you plan again or switch it off.','execute','daily','Open One day'],
-  ['The reason for a postponed action','Move an action to a later date, put it on hold, cancel it, or close a late Top 3 that is not finished, and a window asks why. The reason goes into the Time log with 0 hours, so the Time log tells what held you up.','execute','timelog','Open Time log'],
+  ['Top 3 picked for you, in the free time','On every working day (Monday to Friday, not a holiday, joint leave or day off) the first time you open Polaris One it plans up to 10 actions, Critical first, and the first 3 of them become your Top 3 (starred). All are placed one after another in the time that no meeting, Outlook event, prayer, lunch or break blocks. Meetings with a start time now show in Time blocks. The rest wait for the next working day. The strip “Top 3 planner” on One day lets you plan again or switch it off.','execute','daily','Open One day'],
+  ['The reason for a postponed action','Move any planned action to a later date, put it on hold, cancel it, or close a late Top 3 that is not finished, and a window asks why. The reason goes into the Time log with 0 hours, so the Time log tells what held you up.','execute','timelog','Open Time log'],
   ['Always on top for One day','In the desktop app it now turns on by itself when Polaris One opens, and a Startup button can also open Polaris One when Windows or Mac starts. On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
  {t:'Also new',items:[
   ['Plans per Life Area from the calendar','Plan → Planning shows a Life Area cascade. A plan named like “Work Q4 2026”, “Work Nov 2026” or “Work W45 2026” is made for every period in which that Life Area has an Activity or a Daily Action, under its parent (week → month → quarter → half → year). Activities without a plan are linked to the smallest plan that holds their dates.'],
@@ -22267,12 +22284,13 @@ ACT.cvcopy=async()=>{const tmp=document.createElement('div');tmp.innerHTML=cvDoc
    REV 30 · AUTOMATIC TOP 3, FREE-TIME PLANNING AND THE REASON FOR A POSTPONED ACTION
    • Blocked time: Meetings (with a start time), Outlook events, timed Daily Actions, prayer times, lunch and breaks.
    • On every working day (Monday to Friday; not a public holiday, not a joint leave, not a day off you booked) the first time Polaris One
-     is opened it picks up to 3 actions: Critical before High before Medium before Low, then the one that has waited longest.
-     They are starred, moved to today and placed one after another in the time that is not blocked. It happens once a day:
+     is opened it plans up to 10 actions: Critical before High before Medium before Low, then the one that has waited longest. The first 3 become the Top 3 (starred).
+     The first 3 become your Top 3 and are starred. All are moved to today and placed one after another in the time that is not blocked. It happens once a day:
      finishing all 3 early does not bring 3 more the same day. What is left waits its turn for the next working day.
    • Not done or postponed: a window asks for the reason (required). The reason is written in the Time log with 0 hours.
    ===================================================================== */
 const T3_REASONS=['A meeting or an interruption took the time','Waiting for someone or something','It took longer than planned','Low energy or not feeling well','The priority changed','Not enough time today','Still working on it','Other (write it below)'];
+const T3_PLAN=10;
 const T3_PRI={Critical:0,High:1,Medium:2,Low:3};
 S.t3=S.t3||{q:[],busy:false,last:null};
 const t3On=()=>prefs().top3auto!==false&&!window.__noT3;
@@ -22322,20 +22340,25 @@ async function t3Pick(day,force){
   if(!t3Workday(day))return {n:0,why:'not a working day'};
   const keys=seenSet();if(!force&&keys.has('t3:'+day))return {n:0,why:'done today'};
   const DA=D().daily_actions||[],have=DA.filter(x=>x.action_date===day&&x.is_top3&&!t3Soft(x));
-  const need=3-have.length,out=[];
+  const planned=DA.filter(x=>x.action_date===day&&x.status!=='Cancelled'&&!t3Soft(x));
+  const need=T3_PLAN-planned.length,out=[];
   S.t3.silent=true;
   try{
     /* yesterday's (last working day's) Top 3 that stayed open: ask why, one at a time */
     const stale=DA.filter(x=>x.is_top3&&x.action_date<day&&!isClosed(x)&&!t3Asked(x.id,x.action_date)&&!t3Asked(x.id,day));
-    if(need>0){
-      const free=t3Free(day);have.forEach(x=>{});
-      const cands=t3Candidates(day).filter(x=>!have.some(h=>h.id===x.id)).slice(0,need);
+    {
+      const free=t3Free(day);
+      const cands=need>0?t3Candidates(day).filter(x=>x.action_date<day).slice(0,need):[];
       for(const x of cands){
-        const carried=x.action_date<day,dur=clamp(num(x.planned_min)||60,15,120),patch={action_date:day,is_top3:true};
+        const carried=x.action_date<day,dur=clamp(num(x.planned_min)||60,15,120),patch={action_date:day,is_top3:false};
         const keep=x.action_date===day&&x.start_time&&!t3Busy(day,x.id).some(b=>{const s=mins(tm(x.start_time)),e=x.end_time?mins(tm(x.end_time)):s+dur;return s<b[1]&&e>b[0]});
         if(!keep){const slot=t3Take(free,dur);if(slot){patch.start_time=hhmm(slot[0]);patch.end_time=hhmm(slot[1]);patch.planned_min=dur}else{patch.start_time=null;patch.end_time=null}}
         if(carried)patch.notes=((x.notes?x.notes+'\n':'')+'Carried over from '+fmtD(x.action_date)).slice(0,2000);
         await patchRow('daily_actions',x.id,patch);out.push(byId('daily_actions',x.id))}
+      /* of the planned actions the first ones in the order (priority, then what has waited longest) become the Top 3 */
+      const star=3-have.length;
+      if(star>0){const pool=t3Candidates(day).filter(x=>x.action_date===day&&!x.is_top3).slice(0,star);
+        for(const x of pool){await patchRow('daily_actions',x.id,{is_top3:true});if(!out.some(o=>o.id===x.id))out.push(byId('daily_actions',x.id))}}
     }
     await seenAdd(['t3:'+day]);
     if(stale.length)S.t3.q.push(...stale.map(x=>({id:x.id,why:'Not finished on '+fmtD(x.action_date)})));
@@ -22398,6 +22421,7 @@ const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('d
         if(late)t3Defer(id,x.action_date<t?'Not finished on '+fmtD(x.action_date):'Its planned time has passed')}}}catch(e){console.warn(e)}
     return r}})();
 /* ---------- the strip on One day ---------- */
+const t3Planned=day=>(D().daily_actions||[]).filter(x=>x.action_date===day&&x.status!=='Cancelled'&&!t3Soft(x)).length;
 function t3Strip(day){
   const t=todayS(),work=t3Workday(day);
   const picks=(D().daily_actions||[]).filter(x=>x.action_date===day&&x.is_top3&&!t3Soft(x));
@@ -22405,7 +22429,7 @@ function t3Strip(day){
   const blocked=t3Busy(day).filter(b=>b[2]!=='Lunch'&&!/^Prayer/.test(b[2]));
   const free=t3Free(day),fmin=free.reduce((a,f)=>a+f[1]-f[0],0);
   const line=!work?`<span class="mut">${isWorkDay(day)?'A holiday or a day off: no automatic Top 3.':'Weekend: no automatic Top 3.'}</span>`
-    :`${picks.length} of 3 chosen · ${blocked.length} blocked slot${blocked.length===1?'':'s'}${blocked.length?' ('+esc(blocked.slice(0,3).map(b=>hhmm(b[0])+'–'+hhmm(b[1])).join(', '))+(blocked.length>3?'…':'')+')':''} · ${fmtN(fmin/60,1)} h free`;
+    :`${t3Planned(day)} of ${T3_PLAN} planned · ${picks.length} of 3 Top picks · ${blocked.length} blocked slot${blocked.length===1?'':'s'}${blocked.length?' ('+esc(blocked.slice(0,3).map(b=>hhmm(b[0])+'–'+hhmm(b[1])).join(', '))+(blocked.length>3?'…':'')+')':''} · ${fmtN(fmin/60,1)} h free`;
   const nxt=back.slice(0,4);
   return `<div class="card flat noprint" data-t3-strip style="margin-bottom:12px;background:var(--soft)"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Top 3 planner</b><span class="sm">${line}</span><span class="sp"></span>
    ${day===t&&work?`<button class="btn s" data-act="t3replan">Plan my Top 3 now</button>`:''}<label class="sm" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-change="t3auto" ${t3On()?'checked':''}> Pick automatically on working days</label></div>
@@ -22416,11 +22440,11 @@ function t3Strip(day){
 ACT.t3replan=async()=>{
   const t=todayS();if(!t3Workday(t))return toast('Today is not a working day.',1);
   const have=(D().daily_actions||[]).filter(x=>x.action_date===t&&x.is_top3&&!isClosed(x)&&!t3Soft(x));
-  if(have.length&&!await ask('Plan the Top 3 again?',`Today already has ${have.length} open Top 3 action${have.length>1?'s':''}. They stay. Only the free places are filled, in the order Critical, High, Medium, Low.`,'Plan'))return;
-  try{const r=await t3Pick(t,true);toast(r.n?r.n+' action'+(r.n>1?'s':'')+' added to today\'s Top 3':'Nothing to add: there are already 3, or no open action is waiting.');renderView()}catch(e){toast('Not planned: '+((e&&e.message)||e),1)}};
+  if(have.length&&!await ask('Plan the Top 3 again?',`Today already has ${have.length} open Top 3 action${have.length>1?'s':''}. They stay. Only the free places (up to 10 planned actions, 3 Top picks) are filled, in the order Critical, High, Medium, Low.`,'Plan'))return;
+  try{const r=await t3Pick(t,true);toast(r.n?r.n+' action'+(r.n>1?'s':'')+' added to today\'s Top 3':'Nothing to add: the day already has 10 actions and 3 Top picks, or no open action is waiting.');renderView()}catch(e){toast('Not planned: '+((e&&e.message)||e),1)}};
 CHG.t3auto=async el=>{try{await setPrefs({top3auto:!!el.checked});toast(el.checked?'Top 3 will be picked automatically on working days':'Automatic Top 3 is off');renderView()}catch(e){toast('Not saved: '+((e&&e.message)||e),1)}};
 if(typeof putFaq==='function'){
-  putFaq('How are my Top 3 picked, and when are they not?','On every working day (Monday to Friday, not a public holiday, a joint leave or a day off you booked) the first time you open Polaris One it chooses up to 3 open actions: Critical first, then High, Medium and Low, and the one that has waited longest first. They are starred, moved to today and placed one after another in the time that is not blocked by a meeting, an Outlook event, a prayer, lunch, a break or another timed action. It happens once a day: when you finish all 3 early, 3 more do not appear the same day. The rest wait their turn for the next working day. Switch it off, or plan again by hand, in the “Top 3 planner” strip on One day.');
+  putFaq('How are my Top 3 picked, and when are they not?','On every working day (Monday to Friday, not a public holiday, a joint leave or a day off you booked) the first time you open Polaris One it plans up to 10 open actions: Critical first, then High, Medium and Low, and the one that has waited longest first. The first 3 become your Top 3 and are starred. All are moved to today and placed one after another in the time that is not blocked by a meeting, an Outlook event, a prayer, lunch, a break or another timed action. It happens once a day: when you finish them early, new ones do not appear the same day. The rest wait their turn for the next working day. Switch it off, or plan again by hand, in the “Top 3 planner” strip on One day.');
   putFaq('Why does a window ask me for a reason?','When an action is postponed (moved to a later date, put on hold or cancelled), or you close a Top 3 that is late and not finished, Polaris One asks for the reason and writes it in the Time log with 0 hours. It is asked once a day for an action. The reasons build a picture of what really holds you up.')}
 
 /* several actions moved at once (“Move all to today”): one window for the whole group */
@@ -22428,6 +22452,307 @@ if(typeof putFaq==='function'){
   ACT.dgmoveall=async function(){S.t3.bulk=[];let r;try{r=await o.apply(this,arguments)}finally{const ids=S.t3.bulk.filter((v,i,a)=>a.indexOf(v)===i);S.t3.bulk=null;
     if(ids.length){S.t3.q.push({id:ids[0],ids,why:'Moved to a later day'});setTimeout(t3Next,450)}}
     return r}})();
+
+/* ---- r33: project colours ---- */
+/* Activity linked to a Project: faded purple. Activity without a Project: faded teal-green.
+   Action whose Activity belongs to a Project: faded blue. Action without a Project: faded green. */
+(function(){
+  const css=document.createElement('style');
+  css.textContent=`.pc-ap,.pc-an,.pc-xp,.pc-xn{background-image:none}
+  .pc-ap{background-color:#EFEAF8!important;box-shadow:inset 4px 0 0 #B7A5DE}
+  .pc-an{background-color:#E2F3F0!important;box-shadow:inset 4px 0 0 #86CBBE}
+  .pc-xp{background-color:#E6EFFB!important;box-shadow:inset 4px 0 0 #9BBCEA}
+  .pc-xn{background-color:#E8F4E8!important;box-shadow:inset 4px 0 0 #A3D2A6}
+  .pc-key{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--ink2)}
+  .pc-key i{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.12)}`;
+  document.head.appendChild(css);
+  const SKIP={A:1,BUTTON:1,INPUT:1,SELECT:1,SPAN:1,LABEL:1,OPTION:1,TEXTAREA:1};
+  const CLS=['pc-ap','pc-an','pc-xp','pc-xn'];
+  function projOfAction(x){const a=x&&x.activity_id?byId('activities',x.activity_id):null;return !!(a&&a.project_id)}
+  function paint(){
+    try{
+      const root=document.getElementById('app')||document.body;
+      root.querySelectorAll('[data-act="open"][data-k="activities"],[data-act="open"][data-k="daily_actions"]').forEach(el=>{
+        if(SKIP[el.tagName])return;
+        const k=el.dataset.k,x=byId(k,el.dataset.id);if(!x)return;
+        const c=k==='activities'?(x.project_id?'pc-ap':'pc-an'):(projOfAction(x)?'pc-xp':'pc-xn');
+        let t=el.closest('.item,tr,li')||el;
+        if(t!==el&&t.querySelectorAll('[data-act="open"][data-k="activities"],[data-act="open"][data-k="daily_actions"]').length>1)t=el;
+        if(t.classList.contains(c))return;
+        CLS.forEach(o=>t.classList.remove(o));t.classList.add(c)})
+    }catch(e){}}
+  let q=0;const sched=()=>{if(q)return;q=requestAnimationFrame(()=>{q=0;paint()})};
+  try{new MutationObserver(sched).observe(document.body,{childList:true,subtree:true})}catch(e){}
+  sched();
+  if(typeof putFaq==='function')putFaq('What do the colours of Activities and Actions mean?','Activities that belong to a Project are faded purple; Activities without a Project are faded teal-green. Daily Actions whose Activity belongs to a Project are faded blue; Actions without a Project are faded green. The colour shows in the lists, cards and boards, so you can see at a glance what is project work and what is not.')})();
+
+/* ---- r33: statement templates ---- */
+/* Statements the owner uses are recognised by their layout and rebuilt as a clean table, so the normal review screen
+   (account picker, duplicates, categories) takes over. Recognised: Mandiri Rekening Koran (consolidated), Mandiri credit-card e-Billing,
+   Stockbit transaction history, Bibit Statement of Account. */
+(function(){
+  const MON={jan:1,feb:2,mar:3,apr:4,may:5,mei:5,jun:6,jul:7,aug:8,agu:8,sep:9,oct:10,okt:10,nov:11,dec:12,des:12};
+  const num=s=>String(s).replace(/,/g,'');
+  const iso=(y,m,d)=>y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  const q=v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const toCsv=(head,rows)=>[head].concat(rows).map(r=>r.map(q).join(',')).join('\n');
+  const linesOf=doc=>{const o=[];(doc.pages||[]).forEach(pg=>(pg.lines||[]).forEach(l=>{if(!l.text)return;o.push(String(l.text).replace(/\s+/g,' ').trim())}));return o};
+  const acctName=(no,inst)=>{try{const a=acctFind(no,'',inst);if(a)return a.name}catch(e){}const d=String(no||'').replace(/\D/g,'');return inst+(d.length>=4?' '+d.slice(-4):'')};
+  /* ---- Mandiri Rekening Koran ---- */
+  function mandiriSav(L){
+    const pm=/Periode \/ Period:\s*(\d+)\/(\d+)\/(\d+)\s+s\/d\s+(\d+)\/(\d+)\/(\d+)/.exec(L.join('\n'));
+    const y0=pm?2000+ +pm[3]:new Date().getFullYear(),y1=pm?2000+ +pm[6]:y0,m1=pm?+pm[5]:12;
+    const yr=m=>y0<y1&&m>m1?y0:y1;
+    const rows=[],accts=new Set();let acct='',hdr=false,last=null,deny=/Saldo|Mutasi|Hal |Page|Tabungan|Tanggal|Transaksi|Transaction|Date|Account|Rupiah|\(IDR\)|Balance|Number|Product|Branch|Period/;
+    for(let i=0;i<L.length;i++){
+      const l=L[i];
+      if(/Nama Produk/.test(l)&&/Cabang/.test(l)){hdr=true;last=null;continue}
+      let m=/^(\d{3}-\d{2}-\d{7}-\d)\s/.exec(l);
+      if(m&&hdr){acct=acctName(m[1].replace(/-/g,''),'Mandiri');accts.add(acct);hdr=false;last=null;continue}
+      m=/^(\d{2})\/(\d{2})\s+(?:\d{2}\/\d{2}\s+)?(.+?)\s+([\d,]+\.\d{2})(?:\s+([DK]))?\s+([\d,]+\.\d{2})$/.exec(l);
+      if(m&&acct){
+        const dr=m[5]==='D';
+        last=[iso(yr(+m[2]),m[2],m[1]),m[3].replace(/^-\s*/,'').trim(),dr?num(m[4]):'',dr?'':num(m[4]),'IDR',acct,0];rows.push(last);continue}
+      if(last&&last[6]<3&&!deny.test(l)&&!/^\d/.test(l)&&l.length<80&&!(/\d/.test(l)&&l.indexOf(' ')<0)){last[1]=(last[1]+' '+l).trim();last[6]++;continue}
+      if(/^Saldo Awal|^Mutasi|^Saldo Akhir|^#?Hal /.test(l))last=null}
+    return rows.length?{t:'bank',head:['Date','Description','Debit','Credit','Currency','Account'],rows:rows.map(r=>r.slice(0,6)),multi:accts.size>1,
+      info:{institution:'Mandiri',kind:'Bank account',currency:'IDR',period:pm?[iso(y0,pm[2],pm[1]),iso(y1,pm[5],pm[4])]:null,number:accts.size===1?'':''},
+      label:'Mandiri Rekening Koran (all savings accounts in the file)',extra:accts.size+' account'+(accts.size===1?'':'s')}:null}
+  /* ---- Mandiri credit card e-Billing ---- */
+  function mandiriCC(L){
+    const rows=[];let last=null,card='',skipped=0;
+    for(const l of L){
+      let m=/^(?:Basic|Platinum|Gold|Signature|Infinite|Supplementary|Utama|Tambahan)?\s*(\d{4} \d{2}\*{2} \*{4} \d{4})/.exec(l);
+      if(m&&!card){card=m[1];continue}
+      m=/^(\d{2})-([A-Za-z]{3})-(\d{2})\s+(\d{2})-([A-Za-z]{3})-(\d{2})\s+(.+?)\s+([\d,]+\.\d{2})(?:\s+(CR))?$/.exec(l);
+      if(m){
+        const amt=num(m[8]);
+        if(!+amt){skipped++;last=null;continue}
+        const cr=m[9]==='CR';
+        last=[iso(2000+ +m[3],MON[m[2].toLowerCase()]||1,m[1]),m[7].trim(),cr?'':amt,cr?amt:'','IDR'];rows.push(last);continue}
+      if(last&&/^\(?[A-Z]{3}\s[\d.,]+ x [\d.,]+\)?$/.test(l)){last[1]+=' '+l;last=null;continue}
+      last=null}
+    return rows.length?{t:'bank',head:['Date','Description','Debit','Credit','Currency'],rows,
+      info:{institution:'Mandiri',kind:'Credit card',number:card,currency:'IDR'},
+      label:'Mandiri credit-card e-Billing',extra:skipped?skipped+' zero-amount line'+(skipped===1?'':'s')+' left out':''}:null}
+  /* ---- Stockbit ---- */
+  function stockbit(L){
+    const rows=[];let cli='';
+    for(const l of L){
+      let m=/^Client\s+(\d+)\s/.exec(l);if(m){cli=m[1];continue}
+      m=/^(\d{2})\/(\d{2})\/(\d{4})\s+\d{2}\/\d{2}\/\d{4}\s+([A-Z0-9.\-]+)\s+([BS])\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)$/.exec(l);
+      if(!m)continue;
+      const buy=m[5]==='B';
+      rows.push([iso(m[3],m[2],m[1]),m[4],buy?'Buy':'Sell',num(m[6]),num(m[7]),num(buy?m[8]:m[9]),num(m[10]),'IDR'])}
+    return rows.length?{t:'trade',head:['Date','Symbol','Buy/Sell','Lot','Price','Trade value','Tax','Currency'],rows,
+      info:{institution:'Stockbit',kind:'Brokerage / securities',number:cli,currency:'IDR'},label:'Stockbit transaction history',extra:''}:null}
+  /* ---- Bibit ---- */
+  function bibit(L){
+    const T=L.join('\n'),dm=/As of (\d{1,2}) ([A-Za-z]{3})[a-z]* (\d{4})/.exec(T),asof=dm?iso(dm[3],MON[dm[2].toLowerCase()]||1,dm[1]):'';
+    const sid=(/SID\s*:\s*(\S+)/.exec(T)||[])[1]||'';
+    const rows=[];let sec='';
+    for(const l of L){
+      if(/^Mutual Fund - IDR/.test(l)){sec='mf';continue}
+      if(/^Stocks$/.test(l)){sec='st';continue}
+      if(/^Cash$/.test(l)){sec='cash';continue}
+      if(/^Total\b/.test(l))continue;
+      let m;
+      if(sec==='mf'&&(m=/^(.+?)\s+([\d,]+\.\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+)\s+([\d,]+)$/.exec(l)))
+        rows.push(['Mutual fund',m[1],'',asof,num(m[2]),'units',num(m[3]),num(m[4]),num(m[5]),num(m[6])]);
+      else if(sec==='st'&&(m=/^([A-Z0-9]{3,6})\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+)\s+([\d,]+)$/.exec(l)))
+        rows.push(['Indonesian stock',m[1],m[1],asof,num(m[2]),'lot',num(m[3]),num(m[4]),num(m[5]),num(m[6])]);
+      else if(sec==='cash'&&(m=/^(Trading Balance)\s+([\d,]+)$/.exec(l)))
+        rows.push(['Cash',m[1],'',asof,'','','','',num(m[2]),num(m[2])])}
+    return rows.length?{t:'invest_holdings',head:['Asset class','Name','Symbol','As of','Quantity','Unit','Avg cost','Price','Cost value','Market value'],rows:rows.map(r=>r.concat()),
+      info:{institution:'Bibit',kind:'Brokerage / securities',number:sid,currency:'IDR'},label:'Bibit Statement of Account',extra:'',platform:'Bibit'}:null}
+  /* ---- BNI Laporan Mutasi Rekening (usually a picture, read by OCR) ---- */
+  /* OCR breaks the table rows apart and misreads some letters, so the lines are not trusted row by row. The money figures are taken in order and
+     checked against the running balance (Saldo): each line must move the balance by exactly its amount, which also tells debit from credit. */
+  function bniMutasi(L,doc){
+    const T=L.join('\n'),pm=/Periode:\s*(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/.exec(T);
+    const cur=(/Mata Uang:\s*([A-Z]{3})/.exec(T)||[])[1]||'IDR';
+    let no='';for(const l of L){const m=/[-–]\s*(\d{9,})\s*$/.exec(l);if(m&&/TAPLUS|wondr|BNI|multicurrency|giro|simpanan/i.test(l)){no=m[1];break}}
+    const MONRE=/^(?:jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)/i;
+    const MF=/(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)/i.exec(T),ym=/\b(20[23]\d)\b/.exec(T);
+    let mon=pm?MON[pm[3].slice(0,3).toLowerCase()]:(MF?MON[MF[1].slice(0,3).toLowerCase()]:0),yr=pm?+pm[4]:(ym?+ym[1]:0);
+    const none=/Tidak ada transaksi/i.test(T);
+    const si=L.findIndex(l=>/Saldo Awal/.test(l));
+    const op=/Saldo Awal\s+([\d,.]+)/.exec(T),cl=/Saldo Akhir\s+([\d,.]+)/.exec(T);
+    if(si<0&&!none)return null;
+    if(none)return {t:'bank',label:'BNI Laporan Mutasi Rekening',extra:'No transactions in this period',empty:true,rows:[]};
+    let body=L.slice(si+1).filter(l=>!/berizin|Lembaga Penjamin|Informasi Lainnya|Laporan Mutasi|Periode|Rincian Transaksi|Tanggal\s*&|\(LPS\)|peserta|Otoritas|merupakan|Bank Negara|\bBNI\b|^\W*(?:or|al|ly|SAR|Mig)\W*$/i.test(l));
+    const ei=body.findIndex(l=>/Saldo Akhir/.test(l));if(ei>=0)body=body.slice(0,ei);
+    const txt=body.join('\n');
+    const nums=[];
+    const strip=txt.replace(/\b\d{1,2}[:.]?\d{2}[:.]?\d{2}\s*WIB/gi,' WIB').replace(/\b20[2-3]\d\b/g,' ');
+    const re=/(?<![\d.,])([+\-–−]?)\s?(\d{1,3}(?:[.,]\d{3})+|\d{3,})(?![\d]|[A-Za-z])/g;let m;
+    while((m=re.exec(strip)))nums.push({v:+m[2].replace(/[.,]/g,''),neg:!!m[1]&&/[-–−]/.test(m[1])});
+    /* the digits-only pass is cleaner: when it exists its figures replace the ones read from the words */
+    const opv=op?+op[1].replace(/[.,]/g,''):null;
+    if(doc&&doc.ocrNums&&doc.ocrNums.some(a=>a.length)){
+      const n2=[];doc.ocrNums.forEach(pg=>pg.forEach(l=>{let mm;const r2=/(?<![\d.,])([+\-–−]?)(\d{1,3}(?:[.,]\d{3})+|\d{3,})(?![\d])/g;while((mm=r2.exec(l)))n2.push({v:+mm[2].replace(/[.,]/g,''),neg:mm[1]==='-'})}));
+      const st=opv!=null?n2.findIndex(x=>x.v===opv):-1;
+      if(st>=0){nums.length=0;n2.slice(st+1).forEach(x=>nums.push(x))}}
+    /* each transaction block of the words starts at the line that holds its year (2026), even when the day and month are garbled */
+    const blocks=[];
+    body.forEach(l=>{if(/20[23]\d/.test(l)&&!/Periode/i.test(l))blocks.push({head:l,rest:[]});else if(blocks.length)blocks[blocks.length-1].rest.push(l)});
+    const MN=/(?<![\d.,])[+\-–−]?\d{1,3}(?:[.,]\d{3})+(?![\d])|(?<![\d.,])\d{4,}/g;
+    const dates=blocks.map(bk=>{const q=/(\d{1,2})\s?([A-Za-z0-9]{2,4})\s?20[23]\d/.exec(bk.head);return q?{d:+q[1],mo:q[2]}:null});
+    const clean=x=>x.replace(/[!«~_|]/g,' ').replace(/\b(?!BI\b)[A-Za-z]{1,2}\b/g,' ').replace(/(^|\s)[-–+]+(?=\s|$)/g,' ').replace(/\b\d{1,3}\b/g,' ').replace(/\s+/g,' ').trim();
+    const cats=blocks.map(bk=>clean(bk.head.replace(/^.*?20[23]\d\s*/,'').replace(MN,' ')));
+    const details=blocks.map(bk=>bk.rest.join(' ').replace(/\b\d{1,2}[:.]?\d{2}[:.]?\d{2}\s*WIB[_\s-]*/gi,' ').replace(MN,' '));
+    details.forEach((x,i)=>{details[i]=clean(x)});
+    const closing0=cl?+cl[1].replace(/[.,]/g,''):null;
+    const rows=[];let prev=opv,bad=0,i=0,k=0;
+    while(i<nums.length-1){
+      let hit=-1,dr=false;
+      for(let s=0;s<=2&&i+s+1<nums.length;s++){
+        const a=nums[i+s].v,b=nums[i+s+1].v;
+        if(prev!=null&&Math.abs(prev-a-b)<1){hit=s;dr=true;break}
+        if(prev!=null&&Math.abs(prev+a-b)<1){hit=s;dr=false;break}}
+      let a,b;
+      if(hit>=0){a=nums[i+hit].v;b=nums[i+hit+1].v;i+=hit+2}
+      else{if(closing0!=null&&prev===closing0)break;a=nums[i].v;b=nums[i+1].v;dr=nums[i].neg||(prev!=null&&b<prev);bad++;i+=2}
+      let d=dates[k]||{d:0,mo:''};
+      let dd=d.d>=1&&d.d<=31?d.d:(rows.length?+rows[rows.length-1][0].slice(8):1);
+      let mm=mon;const ms=String(d.mo||'').replace(/[85]/g,'S').replace(/0/g,'O');
+      if(MONRE.test(ms)){const mk=MON[ms.slice(0,3).toLowerCase()];if(mk)mm=mk}
+      const desc=[cats[k],details[k]].filter(Boolean).join(' ').replace(/\s+/g,' ').trim()||'Transaction';
+      rows.push([iso(yr||new Date().getFullYear(),mm||1,dd),desc,dr?String(a):'',dr?'':String(a),cur]);
+      prev=b;k++}
+    if(!rows.length)return null;
+    if(doc&&doc.ocrDates){const dre=/(\d{1,2})\s?([A-Za-z]{3})[a-z]*\s?(20\d\d)/g,tx=doc.ocrDates.map(p=>p.join('\n')).join('\n').replace(/0ct/g,'Oct'),ds=[];let m;
+      while((m=dre.exec(tx))){const mo=MON[m[2].toLowerCase()];if(mo&&+m[1]>=1&&+m[1]<=31)ds.push(iso(m[3],mo,m[1]))}
+      if(ds.length===rows.length)rows.forEach((r,k)=>{r[0]=ds[k]})}
+    let extra='';
+    const closing=cl?+cl[1].replace(/[.,]/g,''):null;
+    if(closing!=null&&prev===closing&&!bad)extra='Each line moves the balance as printed, and the last balance equals the closing balance';
+    else extra='OCR check: '+(bad?bad+' line'+(bad===1?'':'s')+' did not match the running balance; ':'')+(closing!=null&&prev!==closing?'the last balance differs from the closing balance; ':'')+'compare the amounts with the original';
+    return {t:'bank',head:['Date','Description','Debit','Credit','Currency'],rows,
+      info:{institution:'BNI',kind:'Bank account',number:no,currency:cur,period:pm?[iso(yr,mon,pm[1]),iso(yr,mon,pm[2])]:null},
+      label:'BNI Laporan Mutasi Rekening',extra}}
+  /* ---- Mandiri Livin' e-Statement (a picture, read by OCR). Figures use 1.234,56 ---- */
+  function livinEstmt(L,doc){
+    const T=L.join('\n');
+    const idn=s=>+String(s).replace(/\./g,'').replace(',','.');
+    const op=/Initial Balance\s*\S?\s*([\d.]+,\d{2})/.exec(T),cl=/Closing Balance\s*[:.]?\s*([\d.]+,\d{2})/.exec(T);
+    if(!op)return null;
+    const opv=idn(op[1]),clv=cl?idn(cl[1]):null;
+    const MR=/(?<![\d.,])([+\-–−]?)\s?(\d{1,3}(?:\.\d{3})*,\d{2})(?![\d])/g;
+    let nums=[];
+    const grab=(txt,out)=>{let m;MR.lastIndex=0;while((m=MR.exec(txt)))out.push({v:idn(m[2]),neg:/[-–−]/.test(m[1])})};
+    if(doc&&doc.ocrNums&&doc.ocrNums.some(a=>a.length)){doc.ocrNums.forEach(pg=>pg.forEach(l=>grab(l,nums)))}
+    let st=clv!=null?nums.findIndex(x=>x.v===clv):-1;if(st<0)st=nums.findIndex(x=>x.v===opv);
+    nums=st>=0?nums.slice(st+1):[];
+    if(!nums.length){const all=[];L.forEach(l=>grab(l,all));const k=clv!=null?all.findIndex(x=>x.v===clv):-1;nums=k>=0?all.slice(k+1):[]}
+    const rows=[];let prev=opv,i=0,bad=0;
+    while(i<nums.length-1){
+      let hit=-1,dr=false;
+      for(let s=0;s<=2&&i+s+1<nums.length;s++){const a=nums[i+s].v,b=nums[i+s+1].v;
+        if(Math.abs(prev-a-b)<.5){hit=s;dr=true;break}if(Math.abs(prev+a-b)<.5){hit=s;dr=false;break}}
+      let a,b;
+      if(hit>=0){a=nums[i+hit].v;b=nums[i+hit+1].v;i+=hit+2}
+      else{if(clv!=null&&Math.abs(prev-clv)<.5)break;a=nums[i].v;b=nums[i+1].v;dr=nums[i].neg||b<prev;bad++;i+=2}
+      rows.push({a,dr});prev=b}
+    if(!rows.length)return null;
+    /* descriptions: the words before each line that carries two figures */
+    const descs=[];let buf=[];
+    const start=L.findIndex(l=>/Remarks|Keterangan/.test(l)&&/Amount|Nominal/.test(l));
+    L.slice(start+1).forEach(l=>{
+      if(/berizin|Otoritas|Lembaga|peserta|MandiriCall|^No\s|Balance \(IDR\)|Remarks|e-Statement|Menara|Jalan Jend|Nama\/|Cabang|Periode|Dicetak|^Tabungan|Saldo|Dana (?:Masuk|Keluar)|Account Number|Mata Uang|\d\s?dari\s?\d|\bof\s?\d\b|FAUZI\s*[:.]/i.test(l))return;
+      const mc=l.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)||[];
+      let t=l.replace(/[+\-–−]?\s?\d{1,3}(?:\.\d{3})*,\d{2}/g,' ').replace(/\b\d{1,2}[:.]?\d{2}[:.]?\d{2}\s*WIB/gi,' ').replace(/\b\d{1,2}\s?[A-Za-z0-9]{2,4}\s?20[23]\d\b|\b20[23]\d\b/g,' ').replace(/\b\d{9,}\b/g,' ').replace(/^\s*\d{1,2}\s+/,'').replace(/[!«~_|]/g,' ').replace(/\s+/g,' ').trim();
+      if(/^\W*\w{0,2}\W*$/.test(t))t='';
+      if(mc.length>=2){descs.push([buf.join(' '),t].filter(Boolean).join(' ').replace(/\s+/g,' ').trim());buf=[]}
+      else if(t&&!/WIB/.test(l))buf.push(t)});
+    const ds=[];if(doc&&doc.ocrDates){const dre=/(\d{1,2})\s?([A-Za-z]{3})[a-z]*\s?(20\d\d)/g,txt=doc.ocrDates.map(p=>p.join('\n')).join('\n').replace(/0ct/g,'Oct');let m;while((m=dre.exec(txt))){const mo=MON[m[2].toLowerCase()];if(mo&&+m[1]>=1&&+m[1]<=31)ds.push(iso(m[3],mo,m[1]))}}
+    const pm=/(\d{1,2})\s?([A-Za-z]{3})[a-z]*\s?(20\d\d)\s*[-–]\s*(\d{1,2})\s?([A-Za-z]{3})[a-z]*\s?(20\d\d)/.exec(T);
+    const first=pm&&MON[pm[2].toLowerCase()]?iso(pm[3],MON[pm[2].toLowerCase()],pm[1]):'';
+    const out=rows.map((r,k)=>[ds.length===rows.length?ds[k]:(ds[k]||ds[k-1]||first),(descs[k]||'Transaction'),r.dr?String(r.a):'',r.dr?'':String(r.a),'IDR']);
+    const no=(/Account Number\s*[:.]?\s*(\d{9,})/.exec(T)||[])[1]||'';
+    const ok=clv!=null&&Math.abs(prev-clv)<.5&&!bad,dOk=ds.length===rows.length;
+    return {t:'bank',head:['Date','Description','Debit','Credit','Currency'],rows:out,
+      info:{institution:'Mandiri',kind:'Bank account',number:no,currency:'IDR'},label:'Mandiri Livin’ e-Statement',
+      extra:(ok?'Each line moves the balance as printed, and the last balance equals the closing balance':'OCR check: some lines did not match the running balance; compare the amounts with the original')+(dOk?'':'. Some dates could not be read: check them')}}
+  window.pdfTplDetect=function(doc){
+    try{
+      const L=linesOf(doc),T=L.join('\n');let r=null;
+      if(/Statement of Account/.test(T)&&/Bibit|BIBIT/.test(T)&&/Portfolio/.test(T))r=bibit(L);
+      else if(/Transaction History/.test(T)&&/Trans Date/.test(T)&&/Buy\/Sell/.test(T))r=stockbit(L);
+      else if(/Rekening Koran \/ Statement of Account/.test(T)&&/mandiri/i.test(T))r=mandiriSav(L);
+      else if(/Lembar Tagihan Kartu Kredit/.test(T))r=mandiriCC(L);
+      else if(/e-Statement/i.test(T)&&/Initial Balance/i.test(T)&&/mandiri/i.test(T))r=livinEstmt(L,doc);
+      else if(/Laporan Mutasi Rekening/i.test(T)&&/BNI|Negara Indonesia/i.test(T))r=bniMutasi(L,doc);
+      if(!r)return null;
+      if(r.empty)return r;
+      /* Cash counts as "Other" in the holdings list; the name says what it is */
+      if(r.t==='invest_holdings'){r.head.push('Platform');r.rows.forEach(x=>x.push('Bibit'))}
+      r.csv=toCsv(r.head,r.rows);return r
+    }catch(e){console.warn('template',e);return null}};
+})();
+
+/* ---- r34: OCR for statements saved as pictures ---- */
+/* A PDF that is only a picture has no text. Its pages are drawn in the browser and read with Tesseract (loaded when first needed from jsdelivr,
+   about 6 MB, then kept by the browser). The picture never leaves this device. The words are placed as if they were text, so the normal reader and the
+   statement templates take over. Every amount must still be checked by you: OCR can misread a digit. */
+const OCR_CFG=()=>Object.assign({
+  lib:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  integrity:'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F',
+  workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+  corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+  langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',
+  scale:3,maxPages:10},window.__OCR_CFG||{});
+const OCR={p:null};
+function pdfOcrLib(){
+  if(window.Tesseract)return Promise.resolve(window.Tesseract);
+  if(OCR.p)return OCR.p;
+  const c=OCR_CFG();
+  OCR.p=new Promise((res,rej)=>{
+    const s=document.createElement('script');s.src=c.lib;if(c.integrity&&c.integrity!=='sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F'&&!window.__OCR_CFG){s.integrity=c.integrity;s.crossOrigin='anonymous'}
+    s.onload=()=>window.Tesseract?res(window.Tesseract):rej(new Error('The OCR reader did not start.'));
+    s.onerror=()=>rej(new Error('The OCR reader could not be downloaded. It needs an internet connection the first time. Check the connection and try again.'));
+    document.head.appendChild(s)});
+  OCR.p.catch(()=>{OCR.p=null});return OCR.p}
+async function pdfOcr(file,password,onProgress){
+  const c=OCR_CFG(),T=await pdfOcrLib(),lib=await pdfLoadLib(),data=new Uint8Array(await file.arrayBuffer());
+  const doc=await lib.getDocument({data,password:password||undefined,isEvalSupported:false,disableFontFace:true,useSystemFonts:false,disableAutoFetch:true,disableStream:true,disableRange:true,verbosity:0}).promise;
+  const total=doc.numPages,n=Math.min(total,c.maxPages),pages=[],numLines=[],dateLines=[];let worker=null;
+  try{
+    if(onProgress)onProgress(0,n,'Loading the OCR reader…');
+    worker=await T.createWorker('eng',1,{workerPath:c.workerPath,corePath:c.corePath,langPath:c.langPath,gzip:true});
+    try{await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'})}catch(e){}
+    for(let i=1;i<=n;i++){
+      if(onProgress)onProgress(i-1,n,'Reading the picture on page '+i+' of '+n+'…');
+      const pg=await doc.getPage(i),vp=pg.getViewport({scale:c.scale}),cv=document.createElement('canvas');
+      cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+      const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
+      await pg.render({canvasContext:cx,viewport:vp}).promise;
+      const r=await worker.recognize(cv,{},{blocks:true,text:true}),d=r.data||{};
+      let words=d.words;if(!words&&d.blocks){words=[];d.blocks.forEach(b=>(b.paragraphs||[]).forEach(pp=>(pp.lines||[]).forEach(l=>(l.words||[]).forEach(w=>words.push(w)))))}
+      const items=[];(words||[]).forEach(w=>{const t=String(w.text||'').trim(),b=w.bbox;if(!t||!b||(w.confidence!=null&&w.confidence<25))return;
+        items.push({s:t,x:b.x0/c.scale,y:b.y1/c.scale,w:(b.x1-b.x0)/c.scale,fs:Math.max(4,(b.y1-b.y0)/c.scale*0.9)})});
+      pages.push({n:i,w:vp.width/c.scale,h:vp.height/c.scale,items,rotated:0});
+      /* second, quiet pass over the right half of the page with only digits allowed: columns of amounts and balances come out much cleaner */
+      try{
+        const x0=Math.floor(cv.width*0.45),c2=document.createElement('canvas');c2.width=cv.width-x0;c2.height=Math.floor(cv.height*0.92);
+        c2.getContext('2d').drawImage(cv,x0,0,c2.width,c2.height,0,0,c2.width,c2.height);
+        await worker.setParameters({tessedit_char_whitelist:'0123456789,.+-'});
+        const r2=await worker.recognize(c2);numLines.push(String((r2.data||{}).text||'').split('\n').map(x=>x.trim()).filter(Boolean));
+        await worker.setParameters({tessedit_char_whitelist:''});c2.width=c2.height=0}
+      catch(e){numLines.push([])}
+      /* a third quiet pass over the left third (the date column), letters and digits only */
+      try{
+        const c3=document.createElement('canvas'),sx=Math.floor(cv.width*0.07),sw=Math.floor(cv.width*0.19),sh=Math.floor(cv.height*0.92);c3.width=sw*2;c3.height=sh*2;
+        const x3=c3.getContext('2d');x3.imageSmoothingQuality='high';x3.drawImage(cv,sx,0,sw,sh,0,0,c3.width,c3.height);
+        await worker.setParameters({tessedit_char_whitelist:'0123456789: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'});
+        const r3=await worker.recognize(c3);dateLines.push(String((r3.data||{}).text||'').split('\n').map(x=>x.trim()).filter(Boolean));
+        await worker.setParameters({tessedit_char_whitelist:''});c3.width=c3.height=0}
+      catch(e){dateLines.push([])}
+      cv.width=cv.height=0;pg.cleanup();await tick()}
+  }finally{try{if(worker)await worker.terminate()}catch(e){}try{await doc.destroy()}catch(e){}}
+  const L=PDFI_L.layout(pages);L.numPages=total;L.readPages=n;L.ocr=true;L.ocrNums=numLines;L.ocrDates=dateLines;return L}
+
+(function(){if(typeof putFaq==='function')putFaq('Can I import a statement that is only a picture?','Yes. When a PDF has no text (a scan, or a statement saved as an image), Polaris One draws each page and reads it with OCR (Tesseract) on this device. The first time it downloads the OCR reader (about 6 MB) from the internet; the picture itself is never uploaded. For BNI Laporan Mutasi Rekening and Mandiri Livin’ e-Statement the lines are checked against the running balance, so a misread amount is flagged. OCR can still misread a letter or a date, so check the rows on the review screen before you import.')})();
 
 /* ---- r14: 99_zzzzzzzzzzzzz_fmap.js ---- */
 /* Field map tab: which Polaris One field goes to which field of each connected app, shown and editable from the app's own pop-up */
