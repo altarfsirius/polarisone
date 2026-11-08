@@ -22794,6 +22794,84 @@ async function pdfOcr(file,password,onProgress){
 
 (function(){if(typeof putFaq==='function')putFaq('Can I import a statement that is only a picture?','Yes. When a PDF has no text (a scan, or a statement saved as an image), Polaris One draws each page and reads it with OCR (Tesseract) on this device. The first time it downloads the OCR reader (about 6 MB) from the internet; the picture itself is never uploaded. For BNI Laporan Mutasi Rekening and Mandiri Livin’ e-Statement the lines are checked against the running balance, so a misread amount is flagged. OCR can still misread a letter or a date, so check the rows on the review screen before you import.')})();
 
+/* ---- r36: planning levels and strategic thinking ---- */
+/* Two frameworks for every Activity. (1) Three kinds of planning: Strategic (the big picture, 3-5 years, reviewed yearly), Tactical (the strategy in action,
+   1-3 years, reviewed quarterly), Operational (the day-to-day plan, days to 12 months, reviewed weekly). (2) Strategic thinking: seven skills grouped as Think, Tell, Act.
+   The level is suggested from the dates and can be changed. The answers are kept in your account preferences (no database change, nothing sent to other apps). */
+(function(){
+  const LV={
+    Strategic:{tone:'green',tag:'The Big Picture',days:1095,rev:365,revTxt:'yearly',what:['Sets the long-term vision and direction.','Defines where you will compete and where you will not.','Every decision should ladder up to this.'],time:'3–5 years out · reviewed on an annual basis',use:'Deciding to expand into a new market · building a product or acquiring one · planning a fundraiser or an exit.',tips:['Keep it to 3 priorities at most. If everything is a priority, nothing is.','Decide what you will NOT do. It is harder than deciding what you will.','Revisit it every year. The market shifts, so your plan should too.'],errs:['Goals so vague they could mean anything (“become market leader”).','Avoiding the hard trade-offs because they are uncomfortable.','Going after 5 markets at once and winning none of them.']},
+    Tactical:{tone:'blue',tag:'The Strategy in Action',days:365,rev:91,revTxt:'every quarter',what:['Turns the strategy into specific initiatives and projects.','Bridges the gap between vision and daily execution.','Allocates resources effectively.'],time:'1–3 years ahead · broken into quarterly milestones',use:'Launching a sales team to support expansion · hiring over 6 months to ship a product · running a paid beta programme.',tips:['Give every project one owner (you, or the person named in it).','Set quarterly checkpoints.','Kill projects that are not working. Do not let sunk costs keep you going.'],errs:['Taking on too many initiatives at once and finishing none.','Plans that sound good but have no clear owner or deadline.','Spending 3 months planning and 1 month executing. Flip that ratio.']},
+    Operational:{tone:'orange',tag:'The Day-to-Day Plan',days:0,rev:7,revTxt:'every week',what:['Daily and weekly execution of tasks and processes.','Where the actual work happens.','Turns plans into output, consistently.'],time:'Days to 12 months · reviewed weekly, adjusted constantly',use:'A weekly content schedule · daily outreach targets and pipeline reviews · monthly reporting.',tips:['Build a standard procedure for anything that happens more than twice.','Track the 2–3 KPIs that actually matter. Do not drown in dashboards.','Keep plans realistic. Overloading a week is a sure way to kill momentum.'],errs:['Confusing being busy with making progress.','Losing sight of why you are doing the work (no link back to the strategy).','Overloading with tasks and wondering why quality drops.']}};
+  const SK=[
+    {k:'ltm',g:'Think',n:'Long Term Mindset',h:'Focus on building something that lasts',q:'What lasting result does this build? Write a goal for 3–5 years and the system that compounds toward it.',tip:'Set 3–5 year goals · focus on systems that compound over time · think in terms of momentum.'},
+    {k:'sot',g:'Think',n:'Second Order Thinking',h:'Ask “And then what?” to look at trade-offs',q:'And then what? Write the second- and third-order effects, and one scenario that goes differently.',tip:'Map out second-order (and third-order) effects · use scenario planning to explore different futures.'},
+    {k:'ps',g:'Think',n:'Problem Solving',h:'Design solutions that add real value',q:'Reframe the issue as a specific question. Ask “why” five times. Which smaller parts is it made of?',tip:'Reframe vague issues into specific questions · use 5 whys to find the root cause · break big challenges into smaller parts.'},
+    {k:'fm',g:'Think',n:'Force Multiplier',h:'Find high-impact moves that amplify results',q:'Which move gives the most leverage? A repeatable playbook, a system to scale, a tool or a person that adds capacity?',tip:'Use leverage to amplify results · look for repeatable playbooks or systems you can scale · invest in tools or talent.'},
+    {k:'syn',g:'Tell',n:'Synthesis',h:'Observe data and ask “so what?”',q:'So what? What do the sources say together, where do they contradict, and what is your point of view?',tip:'Connect the dots between sources and form a point of view · look for contradictions and common threads.'},
+    {k:'sto',g:'Tell',n:'Storytelling',h:'Write clear and persuasive narratives',q:'Challenge → Big idea → Action. Tell it in three sentences for the person who must say yes.',tip:'Use a simple structure, e.g. Challenge → Big Idea → Action · turn data into visuals · tailor the story to your audience.'},
+    {k:'dec',g:'Act',n:'Decision Making',h:'Use logic and reasoning to make good decisions',q:'Is the decision reversible or not? Weigh impact against effort. What will you do first?',tip:'Separate reversible and irreversible decisions: move fast on the first · weigh impact versus effort to prioritise choices.'}];
+  const GT={Think:'#1d2420',Tell:'#E0A82E',Act:'#6FAE72'};
+  const st=()=>Object.assign({},prefs().strat||{});
+  const get=id=>st()[id]||{};
+  const spanDays=a=>{const s=a.planned_start?pd(a.planned_start):pd(todayS()),f=a.planned_finish?pd(a.planned_finish):null;return f?Math.round((f-s)/864e5):null};
+  function suggest(a){const d=spanDays(a);if(d==null)return {lvl:'Operational',why:'No finish date yet, so it is treated as day-to-day work.'};
+    if(d>1095)return {lvl:'Strategic',why:'The plan runs more than 3 years.'};if(d>365)return {lvl:'Tactical',why:'The plan runs 1–3 years.'};return {lvl:'Operational',why:'The plan runs up to 12 months.'}}
+  const levelOf=a=>{const m=get(a.id).lvl;return LV[m]?m:suggest(a).lvl};
+  const active=a=>!isClosed(a);
+  function lastRev(a){return get(a.id).rev||String(a.created_at||a.planned_start||todayS()).slice(0,10)}
+  function revDue(a){const l=LV[levelOf(a)],d=Math.round((pd(todayS())-pd(lastRev(a)))/864e5);return {over:d>l.rev,days:d,cad:l.rev}}
+  function checks(a){
+    const L=levelOf(a),out=[],all=(D().activities||[]).filter(active);
+    if(!active(a))return out;
+    if(!a.planned_finish)out.push('No clear deadline: add a finish date.');
+    if(!a.deliverable&&!a.result)out.push('No description of what “done” looks like (Deliverable).');
+    if(L!=='Strategic'&&!a.goal_id&&!a.project_id&&!a.parent_id&&!a.plan_id)out.push('Not linked back to a goal, project, plan or parent activity: why are you doing it?');
+    if(L==='Strategic'){const hi=all.filter(x=>levelOf(x)==='Strategic'&&(x.priority==='Critical'||x.priority==='High'));if(hi.length>3&&(a.priority==='Critical'||a.priority==='High'))out.push('More than 3 Strategic priorities ('+hi.length+'). If everything is a priority, nothing is.')}
+    if(L==='Tactical'){const ip=all.filter(x=>levelOf(x)==='Tactical'&&x.status==='In Progress');if(ip.length>5&&a.status==='In Progress')out.push('Too many Tactical initiatives in progress at once ('+ip.length+'). Finish or stop some.')}
+    if(L==='Operational'){const open=(D().daily_actions||[]).filter(x=>x.activity_id===a.id&&!isClosed(x)&&x.action_date>=todayS()&&x.action_date<=String(addD(todayS(),6)));if(open.length>10)out.push('Overloaded week: '+open.length+' open actions in the next 7 days.')}
+    const r=revDue(a);if(r.over)out.push('Review is due: it is a '+L+' plan, reviewed '+LV[L].revTxt+'. Last review '+r.days+' days ago.');
+    return out}
+  window.plLevelOf=levelOf;window.plChecks=checks;
+  function panel(a){
+    const g=get(a.id),sg=suggest(a),L=levelOf(a),lv=LV[L],ck=checks(a),r=revDue(a),canE=canDo('activities','edit')!=='deny';
+    const filled=SK.filter(s=>g.q&&g.q[s.k]).length;
+    return `<div class="ch" style="margin-top:16px"><h3>Planning &amp; strategic thinking</h3></div><div data-pl>
+     <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center"><label class="sm b" for="pl_lvl">Planning level</label>
+      <select class="in" id="pl_lvl" data-change="pllevel" data-id="${a.id}" ${canE?'':'disabled'} style="max-width:260px"><option value="" ${!g.lvl?'selected':''}>Automatic: ${sg.lvl}</option>${Object.keys(LV).map(k=>`<option value="${k}" ${g.lvl===k?'selected':''}>${k} · ${LV[k].tag}</option>`).join('')}</select>
+      ${badge(L,lv.tone)}</div>
+     <p class="sm mut" style="margin:6px 0">${esc(g.lvl?'Set by you.':sg.why)} ${esc(lv.time)}.</p>
+     <div class="row sm" style="gap:10px;flex-wrap:wrap;align-items:center"><span>Reviewed ${lv.revTxt}. Last review: <b>${fmtD(lastRev(a))}</b>${g.rev?'':' (counted from when it was created)'}.</span>${r.over?badge('Review due','amber'):badge('On time','green')}${canE?`<button class="btn s" data-act="plreview" data-id="${a.id}">${ic('check',14)} Mark reviewed today</button>`:''}</div>
+     ${ck.length?`<div class="callout warn" style="margin-top:8px;background:var(--ambersoft);color:#6B4400">${ic('alert')}<div><b>Check this plan</b><ul style="margin:4px 0 0 18px;padding:0">${ck.map(c=>`<li class="sm">${esc(c)}</li>`).join('')}</ul></div></div>`:`<p class="sm" style="margin-top:8px;color:var(--greent,#1F7A47)">No common planning errors found.</p>`}
+     <details style="margin-top:10px"><summary class="sm b" style="cursor:pointer">Tips for ${L} planning</summary><ul style="margin:6px 0 0 18px;padding:0">${lv.tips.map(t=>`<li class="sm">${esc(t)}</li>`).join('')}</ul><div class="sm b" style="margin-top:6px">Common errors</div><ul style="margin:2px 0 0 18px;padding:0">${lv.errs.map(t=>`<li class="sm">${esc(t)}</li>`).join('')}</ul></details>
+     <details style="margin-top:8px"><summary class="sm b" style="cursor:pointer">Strategic thinking sheet · ${filled} of 7 answered</summary>
+      ${SK.map((s,i)=>`<div style="margin-top:10px"><label class="sm b" for="pl_q_${s.k}"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${GT[s.g]};margin-right:6px"></span>${i+1}. ${s.n} <span class="mut" style="font-weight:400">· ${s.g}</span></label><div class="xs mut">${esc(s.h)}. ${esc(s.q)}</div><textarea class="in" id="pl_q_${s.k}" rows="2" maxlength="400" style="width:100%" ${canE?'':'disabled'}>${esc((g.q||{})[s.k]||'')}</textarea></div>`).join('')}
+      ${canE?`<div class="row" style="margin-top:10px"><button class="btn p" data-act="plsave" data-id="${a.id}">${ic('check',14)} Save the sheet</button></div>`:''}</details></div>`}
+  const _ex=EXTRA.activities;EXTRA.activities=a=>(_ex?_ex(a):'')+panel(a);
+  CHG.pllevel=async el=>{const s=st(),id=el.dataset.id;s[id]=Object.assign({},s[id]||{});if(el.value)s[id].lvl=el.value;else delete s[id].lvl;await setPrefs({strat:s});toast('Planning level saved');refreshTop()};
+  ACT.plreview=async el=>{const s=st(),id=el.dataset.id;s[id]=Object.assign({},s[id]||{},{rev:todayS()});await setPrefs({strat:s});toast('Marked as reviewed');refreshTop()};
+  ACT.plsave=async el=>{const s=st(),id=el.dataset.id,q={};SK.forEach(k=>{const v=(document.getElementById('pl_q_'+k.k)||{}).value||'';if(v.trim())q[k.k]=v.trim().slice(0,400)});
+    s[id]=Object.assign({},s[id]||{});if(Object.keys(q).length)s[id].q=q;else delete s[id].q;
+    if(!s[id].lvl&&!s[id].q&&!s[id].rev)delete s[id];await setPrefs({strat:s});toast('Saved');refreshTop()};
+  /* overview screen */
+  navP('execute').subs.splice(Math.max(0,navP('execute').subs.findIndex(x=>x[0]==='activities')+1),0,['planning','Planning levels']);
+  PAGEHELP['execute/planning']='Every Activity sits at one of three planning levels: Strategic (the big picture, 3–5 years, reviewed yearly), Tactical (the strategy in action, 1–3 years, reviewed quarterly) or Operational (the day-to-day plan, up to 12 months, reviewed weekly). The level is suggested from the dates and you can change it in the Activity. Open an Activity to answer the seven strategic thinking questions and to see the common errors found in its plan.';
+  VIEWS['execute/planning']=()=>{
+    const acts=(D().activities||[]).filter(active),by={Strategic:[],Tactical:[],Operational:[]};acts.forEach(a=>by[levelOf(a)].push(a));
+    const bad=acts.filter(a=>checks(a).length).length;
+    const col=k=>{const l=LV[k],list=by[k].sort((a,b)=>String(a.planned_finish||'9999').localeCompare(String(b.planned_finish||'9999')));
+      return `<div class="card"><div class="ch"><h3>${k} planning</h3><span class="sp"></span>${badge(list.length+' active',l.tone)}</div>
+       <p class="sm" style="margin:0 0 6px"><b>${esc(l.tag)}</b> · ${esc(l.time)}</p>
+       <ul class="sm" style="margin:0 0 8px 18px;padding:0">${l.what.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+       <div class="list">${list.length?list.slice(0,14).map(a=>{const n=checks(a).length;return `<div class="item" data-act="open" data-k="activities" data-id="${a.id}"><span class="t" style="flex:1">${esc(a.name)}</span>${a.planned_finish?`<span class="sm mut">${fmtD(a.planned_finish)}</span>`:''}${n?badge(n+' to check','amber'):''}</div>`}).join('')+(list.length>14?`<div class="sm mut" style="padding:6px">and ${list.length-14} more</div>`:''):`<div class="sm mut" style="padding:6px">No active ${k.toLowerCase()} activities.</div>`}</div>
+       <details style="margin-top:8px"><summary class="sm b" style="cursor:pointer">Use cases, tips and common errors</summary><p class="sm" style="margin:6px 0">${esc(l.use)}</p><div class="sm b">Top tips</div><ul class="sm" style="margin:2px 0 6px 18px;padding:0">${l.tips.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class="sm b">Common errors</div><ul class="sm" style="margin:2px 0 0 18px;padding:0">${l.errs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details></div>`};
+    const sk=`<div class="card mt"><div class="ch"><h3>Strategic thinking toolkit</h3><span class="sp"></span><span class="sm mut">Think · Tell · Act</span></div>
+      <div class="g g2">${SK.map((s,i)=>`<div class="item" style="align-items:flex-start;gap:10px"><span style="flex:none;width:12px;height:12px;margin-top:4px;border-radius:3px;background:${GT[s.g]}"></span><div><div class="b">${i+1}. ${esc(s.n)} <span class="sm mut">· ${s.g}</span></div><div class="sm">${esc(s.h)}</div><div class="xs mut">${esc(s.tip)}</div></div></div>`).join('')}</div>
+      <p class="sm mut" style="margin-top:8px">Answer the seven questions inside each Activity (open it, then “Strategic thinking sheet”).</p></div>`;
+    return `<div class="row sm" style="gap:10px;flex-wrap:wrap;margin-bottom:10px"><span>${acts.length} active activities</span>${bad?badge(bad+' with something to check','amber'):badge('No planning errors found','green')}</div>
+      <div class="g g3">${col('Strategic')}${col('Tactical')}${col('Operational')}</div>${sk}`};
+})();
+
 /* ---- r14: 99_zzzzzzzzzzzzz_fmap.js ---- */
 /* Field map tab: which Polaris One field goes to which field of each connected app, shown and editable from the app's own pop-up */
 (function(){
