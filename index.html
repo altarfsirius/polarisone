@@ -5231,7 +5231,9 @@ VIEWS['settings/workday']=()=>{
   <div class="card"><div class="ch"><h3>Your day</h3></div><div class="list">
    ${[['Morning block',R(s.s,s.m1),'Focus','b-blue'],['Morning break',R(s.m1,s.m1+s.L),'Lowest priority','b-green'],['Morning block, part 2',R(s.m1+s.L,s.ls),'Collaboration','b-blue'],['Lunch',R(s.ls,s.le),'Dzuhur, eat, rest','b-slate'],['Afternoon block',R(s.le,s.m2),'Focus','b-blue'],['Afternoon break',R(s.m2,s.m2+s.L),'Lowest priority','b-green'],['Wrap-up',R(s.m2+s.L,s.e),'Finish and close','b-blue']].map(r=>`<div class="item"><span class="t" style="flex:1">${r[0]}</span><span class="sm mut">${r[1]}</span><span class="badge ${r[3]}">${r[2]}</span></div>`).join('')}</div>
    <div class="callout" style="margin-top:12px">${ic('info')}<div>A break sits in the <b>middle</b> of each block. It has the <b>lowest priority</b>: it never counts as workload or progress, never pushes other items aside on the timeline, and any task can take its time. Use it to <b>refresh</b>, <b>cool down</b>, pray <b>Sholat Dhuha</b> or simply <b>rest</b>. Tap the matching button on the break in Daily Action.</div></div>
-   <p class="sm mut" style="margin-top:8px">${mine.length} break${mine.length===1?'':'s'} created so far.</p></div></div><div class="g g2 mt">${geoCardHtml()}</div>`};
+   <p class="sm mut" style="margin-top:8px">${mine.length} break${mine.length===1?'':'s'} created so far.</p></div></div><div class="card mt"><div class="ch"><h3>Life areas outside work</h3></div><p class="sm mut" style="margin:0 0 8px">When you give a reason for not doing an action, it moves to the next working day: Saturday, Sunday, public holidays and leave are skipped. Actions in the life areas ticked here can be done in your free time, so they only move one calendar day.</p>
+   <div class="row" style="flex-wrap:wrap;gap:6px 16px">${(D().portfolios||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<label class="chk" style="padding:4px 0"><input type="checkbox" name="freearea" value="${esc(p.name)}" data-change="freearea" ${t3FreeAreas().includes(p.name)?'checked':''}> ${esc(p.name)}</label>`).join('')||'<span class="sm mut">No life areas yet.</span>'}</div></div><div class="g g2 mt">${geoCardHtml()}</div>`};
+CHG.freearea=async()=>{const v=[...document.querySelectorAll('input[name=freearea]:checked')].map(x=>x.value);await setPrefs({work:Object.assign({},prefs().work||{},{freeAreas:v})});toast('Saved')};
 AFTER['settings/workday']=()=>feedsAfter({years:[],dates:[todayS()]});
 ACT.worksave=async()=>{
   const g=id=>document.getElementById(id).value,days=[...document.querySelectorAll('input[name=wd]:checked')].map(x=>+x.value);
@@ -5239,6 +5241,7 @@ ACT.worksave=async()=>{
   if(!['start','lunchStart','lunchEnd','end'].every(k=>HM_RE.test(c[k])))return toast('Fill in all four times.',1);
   if(!(mins(c.start)<mins(c.lunchStart)&&mins(c.lunchStart)<mins(c.lunchEnd)&&mins(c.lunchEnd)<mins(c.end)))return toast('The times must run in order: start, lunch starts, lunch ends, end.',1);
   if(!days.length)return toast('Choose at least one working day.',1);
+  if((prefs().work||{}).freeAreas)c.freeAreas=prefs().work.freeAreas;
   await setPrefs({work:c});toast('Work day saved');runAutomations();renderView()};
 ACT.workreset=async()=>{await setPrefs({work:null});toast('Back to the default work day');renderView()};
 ACT.brkreset=async()=>{
@@ -22010,7 +22013,7 @@ RELEASE_NOTES.unshift({rev:30,date:'2026-10-29',groups:[
   ['Weekly summary, like a personal assistant','“Weekly summary” on Daily Actions, a card on Home and a bell alert from Friday 15:00 to Monday 12:00. It shows what you did and did not do, your condition, and growth in potential, professional work, knowledge, emotional and spiritual life, with one step for next week that becomes a Daily Action or a weekly review.'],
   ['Biodata (CV) for every user','A new menu with personal details, languages, interests, values and hobbies. The CV page gathers your work experience, education, certifications, seminars and skills from Skills & Knowledge and your hobbies from Healthcare, lets you choose which parts to include, and prints or saves as PDF. It is private to your account; the health summary is only included if you tick it.'],
   ['Top 3 picked for you, in the free time','On every working day (Monday to Friday, not a holiday, joint leave or day off) the first time you open Polaris One it plans up to 10 actions, Critical first, and the first 3 of them become your Top 3 (starred). All are placed one after another in the time that no meeting, Outlook event, prayer, lunch or break blocks. Meetings with a start time now show in Time blocks. The rest wait for the next working day. The strip “Top 3 planner” on One day lets you plan again or switch it off.','execute','daily','Open One day'],
-  ['The reason for a postponed action','Move any planned action to a later date, put it on hold, cancel it, or close a late Top 3 that is not finished, and a window asks why. The reason goes into the Time log with 0 hours, so the Time log tells what held you up.','execute','timelog','Open Time log'],
+  ['The reason for a postponed action','Move any planned action to a later date, put it on hold, cancel it, or close a late Top 3 that is not finished, and a window asks why. After the reason is saved, an action that is still open moves to the next working day (Saturday, Sunday, public holidays and leave are skipped); actions in life areas you can do in free time only move one day. The reason goes into the Time log with 0 hours, so the Time log tells what held you up.','execute','timelog','Open Time log'],
   ['Always on top for One day','In the desktop app it now turns on by itself when Polaris One opens, and a Startup button can also open Polaris One when Windows or Mac starts. On a laptop or computer, One day can float above other windows: a small window in the desktop app (Windows, Mac) or a floating mini window in Chrome and Edge, with a tick box for each action and a one-tap mood. It is not offered on phones and tablets.']]},
  {t:'Also new',items:[
   ['Plans per Life Area from the calendar','Plan → Planning shows a Life Area cascade. A plan named like “Work Q4 2026”, “Work Nov 2026” or “Work W45 2026” is made for every period in which that Life Area has an Activity or a Daily Action, under its parent (week → month → quarter → half → year). Activities without a plan are linked to the smallest plan that holds their dates.'],
@@ -22302,6 +22305,12 @@ function t3Workday(d){
   if(typeof holidayOn==='function'&&holidayOn(d).length)return false;
   if(typeof leavesOn==='function'&&leavesOn(d).some(l=>!l.half_day))return false;
   return true}
+/* life areas that can be done in free time (settings, Work day); by default the personal ones */
+const T3_FREE_DEFAULT=['Family','Ibadah','Hobby','Automotive','Health','Personal Development','Learning','Financial','Investment'];
+const t3FreeAreas=()=>{const w=prefs().work||{};return Array.isArray(w.freeAreas)?w.freeAreas:T3_FREE_DEFAULT};
+function t3AreaName(x){const a=x&&x.activity_id?byId('activities',x.activity_id):null,pid=(a&&a.portfolio_id)||x.portfolio_id,p=pid?byId('portfolios',pid):null;return p?p.name:''}
+/* where a postponed action goes: the next calendar day for free-time life areas, otherwise the next working day */
+function t3PostponeTo(x,from){return t3FreeAreas().includes(t3AreaName(x))?addD(from,1):t3NextWorkday(from)}
 function t3NextWorkday(from){let d=addD(from,1);for(let i=0;i<14&&!t3Workday(d);i++)d=addD(d,1);return d}
 /* everything that blocks the day, in minutes from midnight: [start,end,label] */
 function t3Busy(day,ignoreId){
@@ -22393,7 +22402,11 @@ ACT.t3save=async el=>{
     const ids=(S.t3.q[0]&&S.t3.q[0].ids)||[el.dataset.id];
     for(const aid of ids){const y=byId('daily_actions',aid);if(!y||t3Asked(aid,todayS()))continue;
       await saveRow('time_logs',{activity_id:y.activity_id||null,daily_action_id:aid,log_date:todayS(),hours:0,source:'Postponed',note:(trunc(y.title,80)+' · '+reason+(note.trim()?': '+note.trim():'')).slice(0,1000)})}
-    S.t3.q.shift();S.t3.busy=false;finishModal();toast('Reason saved in the Time log');renderView();setTimeout(t3Next,300)}
+    let moved=0;
+    for(const aid of ids){const y=byId('daily_actions',aid);if(!y||isClosed(y)||y.status==='On Hold'||y.status==='Cancelled'||t3Soft(y)||!y.action_date||y.action_date>todayS())continue;
+      /* an action you already moved to a later date keeps the date you chose; one that is still today or late goes to the next free day */
+      const to=t3PostponeTo(y,todayS());if(to!==y.action_date){await patchRow('daily_actions',aid,{action_date:to,is_top3:false,start_time:null,end_time:null});moved++}}
+    S.t3.q.shift();S.t3.busy=false;finishModal();toast(moved?'Reason saved. '+(moved===1?'The action moved':moved+' actions moved')+' to the next free day':'Reason saved in the Time log');renderView();setTimeout(t3Next,300)}
   catch(e){el.disabled=false;if(err)err.textContent='Not saved: '+((e&&e.message)||e)}};
 const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('daily_actions',id);if(!x||t3Soft(x)||t3Asked(id,todayS()))return;if(!S.t3.q.some(q=>q.id===id))S.t3.q.push({id,why});setTimeout(t3Next,450)};
 /* postponed: moved to a later date, put on hold, or cancelled */
