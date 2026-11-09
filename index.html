@@ -5184,6 +5184,11 @@ const isWorkDay=d=>workCfg().days.includes(pd(d).getDay());
 function dhuhaWindow(day){const p=typeof prayerFor==='function'?prayerFor(day):null;if(!p||!p.Sunrise||!p.Dhuhr)return null;const a=mins(p.Sunrise)+15,b=mins(p.Dhuhr)-10;return b>a?[hhmm(a),hhmm(b)]:null}
 
 /* ---------- the two daily breaks ---------- */
+/* r37: the keys (of a list) that the server already has on a Daily Action; demo mode and any failure answer "none" */
+DB.extKeysExisting=async function(keys){
+  if(this.mode!=='supabase'||!this.sb||!keys||!keys.length)return new Set();
+  try{const {data,error}=await this.sb.from('daily_actions').select('ext_key').in('ext_key',keys);if(error)throw error;return new Set((data||[]).map(r=>r.ext_key))}
+  catch(e){console.warn('extKeysExisting',e);return new Set()}};
 async function autoBreaks(){
   const c=workCfg();if(!c.breaks)return 0;
   const sl=workSlots(),seen=seenSet(),t=todayS(),rows=[],keys=[],yrs=new Set();
@@ -5198,8 +5203,10 @@ async function autoBreaks(){
     [['am',sl.b1,'Break (morning)'],['pm',sl.b2,'Break (afternoon)']].forEach(([k,b,title])=>{
       if((D().daily_actions||[]).some(x=>x.ext_key==='auto:brk:'+d+':'+k))return;
       rows.push({action_date:d,title,time_cat:'Break',priority:'Low',start_time:hhmm(b[0]),end_time:hhmm(b[1]),planned_min:sl.L,status:'Not Started',progress:0,pomodoros:0,ext_key:'auto:brk:'+d+':'+k})})}
-  if(rows.length){const ins=await DB.insertMany('daily_actions',rows);D().daily_actions=(D().daily_actions||[]).concat(ins)}
-  await seenAdd(keys);return rows.length}
+  /* r37: another device or tab may have created the same break a moment ago: ask the server and skip those */
+  const have=rows.length?await DB.extKeysExisting(rows.map(r=>r.ext_key)):new Set(),fresh=rows.filter(r=>!have.has(r.ext_key));
+  if(fresh.length){const ins=await DB.insertMany('daily_actions',fresh);D().daily_actions=(D().daily_actions||[]).concat(ins)}
+  await seenAdd(keys);return fresh.length}
 AUTO_TASKS.push({id:'brk',need:'daily_actions',on:()=>workCfg().breaks,run:autoBreaks,txt:n=>n+' break'+(n>1?'s':'')});
 const BREAK_KINDS=['Sholat Dhuha','Refresh','Cool down','Rest'];
 function breakChips(x){return `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap" aria-label="What did you use this break for?">${BREAK_KINDS.map(k=>`<button class="btn s" data-act="brk" data-id="${x.id}" data-k="${k}">${k}</button>`).join('')}</div>`}
@@ -15366,6 +15373,24 @@ const ID_SPEC={
  ACT:{re:/^ACT-(\d{2})(\d{2})-(\d+)$/,yy:m=>+m[2],n:m=>+m[3]},
  ACN:{re:/^ACN-(\d{2})(\d{2})(\d{2})-(\d+)$/,yy:m=>+m[3],n:m=>+m[4]}};
 S.idOff=S.idOff||{};          /* tables whose database has no `code` column yet */
+S.idRemote=S.idRemote||{};    /* numbers other sessions already used: {table:{at,key,codes:[{code}]}} (r37) */
+/* r37: the codes of this year that the server already has (another device or tab may have used the next number). Demo mode has none. */
+DB.idRemoteCodes=async function(t,pre,yys){
+  if(this.mode!=='supabase'||!this.sb)return [];
+  const out=[];
+  for(const yy of yys){
+    const y2=String(yy).padStart(2,'0'),pat=(pre==='PRJ'||pre==='PRB')?pre+'-20'+y2+'-%':pre==='ACT'?'ACT-__'+y2+'-%':'ACN-____'+y2+'-%';
+    for(let from=0;from<5000;from+=1000){
+      const {data,error}=await this.sb.from(t).select('code').like('code',pat).range(from,from+999);
+      if(error)throw error;(data||[]).forEach(r=>out.push(r.code));if(!data||data.length<1000)break}}
+  return out};
+async function idRefresh(t,rows,force){
+  const c=ID_T[t];if(!c||S.idOff[t])return;
+  const need=rows.filter(r=>!r.code&&!idSkip(t,r));if(!need.length)return;
+  const yys=[...new Set(need.map(r=>idHead(c.pre,idWhen(t,r)).yy))],key=yys.join(','),cache=S.idRemote[t]=S.idRemote[t]||{at:0,key:'',codes:[]};
+  if(!force&&cache.key===key&&Date.now()-cache.at<8000)return;
+  try{cache.codes=(await DB.idRemoteCodes(t,c.pre,yys)).map(code=>({code}));cache.at=Date.now();cache.key=key}catch(e){console.warn('idRefresh',e)}}
+const idConflict=e=>{const m=String((e&&e.message)||'')+' '+String((e&&e.details)||'');return !!e&&(e.code==='23505'||/duplicate key|unique constraint/i.test(m))&&/\bcode\b/i.test(m)};
 
 /* a title without any ID in front of it */
 function idRaw(v){let s=String(v==null?'':v),g=0;while(g++<3&&ID_RE.test(s))s=s.replace(ID_RE,'');return s}
@@ -15398,7 +15423,7 @@ function idAssign(t,rows){
   const c=ID_T[t];if(!c||S.idOff[t])return rows;
   const sp=ID_SPEC[c.pre],mx={},seen=new Set();
   const scan=r=>{const k=r&&r.code;if(!k)return;seen.add(k);const m=sp.re.exec(k);if(m){const y=sp.yy(m);mx[y]=Math.max(mx[y]||0,sp.n(m))}};
-  (D()[t]||[]).forEach(scan);rows.forEach(scan);
+  (D()[t]||[]).forEach(scan);rows.forEach(scan);((S.idRemote[t]&&S.idRemote[t].codes)||[]).forEach(scan);
   rows.forEach(r=>{
     if(r.code||idSkip(t,r))return;
     const h=idHead(c.pre,idWhen(t,r));let n=(mx[h.yy]||0)+1,code=h.head+'-'+idP3(n);
@@ -15421,16 +15446,30 @@ const idMissing=(e,t)=>{const m=String((e&&e.message)||'')+' '+String((e&&e.code
 (function(){
   const _ins=DB.insert,_insM=DB.insertMany,_upd=DB.update,_load=DB.loadAll,_shared=DB.sharedRows,_snap=DB.snapshot;
   const prep=(t,rows)=>{const c=ID_T[t];rows.forEach(r=>{if(r[c.f]!=null)r[c.f]=idStrip(r[c.f],[r.code])});if(!S.idOff[t])idAssign(t,rows);else rows.forEach(r=>{if(r.code===undefined)delete r.code})};
+  /* r37: numbers are taken from the local list AND from what the server already has; if the database still refuses a number
+     (a unique index on code, or another session was faster), the rows without a number of their own get a new one, up to 3 tries.
+     A list bigger than one 400-row chunk is never retried (part of it may already be saved). */
+  async function idRetry(t,rows,run){
+    const auto=rows.map(r=>!r.code);
+    for(let i=0;;i++){
+      await idRefresh(t,rows,i>0);prep(t,rows);
+      try{return await run(rows)}
+      catch(e){
+        if(i<2&&rows.length<=400&&auto.some(Boolean)&&idConflict(e)){rows.forEach((r,j)=>{if(auto[j])delete r.code});continue}
+        throw e}}}
+  window.idRetry=idRetry;
   DB.insert=async function(t,row){
     if(!ID_T[t])return _ins.call(this,t,row);
-    row=Object.assign({},row);prep(t,[row]);
-    try{return idDeco(t,await _ins.call(this,t,row))}
-    catch(e){if(row.code&&idMissing(e,t)){delete row.code;return idDeco(t,await _ins.call(this,t,row))}throw e}};
+    row=Object.assign({},row);
+    return idRetry(t,[row],async rs=>{const r=rs[0];
+      try{return idDeco(t,await _ins.call(this,t,r))}
+      catch(e){if(r.code&&idMissing(e,t)){delete r.code;return idDeco(t,await _ins.call(this,t,r))}throw e}})};
   DB.insertMany=async function(t,rows){
     if(!ID_T[t])return _insM.call(this,t,rows);
-    rows=rows.map(r=>Object.assign({},r));prep(t,rows);
-    try{return idDecoAll(t,await _insM.call(this,t,rows))}
-    catch(e){if(rows.some(r=>r.code)&&idMissing(e,t)){rows.forEach(r=>{delete r.code});return idDecoAll(t,await _insM.call(this,t,rows))}throw e}};
+    rows=rows.map(r=>Object.assign({},r));
+    return idRetry(t,rows,async rs=>{
+      try{return idDecoAll(t,await _insM.call(this,t,rs))}
+      catch(e){if(rs.some(r=>r.code)&&idMissing(e,t)){rs.forEach(r=>{delete r.code});return idDecoAll(t,await _insM.call(this,t,rs))}throw e}})};
   DB.update=async function(t,id,patch){
     if(!ID_T[t])return _upd.call(this,t,id,patch);
     const c=ID_T[t],cur=byId(t,id)||null;patch=Object.assign({},patch);
