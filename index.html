@@ -23788,19 +23788,19 @@ const EX_SHORT={po:'Polaris One',apm:'APM',aero:'Aero',auto:'Auto',imp:'Import'}
 const EX_SEC=[['summary','Summary figures'],['sources','Totals by app'],['review','Weekly review'],['actions','Actions'],['time','Time log'],['evidence','Evidence'],['notes','Deliverable, result, remarks'],['loose','Actions without an Activity']];
 const EX_COL=[['code','IDs'],['source','App'],['dates','Planned dates'],['hours','Hours'],['priority','Priority'],['result','Action result'],['blocker','Blocker'],['tlnote','Time log notes'],['url','Evidence links']];
 const EX_WEEKS=[[1,'1 week'],[2,'2 weeks'],[4,'4 weeks'],[13,'13 weeks (quarter)']];
-function exDef(){return {weeks:1,src:{po:1,apm:1,aero:1,auto:1,imp:1},scope:'open',status:'',project:'',group:'project',evid:'period',
+function exDef(){return {weeks:1,src:{po:1,apm:1,aero:1,auto:1,imp:1},scope:'open',status:'',group:'project',evid:'period',areaOff:{},projOff:{},
   sec:{summary:1,sources:1,review:1,actions:1,time:1,evidence:1,notes:0,loose:0},col:{code:1,source:1,dates:1,hours:1,priority:0,result:1,blocker:0,tlnote:1,url:1},off:{}}}
 function exS(){
   if(S.ex)return S.ex;
   const d=exDef();let o={};try{o=JSON.parse(localStorage.getItem(EX_KEY)||'{}')||{}}catch(e){o={}}
-  ['weeks','scope','status','project','group','evid'].forEach(k=>{if(typeof o[k]==='string'||typeof o[k]==='number')d[k]=o[k]});
-  ['src','sec','col','off'].forEach(k=>{if(o[k]&&typeof o[k]==='object')Object.assign(d[k],o[k])});
+  ['weeks','scope','status','group','evid'].forEach(k=>{if(typeof o[k]==='string'||typeof o[k]==='number')d[k]=o[k]});
+  ['src','sec','col','off','areaOff','projOff'].forEach(k=>{if(o[k]&&typeof o[k]==='object')Object.assign(d[k],o[k])});
   d.weeks=EX_WEEKS.some(w=>w[0]===+d.weeks)?+d.weeks:1;
   if(!['moved','open','all'].includes(d.scope))d.scope='open';if(!['project','area','source','none'].includes(d.group))d.group='project';if(!['period','all'].includes(d.evid))d.evid='period';
   /* start on the week of the latest weekly review when it is recent, otherwise on this week */
   const t=todayS(),wr=(D().reviews||[]).filter(r=>r.review_type==='Weekly'&&r.period_start).map(r=>weekStart(r.period_start)).sort(),last=wr[wr.length-1];
   d.ws=last&&last>=addD(weekStart(t),-14)&&last<=weekStart(t)?last:weekStart(t);d.pick=false;S.ex=d;return d}
-function exSave(){const s=S.ex;if(!s)return;try{localStorage.setItem(EX_KEY,JSON.stringify({weeks:s.weeks,src:s.src,scope:s.scope,status:s.status,project:s.project,group:s.group,evid:s.evid,sec:s.sec,col:s.col,off:s.off}))}catch(e){}}
+function exSave(){const s=S.ex;if(!s)return;try{localStorage.setItem(EX_KEY,JSON.stringify({weeks:s.weeks,src:s.src,scope:s.scope,status:s.status,group:s.group,evid:s.evid,sec:s.sec,col:s.col,off:s.off,areaOff:s.areaOff,projOff:s.projOff}))}catch(e){}}
 /* which linked app an item belongs to; an item can be in more than one */
 function exSrc(r,ent){
   const o=[],id=r.id,sy=S.sync||{},ph=(S.ph&&S.ph.states)||{};
@@ -23831,28 +23831,32 @@ function exData(){
   (D().evidence||[]).forEach(e=>{const k=e.link_type==='activities'?e.link_id:e.link_type==='daily_actions'?actOf(e.link_id):null;if(!k)return;
     if(inP(e.evidence_date))push(mEp,k,e);
     if(s.evid==='period'?inP(e.evidence_date):(!e.evidence_date||String(e.evidence_date).slice(0,10)<=we))push(mE,k,e)});
-  const all=FD('activities').map(a=>{
+  const all=(D().activities||[]).map(a=>{
     const actions=(mA.get(a.id)||[]).slice().sort((x,y)=>String(x.action_date).localeCompare(String(y.action_date))||String(x.start_time||'').localeCompare(String(y.start_time||'')));
     const logs=(mT.get(a.id)||[]).slice().sort((x,y)=>String(x.log_date).localeCompare(String(y.log_date)));
     const ev=(mE.get(a.id)||[]).slice().sort((x,y)=>String(x.evidence_date||'').localeCompare(String(y.evidence_date||'')));
     const moved=actions.length>0||logs.length>0||mEp.has(a.id)||inP(a.completed_on);
-    return {a,src:exSrc(a,'activity'),actions,logs,ev,moved,hrs:sum(logs.map(l=>l.hours)),done:actions.filter(x=>x.status==='Completed').length,
+    return {a,area:areaOf('activities',a)||'none',proj:a.project_id&&byId('projects',a.project_id)?a.project_id:'none',src:exSrc(a,'activity'),actions,logs,ev,moved,hrs:sum(logs.map(l=>l.hours)),done:actions.filter(x=>x.status==='Completed').length,
       late:!isClosed(a)&&a.planned_finish&&a.planned_finish<asOf?diffD(asOf,a.planned_finish):0,depth:0}});
   /* 1. scope, 2. the reader's filters, 3. the reader's own ticks */
   const scoped=all.filter(r=>s.scope==='all'?true:s.scope==='moved'?r.moved:(r.moved||(!isClosed(r.a)&&(!r.a.planned_start||r.a.planned_start<=we))));
   const srcCount={};Object.keys(EX_SRC).forEach(k=>srcCount[k]=0);scoped.forEach(r=>r.src.forEach(k=>srcCount[k]++));
-  const cand=scoped.filter(r=>r.src.some(k=>s.src[k])&&(!s.status||r.a.status===s.status)&&(!s.project||(s.project==='none'?!r.a.project_id:r.a.project_id===s.project)));
+  const base=scoped.filter(r=>r.src.some(k=>s.src[k])&&(!s.status||r.a.status===s.status));
+  /* life areas first, then the projects that are left inside the ticked life areas */
+  const areaCount=new Map(),projCount=new Map(),inc=(m,k)=>m.set(k,(m.get(k)||0)+1);
+  base.forEach(r=>inc(areaCount,r.area));const inArea=base.filter(r=>!s.areaOff[r.area]);inArea.forEach(r=>inc(projCount,r.proj));
+  const cand=inArea.filter(r=>!s.projOff[r.proj]);
   const rows=cand.filter(r=>!s.off[r.a.id]);
-  const gk=r=>s.group==='project'?(r.a.project_id&&byId('projects',r.a.project_id)?refLabel('projects',r.a.project_id):'No project'):s.group==='area'?(r.a.portfolio_id&&byId('portfolios',r.a.portfolio_id)?String(refLabel('portfolios',r.a.portfolio_id)).trim():'No life area'):s.group==='source'?EX_SRC[r.src[0]]:'';
+  const gk=r=>s.group==='project'?(r.proj!=='none'?refLabel('projects',r.proj):'No project'):s.group==='area'?(r.area!=='none'&&byId('portfolios',r.area)?String(refLabel('portfolios',r.area)).trim():'No life area'):s.group==='source'?EX_SRC[r.src[0]]:'';
   const gm=new Map();rows.forEach(r=>{const k=gk(r);if(!gm.has(k))gm.set(k,[]);gm.get(k).push(r)});
   const groups=[...gm.entries()].sort((x,y)=>(/^No /.test(x[0])-/^No /.test(y[0]))||x[0].localeCompare(y[0],undefined,{numeric:true})).map(([name,list])=>({name,list:exOrder(list)}));
   const acts=rows.map(r=>r.a),nAct=sum(rows.map(r=>r.actions.length)),nDone=sum(rows.map(r=>r.done));
   const tot={n:rows.length,completed:acts.filter(a=>inP(a.completed_on)).length,inprog:acts.filter(a=>a.status==='In Progress').length,late:rows.filter(r=>r.late>0).length,
     prog:rows.length?sum(acts.map(a=>a.progress))/rows.length:null,nAct,nDone,hrs:sum(rows.map(r=>r.hrs)),ev:sum(rows.map(r=>r.ev.length))};
   const bySrc=Object.keys(EX_SRC).map(k=>{const l=rows.filter(r=>r.src.includes(k));return {k,n:l.length,done:l.filter(r=>r.a.status==='Completed').length,late:l.filter(r=>r.late>0).length,prog:l.length?sum(l.map(r=>r.a.progress))/l.length:null,act:sum(l.map(r=>r.actions.length)),actDone:sum(l.map(r=>r.done)),hrs:sum(l.map(r=>r.hrs))}}).filter(x=>x.n);
-  const reviews=FD('reviews').filter(r=>r.review_type==='Weekly'&&r.period_start&&String(r.period_start).slice(0,10)<=we&&String(r.period_end||r.period_start).slice(0,10)>=ws).sort((x,y)=>String(x.period_start).localeCompare(String(y.period_start)));
-  const loose=FD('daily_actions').filter(x=>!x.activity_id&&x.status!=='Cancelled'&&inP(x.action_date)&&!(typeof isLight==='function'&&isLight(x))).sort((x,y)=>String(x.action_date).localeCompare(String(y.action_date)));
-  return {s,ws,we,asOf,cand,rows,groups,tot,bySrc,reviews,loose,srcCount,daBy}}
+  const reviews=(D().reviews||[]).filter(r=>(!r.portfolio_id||!s.areaOff[r.portfolio_id])&&r.review_type==='Weekly'&&r.period_start&&String(r.period_start).slice(0,10)<=we&&String(r.period_end||r.period_start).slice(0,10)>=ws).sort((x,y)=>String(x.period_start).localeCompare(String(y.period_start)));
+  const loose=(D().daily_actions||[]).filter(x=>!x.activity_id&&!s.areaOff[areaOf('daily_actions',x)||'none']&&x.status!=='Cancelled'&&inP(x.action_date)&&!(typeof isLight==='function'&&isLight(x))).sort((x,y)=>String(x.action_date).localeCompare(String(y.action_date)));
+  return {s,ws,we,asOf,cand,rows,groups,tot,bySrc,reviews,loose,srcCount,daBy,areaCount,projCount}}
 const exH=h=>fmtN(h,Math.abs(h)<10&&!Number.isInteger(+h)?1:(Number.isInteger(+h)?0:1))+' h';
 const exMin=m=>{m=Math.round(num(m));return m?(m>=60?Math.floor(m/60)+' h'+(m%60?' '+m%60+' min':''):m+' min'):'—'};
 const exBar=p=>{p=clamp(Math.round(num(p)),0,100);return `<span class="exbar"><i style="width:${p}%"></i></span> <span class="exnum">${p}%</span>`};
@@ -23882,7 +23886,11 @@ function exActivity(r,d){
   return h+'</section>'}
 function exReport(d){
   const s=d.s,T=d.tot,who=(S.profile&&S.profile.full_name)||'',links=exLinks();
-  const f=[];f.push(focusName());if(s.status)f.push('Status: '+s.status);if(s.project)f.push('Project: '+(s.project==='none'?'none':refLabel('projects',s.project)));
+  const f=[],nmA=k=>k==='none'?'No life area':String(refLabel('portfolios',k)).trim(),nmP=k=>k==='none'?'No project':refLabel('projects',k);
+  const aOn=[...d.areaCount.keys()].filter(k=>!s.areaOff[k]),pOn=[...d.projCount.keys()].filter(k=>!s.projOff[k]);
+  f.push(aOn.length===d.areaCount.size?'All life areas':'Life areas: '+(aOn.map(nmA).sort().join(', ')||'none'));
+  f.push(pOn.length===d.projCount.size?'All projects':'Projects: '+(pOn.map(nmP).sort().join(', ')||'none'));
+  if(s.status)f.push('Status: '+s.status);
   f.push('Apps: '+Object.keys(EX_SRC).filter(k=>s.src[k]&&d.srcCount[k]).map(k=>EX_SHORT[k]).join(', ')||'none');
   f.push(s.scope==='moved'?'Only Activities with movement':s.scope==='all'?'All Activities':'Open Activities and those with movement');
   let h=`<div class="exrep" data-exrep><header class="exhead"><div><div class="exkick">Polaris One</div><h2>Executive Progress Report</h2><div class="exper">${s.weeks>1?s.weeks+' weeks: ':'Week: '}<b>${fmtD(d.ws)} – ${fmtD(d.we)}</b></div></div><div class="exwho">${who?`<div><b>${esc(who)}</b></div>`:''}<div>Prepared ${fmtDT(new Date())}</div><div>${d.rows.length} of ${d.cand.length} Activities shown</div></div></header>
@@ -23921,7 +23929,7 @@ function exStyle(){if(document.getElementById('exsty'))return;const st=document.
 .exrevg{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-top:6px;font-size:12px}.exrevl{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#5B6878}
 .exfoot{margin-top:16px;padding-top:8px;border-top:1px solid #C9D2DD;font-size:10.5px;color:#5B6878}.exurl a{color:#1D4ED8}
 .exctl{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-bottom:14px}.exctl>*{min-width:0}.exrow>*{max-width:100%}.exrow .btn{white-space:normal}.exrow{display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center}.exchk{display:inline-flex;gap:6px;align-items:center;font-size:13px;min-height:28px;cursor:pointer}
-.exctl select.in{width:auto;max-width:100%;flex:0 1 auto}.exnw{white-space:nowrap}.exlab{font-size:12px;font-weight:700;min-width:96px}.expick{max-height:260px;overflow:auto;border:1px solid var(--line,#E2E8F0);border-radius:8px;padding:6px 10px;display:grid;gap:2px}
+.exctl select.in{width:auto;max-width:100%;flex:0 1 auto}.exnw{white-space:nowrap}.exwrap{display:flex;gap:4px 14px;flex-wrap:wrap;flex:1;min-width:200px;max-height:150px;overflow:auto}.exlab{font-size:12px;font-weight:700;min-width:96px}.expick{max-height:260px;overflow:auto;border:1px solid var(--line,#E2E8F0);border-radius:8px;padding:6px 10px;display:grid;gap:2px}
 @media screen{.exrep{overflow-x:auto}}
 @media(max-width:820px){.exa{margin-left:0!important}.ext{min-width:520px}.exsec{overflow-x:auto}.exks4{grid-template-columns:repeat(2,1fr)}.exrevg{grid-template-columns:1fr}.exrep{padding:14px 12px}.exwho{text-align:left}}
 @media print{.exrep{border:0;border-radius:0;padding:0;font-size:11px}.exks4{grid-template-columns:repeat(6,1fr)}.exrevg{grid-template-columns:1fr 1fr}.exurl a{color:inherit;text-decoration:underline}.exa{break-inside:auto}body{background:#fff!important}}`;document.head.appendChild(st)}
@@ -23933,26 +23941,31 @@ VIEWS['performance/executive']=()=>{
   const chk=(g,k,l,on,x)=>`<label class="exchk"><input type="checkbox" data-change="exopt" data-g="${g}" data-k="${esc(k)}" ${on?'checked':''}> <span>${esc(l)}${x||''}</span></label>`;
   const wr=[...new Map((D().reviews||[]).filter(r=>r.review_type==='Weekly'&&r.period_start).map(r=>[weekStart(r.period_start),r])).entries()].sort((a,b)=>b[0].localeCompare(a[0])).slice(0,52);
   const revSel=`<select class="in" data-change="exset" data-k="ws" aria-label="Week of a weekly review"><option value="">Weekly reviews (${wr.length})</option>${wr.map(([w,r])=>opt(w,`${fmtS(w)} – ${fmtD(addD(w,6))}${r.score!=null&&r.score!==''?' · score '+Math.round(num(r.score))+'%':''}`,d.ws)).join('')}</select>`;
-  const projs=[...new Set(FD('activities').map(a=>a.project_id).filter(id=>id&&byId('projects',id)))].map(id=>[id,refLabel('projects',id)]).sort((a,b)=>a[1].localeCompare(b[1]));
-  const sts=[...new Set(FD('activities').map(a=>a.status).filter(Boolean))].sort();
+  const sts=[...new Set((D().activities||[]).map(a=>a.status).filter(Boolean))].sort();
+  const inc=(g,k,l,n)=>`<label class="exchk"><input type="checkbox" data-change="exinc" data-g="${g}" data-k="${esc(k)}" ${s[g][k]?'':'checked'}> <span>${esc(l)} <span class="mut">(${n})</span></span></label>`;
+  const lst=(m,nm)=>[...m.entries()].map(([k,n])=>[k,nm(k),n]).sort((a,b)=>((a[0]==='none')-(b[0]==='none'))||a[1].localeCompare(b[1],undefined,{numeric:true}));
+  const areas=lst(d.areaCount,k=>k==='none'?'No life area':String(refLabel('portfolios',k)).trim()),projs=lst(d.projCount,k=>k==='none'?'No project':refLabel('projects',k));
+  const allNone=g=>`<button class="btn s" data-act="exgrp" data-g="${g}" data-v="1">All</button><button class="btn s" data-act="exgrp" data-g="${g}" data-v="0">None</button>`;
   const hasRev=d.reviews.length>0;
   const bar=`<div class="card flat noprint exctl" data-exctl>
    <div class="exrow"><span class="exlab">Period</span><button class="btn s" data-act="exweek" data-n="-1" aria-label="Earlier">${ic('cl',14)}</button><b>${fmtS(d.ws)} – ${fmtD(d.we)}</b><button class="btn s" data-act="exweek" data-n="1" aria-label="Later" ${addD(d.ws,7)>t?'disabled':''}>${ic('cr',14)}</button>${cur?'<span class="badge b-blue">this week</span>':`<button class="btn s" data-act="exweek" data-n="0">This week</button>`}
     <select class="in" data-change="exset" data-k="weeks" aria-label="Length of the period">${EX_WEEKS.map(w=>opt(w[0],w[1],s.weeks)).join('')}</select>${revSel}${hasRev?`<span class="badge b-green">${d.reviews.length} weekly review${d.reviews.length>1?'s':''}</span>`:`<span class="badge b-amber">no weekly review yet</span><button class="btn s" data-act="exreview">${ic('edit',14)} Write it</button>`}
     <span class="sp"></span><button class="btn p" data-act="exprint" ${d.rows.length?'':'disabled'}>${ic('print')} Save as PDF</button></div>
    <div class="exrow"><span class="exlab">Apps</span>${Object.keys(EX_SRC).filter(k=>k==='po'||d.srcCount[k]).map(k=>chk('src',k,EX_SRC[k],s.src[k],` <span class="mut">(${d.srcCount[k]})</span>`)).join('')}</div>
+   <div class="exrow" data-exareas><span class="exlab">Life areas</span>${areas.length?areas.map(x=>inc('areaOff',x[0],x[1],x[2])).join('')+allNone('areaOff'):'<span class="sm mut">No Activities in this period.</span>'}</div>
+   <div class="exrow" data-exprojs style="align-items:flex-start"><span class="exlab" style="padding-top:5px">Projects</span><div class="exwrap">${projs.length?projs.map(x=>inc('projOff',x[0],trunc(x[1],48),x[2])).join(''):'<span class="sm mut">Tick a life area first.</span>'}</div>${projs.length?allNone('projOff'):''}</div>
    <div class="exrow"><span class="exlab">Activities</span>
     <select class="in" data-change="exset" data-k="scope" aria-label="Which Activities">${opt('open','Open, and those with movement',s.scope)}${opt('moved','Only with movement in the period',s.scope)}${opt('all','All, also closed and cancelled',s.scope)}</select>
     <select class="in" data-change="exset" data-k="status" aria-label="Status">${opt('','All statuses',s.status)}${sts.map(x=>opt(x,x,s.status)).join('')}</select>
-    <select class="in" data-change="exset" data-k="project" aria-label="Project">${opt('','All projects',s.project)}${projs.map(p=>opt(p[0],trunc(p[1],40),s.project)).join('')}${opt('none','No project',s.project)}</select>
     <select class="in" data-change="exset" data-k="group" aria-label="Group by">${opt('project','Group by project',s.group)}${opt('area','Group by life area',s.group)}${opt('source','Group by app',s.group)}${opt('none','No grouping',s.group)}</select>
     <button class="btn s" data-act="expick" aria-expanded="${s.pick?'true':'false'}">${ic('list',14)} Choose Activities (${d.rows.length} of ${d.cand.length})</button></div>
    ${s.pick?`<div><div class="exrow" style="margin-bottom:6px"><button class="btn s" data-act="exall" data-v="1">Tick all</button><button class="btn s" data-act="exall" data-v="0">Untick all</button><span class="sm mut">Unticked Activities are left out of the report.</span></div><div class="expick" data-expick>${d.cand.length?exOrder(d.cand.map(r=>Object.assign({},r))).map(r=>`<label class="exchk" style="padding-left:${Math.min(r.depth,4)*14}px"><input type="checkbox" data-change="exoff" data-id="${esc(r.a.id)}" ${s.off[r.a.id]?'':'checked'}> <span>${r.a.code?`<span class="excode">${esc(r.a.code)}</span> `:''}${esc(trunc(exName(r.a.name,r.a.code),80))} <span class="mut xs">· ${esc(r.a.status||'')} · ${r.src.map(k=>EX_SHORT[k]).join(', ')}</span></span></label>`).join(''):'<span class="sm mut">Nothing to choose from with these filters.</span>'}</div></div>`:''}
    <div class="exrow"><span class="exlab">Sections</span>${EX_SEC.map(x=>chk('sec',x[0],x[1],s.sec[x[0]])).join('')}</div>
    <div class="exrow"><span class="exlab">Details</span>${EX_COL.map(x=>chk('col',x[0],x[1],s.col[x[0]])).join('')}<select class="in" data-change="exset" data-k="evid" aria-label="Which evidence">${opt('period','Evidence dated in the period',s.evid)}${opt('all','All evidence to date',s.evid)}</select></div>
    <p class="xs mut">The report is built from the week of a weekly review: Actions and time entries dated in the period, grouped under their Activity. In the print dialog choose “Save as PDF”. Your choices stay on this device.</p></div>`;
-  return focusBar()+bar+exReport(d)};
+  return bar+exReport(d)};
 CHG.exopt=el=>{const s=exS();s[el.dataset.g][el.dataset.k]=el.checked?1:0;exSave();renderView()};
+CHG.exinc=el=>{const s=exS(),g=el.dataset.g;if(g!=='areaOff'&&g!=='projOff')return;if(el.checked)delete s[g][el.dataset.k];else s[g][el.dataset.k]=1;exSave();renderView()};
 CHG.exoff=el=>{const s=exS();if(el.checked)delete s.off[el.dataset.id];else s.off[el.dataset.id]=1;exSave();renderView()};
 CHG.exset=el=>{const s=exS(),k=el.dataset.k,v=el.value;
   if(k==='ws'){if(!v)return;s.ws=v}else if(k==='weeks')s.weeks=+v||1;else s[k]=v;
@@ -23960,14 +23973,15 @@ CHG.exset=el=>{const s=exS(),k=el.dataset.k,v=el.value;
 ACT.exweek=el=>{const s=exS(),n=+el.dataset.n,t=weekStart(todayS());s.ws=n===0?t:addD(s.ws,n*7);if(s.ws>t)s.ws=t;renderView()};
 ACT.expick=()=>{const s=exS();s.pick=!s.pick;renderView()};
 ACT.exall=el=>{const s=exS(),d=exData();if(el.dataset.v==='1')d.cand.forEach(r=>{delete s.off[r.a.id]});else d.cand.forEach(r=>{s.off[r.a.id]=1});exSave();renderView()};
-ACT.exreview=()=>{const s=exS(),ws=s.ws,we=addD(ws,6),A=FD('activities'),done=A.filter(a=>a.completed_on&&a.completed_on>=ws&&a.completed_on<=we),open=A.filter(a=>!isClosed(a)&&a.planned_finish&&a.planned_finish<=we);
-  const da=FD('daily_actions').filter(x=>x.action_date>=ws&&x.action_date<=we&&x.status!=='Cancelled'&&!(typeof isLight==='function'&&isLight(x))),dd=da.filter(x=>x.status==='Completed');
-  openForm('reviews',null,{portfolio_id:(focusId()!=='all'&&focusId()!=='none')?focusId():undefined,review_type:'Weekly',period_start:ws,period_end:we,score:da.length?Math.round(dd.length/da.length*100):70,wins:done.map(a=>'• Completed: '+a.name).join('\n'),gaps:open.map(a=>'• Not finished: '+a.name).join('\n'),insights:`${dd.length} of ${da.length} daily actions done · ${done.length} activities completed in this week.`,next_actions:''})};
+ACT.exgrp=el=>{const s=exS(),g=el.dataset.g,d=exData(),m=g==='areaOff'?d.areaCount:g==='projOff'?d.projCount:null;if(!m)return;[...m.keys()].forEach(k=>{if(el.dataset.v==='1')delete s[g][k];else s[g][k]=1});exSave();renderView()};
+ACT.exreview=()=>{const s=exS(),ws=s.ws,we=addD(ws,6),one=[...exData().areaCount.keys()].filter(k=>!s.areaOff[k]&&k!=='none'),A=(D().activities||[]).filter(a=>!s.areaOff[areaOf('activities',a)||'none']),done=A.filter(a=>a.completed_on&&a.completed_on>=ws&&a.completed_on<=we),open=A.filter(a=>!isClosed(a)&&a.planned_finish&&a.planned_finish<=we);
+  const da=(D().daily_actions||[]).filter(x=>!s.areaOff[areaOf('daily_actions',x)||'none']&&x.action_date>=ws&&x.action_date<=we&&x.status!=='Cancelled'&&!(typeof isLight==='function'&&isLight(x))),dd=da.filter(x=>x.status==='Completed');
+  openForm('reviews',null,{portfolio_id:one.length===1?one[0]:undefined,review_type:'Weekly',period_start:ws,period_end:we,score:da.length?Math.round(dd.length/da.length*100):70,wins:done.map(a=>'• Completed: '+a.name).join('\n'),gaps:open.map(a=>'• Not finished: '+a.name).join('\n'),insights:`${dd.length} of ${da.length} daily actions done · ${done.length} activities completed in this week.`,next_actions:''})};
 ACT.exprint=()=>{const s=exS(),old=document.title,st=document.createElement('style');st.id='expage';st.textContent='@page{size:A4;margin:12mm}';document.head.appendChild(st);
   document.title=`Executive-Progress-Report_${s.ws}_${addD(s.ws,s.weeks*7-1)}`;let fin=false;
   const done=()=>{if(fin)return;fin=true;document.title=old;st.remove();window.removeEventListener('afterprint',done)};
   window.addEventListener('afterprint',done);setTimeout(done,120000);window.print()};
-if(typeof putFaq==='function')putFaq('How do I make an executive progress report as a PDF?','Open Performance → Executive Report. Choose the week (the weeks that have a weekly review are in the list), which linked apps to include (Polaris One, Altair Project Management, Altair Aero Engineering, Altair Auto, imports), and which sections and details to show. Every Activity lists its Actions, time log and evidence for that period, and you can untick Activities you do not want. Press “Save as PDF” and choose “Save as PDF” in the print dialog. The report only reads what is in Polaris One; items of linked apps appear as last synchronised.');
+if(typeof putFaq==='function')putFaq('How do I make an executive progress report as a PDF?','Open Performance → Executive Report. Choose the week (the weeks that have a weekly review are in the list), the life areas and projects to show, which linked apps to include (Polaris One, Altair Project Management, Altair Aero Engineering, Altair Auto, imports), and which sections and details to show. Every Activity lists its Actions, time log and evidence for that period, and you can untick Activities you do not want. Press “Save as PDF” and choose “Save as PDF” in the print dialog. The report only reads what is in Polaris One; items of linked apps appear as last synchronised.');
 
 
 /* =====================================================================
