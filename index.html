@@ -2773,6 +2773,9 @@ async function runAutoSync(kind){
   if(S.syncing||!S.profile)return;
   const now=Date.now(),due=(D().api_connections||[]).filter(c=>{
     if(c.enabled===false||!c.target_table)return false;const last=c.last_run_at?new Date(c.last_run_at).getTime():0;
+    /* r40: while the two-way link with Altair Project Management is live, its schedule import must not refresh by itself:
+       it would bring back, as AO-… copies, the items the link already keeps in step (and the ones you deleted). Import by hand still works. */
+    if(c.hier&&c.hier.on&&typeof syLinked==='function'&&S.sync&&syLinked())return false;
     if(c.auto_sync==='On app open')return kind==='open'&&now-last>10*60e3;
     if(c.auto_sync==='Every hour while open')return now-last>60*60e3;return false});
   if(!due.length)return;
