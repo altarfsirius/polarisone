@@ -1684,11 +1684,12 @@ function crud(key,o={}){
   (m.filters||[]).forEach(k=>{if(fs[k])rows=rows.filter(r=>{const v=m.fval&&m.fval[k]?m.fval[k](r):r[k];return String(v==null?'':v)===fs[k]})});
   const q=(fs.q||'').toLowerCase().trim();if(q)rows=rows.filter(r=>searchText(m,r).includes(q)||labelOf(m.t,r).toLowerCase().includes(q));
   const oc=ordCur(key,m),[sk,sd]=oc||o.sort||m.sort||['created_at','desc'];rows=rows.slice().sort(oc?((a,b)=>cmp(a[sk],b[sk])*(sd==='desc'?-1:1)||String(a.created_at).localeCompare(String(b.created_at))):(o.sortFn||((a,b)=>cmp(a[sk],b[sk])*(sd==='desc'?-1:1))));
+  const tr=typeof o.tree==='function'?o.tree(key,rows,{q,oc}):null;if(tr)rows=tr.rows;   /* r39: parents carry their sub-items */
   const cols=m.cols.includes(m.main)?[m.main,...m.cols.filter(c=>c!==m.main)]:m.cols,add=o.add||{};
   const filt=(m.filters||[]).map(k=>{const f=m.fields.find(x=>x.k===k);return `<select class="in" data-change="flt" data-k="${key}" data-f="${k}" aria-label="Filter ${esc(f.l)}"><option value="">All ${esc(f.l.toLowerCase())}</option>${filterOpts(m,k).map(x=>`<option value="${esc(x[0])}" ${String(fs[k]||'')===String(x[0])?'selected':''}>${esc(trunc(x[1],40))}</option>`).join('')}</select>`}).join('');
   const bar=`<div class="toolbar noprint"><input class="in search" id="q-${key}" data-input="q" data-k="${key}" placeholder="Search ${m.placeholder||m.many.toLowerCase()}…" value="${esc(fs.q||'')}" aria-label="Search"><div class="tfilt">${filt}${ordSel(key,m,o)}</div><span class="sp"></span>${o.tools||''}<div class="tbtn row"><button class="btn" data-act="csv" data-k="${key}" title="Export CSV" aria-label="Export CSV">${ic('down')}<span class="hide-s"> CSV</span></button>${addBtn(key,m,add,o)}</div></div>`;
   const lim=fs.limit||200,total=rows.length,shownRows=rows.slice(0,lim);
-  const body=rows.length?`<div class="tw"><table class="tbl stack"><thead><tr>${cols.map(c=>`<th>${esc(colLabel(m,c))}</th>`).join('')}</tr></thead><tbody>${shownRows.map(r=>`<tr data-act="open" data-k="${key}" data-id="${r.id}">${cols.map(c=>`<td data-l="${esc(colLabel(m,c))}">${cell(m,c,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="sm mut" style="margin-top:8px">${total>lim?`Showing ${lim} of ${total} ${m.many.toLowerCase()} `:`${total} ${total===1?m.one.toLowerCase():m.many.toLowerCase()}`}${total>lim?`<button class="btn s" data-act="more" data-k="${key}" style="margin-left:8px">Show ${Math.min(200,total-lim)} more</button><button class="link" data-act="more" data-k="${key}" data-all="1">Show all</button>`:''}</p>`
+  const body=rows.length?`<div class="tw"><table class="tbl stack"><thead><tr>${cols.map(c=>`<th>${esc(colLabel(m,c))}</th>`).join('')}</tr></thead><tbody>${shownRows.map(r=>`<tr data-act="open" data-k="${key}" data-id="${r.id}"${tr?tr.attr(r):''}>${cols.map((c,ci)=>`<td data-l="${esc(colLabel(m,c))}">${tr&&ci===0?tr.wrap(r,cell(m,c,r)):cell(m,c,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="sm mut" style="margin-top:8px">${total>lim?`Showing ${lim} of ${total} ${m.many.toLowerCase()} `:`${total} ${total===1?m.one.toLowerCase():m.many.toLowerCase()}`}${total>lim?`<button class="btn s" data-act="more" data-k="${key}" style="margin-left:8px">Show ${Math.min(200,total-lim)} more</button><button class="link" data-act="more" data-k="${key}" data-all="1">Show all</button>`:''}</p>`
    :`<div class="card"><div class="empty"><b>${(D()[m.t]||[]).length?'Nothing matches your filters':'No '+m.many.toLowerCase()+' yet'}</b>${(D()[m.t]||[]).length?'Clear the search or change a filter.':(o.emptyMsg||'Create your first one — every field has a short explanation.')}<br>${o.empty||''}${addBtn(key,m,add,o)}</div></div>`;
   return (o.head||'')+bar+(o.mid||'')+body;
 }
@@ -1994,7 +1995,7 @@ function filteredRows(key){const m=MOD[key],fs=S.f[key]=S.f[key]||{q:''};let row
 VIEWS['execute/activities']=()=>{
   const v=S.ui.actView;
   const tog=`<div class="pills noprint"><button class="pill ${v==='list'?'on':''}" data-act="setui" data-k="actView" data-v="list">${ic('list',14)} List</button><button class="pill ${v==='board'?'on':''}" data-act="setui" data-k="actView" data-v="board">${ic('board',14)} Board</button></div>`;
-  if(v==='list')return crud('activities',{tools:tog+backBtn('activities'),pre:r=>window.actPeriodPre?window.actPeriodPre(r):true,sortFn:(a,b)=>(isClosed(a)-isClosed(b))||String(a.planned_finish||'9999').localeCompare(String(b.planned_finish||'9999'))});
+  if(v==='list')return crud('activities',{tree:typeof actTree==='function'?actTree:null,tools:(typeof actTreeTools==='function'?actTreeTools():'')+tog+backBtn('activities'),pre:r=>window.actPeriodPre?window.actPeriodPre(r):true,sortFn:(a,b)=>(isClosed(a)-isClosed(b))||String(a.planned_finish||'9999').localeCompare(String(b.planned_finish||'9999'))});
   const rows=filteredRows('activities'),cols=['Not Started','In Progress','On Hold','Completed'];
   const fs=S.f.activities;
   const filt=['status','priority','portfolio_id'].filter(k=>k!=='status').map(k=>{const f=MOD.activities.fields.find(x=>x.k===k);return `<select class="in" data-change="flt" data-k="activities" data-f="${k}" aria-label="Filter ${esc(f.l)}"><option value="">All ${esc(f.l.toLowerCase())}</option>${filterOpts(MOD.activities,k).map(x=>`<option value="${esc(x[0])}" ${String(fs[k]||'')===String(x[0])?'selected':''}>${esc(trunc(x[1],36))}</option>`).join('')}</select>`}).join('');
@@ -23986,6 +23987,61 @@ ACT.exprint=()=>{const s=exS(),old=document.title,st=document.createElement('sty
   const done=()=>{if(fin)return;fin=true;document.title=old;st.remove();window.removeEventListener('afterprint',done)};
   window.addEventListener('afterprint',done);setTimeout(done,120000);window.print()};
 if(typeof putFaq==='function')putFaq('How do I make an executive progress report as a PDF?','Open Performance → Executive Report. Choose the week (the weeks that have a weekly review are in the list), the life areas and projects to show, which linked apps to include (Polaris One, Altair Project Management, Altair Aero Engineering, Altair Auto, imports), and which sections and details to show. Every Activity lists its Actions, time log and evidence for that period, and you can untick Activities you do not want. Press “Save as PDF” and choose “Save as PDF” in the print dialog. The report only reads what is in Polaris One; items of linked apps appear as last synchronised.');
+
+
+/* ---- r39: 99_zzzzzzzzzzzzzzzzzzzzzzzzzzz_acttree.js ---- */
+/* =====================================================================
+   ACTIVITIES LIST AS A TREE  (Execute → Activities → List)
+   A parent Activity carries its sub-Activities; the arrow in front of the name folds and opens them.
+   • The parent is parent_id. Only when parent_id is empty, a dotted ID (TSK-0001.2.8 under TSK-0001.2, same project) is used.
+   • Nothing is saved to the database: which parents are folded stays on this device.
+   • While you search, every match is shown, folded or not.
+   ===================================================================== */
+const ACT_FOLD_KEY='po_act_fold_v1';
+function actFold(){if(!S.actFold){let o={};try{o=JSON.parse(localStorage.getItem(ACT_FOLD_KEY)||'{}')||{}}catch(e){o={}}S.actFold=(o&&typeof o==='object')?o:{}}return S.actFold}
+function actFoldSave(){try{localStorage.setItem(ACT_FOLD_KEY,JSON.stringify(S.actFold||{}))}catch(e){}}
+/* parent of each row, looking only inside the rows given */
+function actParents(rows){
+  const ids=new Set(rows.map(r=>r.id)),byCode=new Map(),par=new Map();
+  rows.forEach(r=>{if(!r.code)return;const k=String(r.code)+'|'+(r.project_id||'');byCode.set(k,byCode.has(k)?null:r)});   /* an ID used twice is never a parent by ID */
+  rows.forEach(r=>{let p='';
+    if(r.parent_id){if(r.parent_id!==r.id&&ids.has(r.parent_id))p=r.parent_id}
+    else if(r.code){const c=String(r.code),i=c.lastIndexOf('.');if(i>0){const x=byCode.get(c.slice(0,i)+'|'+(r.project_id||''));if(x&&x.id!==r.id)p=x.id}}
+    par.set(r.id,p)});
+  return par}
+function actTree(key,rows,ctx){
+  const par=actParents(rows),kids=new Map(),fold=actFold(),searching=!!(ctx&&ctx.q),info=new Map(),out=[],seen=new Set();
+  rows.forEach(r=>{const p=par.get(r.id)||'';if(!kids.has(p))kids.set(p,[]);kids.get(p).push(r)});
+  const any=[...kids.keys()].some(k=>k!=='');
+  const nat=(a,b)=>String(a.code||'~').localeCompare(String(b.code||'~'),undefined,{numeric:true});
+  const count=id=>{let n=0;(kids.get(id)||[]).forEach(k=>{if(!cnt.has(k.id)){cnt.add(k.id);n+=1+count(k.id)}});return n},cnt=new Set();
+  const walk=(p,d,hidden)=>{let list=kids.get(p)||[];if(p!==''&&!(ctx&&ctx.oc))list=list.slice().sort(nat);   /* sub-items in ID order unless you chose an order */
+    list.forEach(r=>{if(seen.has(r.id))return;seen.add(r.id);const k=(kids.get(r.id)||[]).length,folded=k>0&&!searching&&!!fold[r.id];
+      if(!hidden){cnt.clear();info.set(r.id,{d,k,folded,n:k?count(r.id):0});out.push(r)}
+      walk(r.id,d+1,hidden||folded)})};
+  walk('',0,false);
+  rows.forEach(r=>{if(!seen.has(r.id)){seen.add(r.id);info.set(r.id,{d:0,k:0,folded:false,n:0});out.push(r)}});   /* a loop in the parents never hides a row */
+  return {rows:out,any,
+    attr:r=>{const i=info.get(r.id);return i&&i.d?` data-depth="${i.d}"`:''},
+    wrap:(r,html)=>{const i=info.get(r.id);if(!any||!i)return html;
+      const btn=i.k?`<button type="button" class="trb" data-act="actfold" data-id="${esc(r.id)}" aria-expanded="${i.folded?'false':'true'}" aria-label="${i.folded?'Open':'Fold'} ${i.n} sub-item${i.n>1?'s':''}" title="${i.folded?'Open':'Fold'} ${i.n} sub-item${i.n>1?'s':''}">${i.folded?'▸':'▾'}</button>`:'<span class="trb0" aria-hidden="true"></span>';
+      return `<div class="trc" style="padding-left:${Math.min(i.d,6)*18}px">${btn}<div class="trn">${html}${i.k&&i.folded?` <span class="badge" title="${i.n} sub-item${i.n>1?'s':''} folded">${i.n}</span>`:''}</div></div>`}}}
+function actTreeTools(){
+  const rows=D().activities||[],par=actParents(rows),parents=[...new Set([...par.values()].filter(Boolean))];
+  if(!parents.length)return '';
+  const fold=actFold(),allFolded=parents.every(id=>fold[id]);
+  return `<button class="btn s" data-act="actfoldall" data-v="${allFolded?'0':'1'}" title="${allFolded?'Open every parent Activity':'Fold every parent Activity so only the top level shows'}">${allFolded?'▾ Open all':'▸ Fold all'}</button>`}
+ACT.actfold=el=>{const f=actFold(),id=el.dataset.id;if(f[id])delete f[id];else f[id]=1;actFoldSave();renderView()};
+ACT.actfoldall=el=>{const rows=D().activities||[],par=actParents(rows),f=actFold();
+  if(el.dataset.v==='1')[...new Set([...par.values()].filter(Boolean))].forEach(id=>{f[id]=1});else Object.keys(f).forEach(k=>{delete f[k]});
+  actFoldSave();renderView()};
+(function(){if(document.getElementById('trsty'))return;const st=document.createElement('style');st.id='trsty';st.textContent=`
+.trc{display:flex;align-items:flex-start;gap:4px;min-width:0}.trn{min-width:0;flex:1}
+.trb{flex:none;width:26px;height:26px;margin:-3px 0 0 -4px;border:0;background:none;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;color:inherit;padding:0}
+.trb:hover{background:rgba(100,116,139,.18)}.trb:focus-visible{outline:2px solid var(--brand,#0E7C66);outline-offset:1px}.trb0{flex:none;width:22px;height:20px}
+tr[data-depth] td:first-child{font-weight:400}
+@media(max-width:700px){.trb{width:32px;height:32px;margin-top:-6px}.trb0{width:28px}}`;document.head.appendChild(st)})();
+if(typeof putFaq==='function')putFaq('How do I fold sub-Activities under their parent in the Activities list?','Open Execute → Activities → List. A parent Activity has a small arrow in front of its name: press it to fold or open its sub-Activities. “Fold all” and “Open all” do it for the whole list. A sub-Activity belongs to the parent chosen in its form; when no parent is chosen, a dotted ID is used (TSK-0001.2.8 sits under TSK-0001.2 of the same project). While you search, every match is shown. Which parents are folded stays on this device.');
 
 
 /* =====================================================================
