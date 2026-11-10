@@ -23786,10 +23786,10 @@ const EX_KEY='po_exec_v1';
 const EX_SRC={po:'Polaris One',apm:'Altair Project Management',aero:'Altair Aero Engineering',auto:'Altair Auto',imp:'Imported (API gateway)'};
 const EX_SHORT={po:'Polaris One',apm:'APM',aero:'Aero',auto:'Auto',imp:'Import'};
 const EX_SEC=[['summary','Summary figures'],['sources','Totals by app'],['review','Weekly review'],['actions','Actions'],['time','Time log'],['evidence','Evidence'],['notes','Deliverable, result, remarks'],['loose','Actions without an Activity']];
-const EX_COL=[['code','IDs'],['source','App'],['dates','Planned dates'],['hours','Hours'],['priority','Priority'],['result','Action result'],['blocker','Blocker'],['tlnote','Time log notes'],['url','Evidence links']];
+const EX_COL=[['code','IDs'],['source','App'],['dates','Planned dates'],['hours','Hours'],['priority','Priority'],['result','Action result'],['blocker','Blocker'],['tlnote','Time log notes'],['zero','Time entries with 0 hours'],['url','Evidence links']];
 const EX_WEEKS=[[1,'1 week'],[2,'2 weeks'],[4,'4 weeks'],[13,'13 weeks (quarter)']];
 function exDef(){return {weeks:1,src:{po:1,apm:1,aero:1,auto:1,imp:1},scope:'open',status:'',group:'project',evid:'period',areaOff:{},projOff:{},
-  sec:{summary:1,sources:1,review:1,actions:1,time:1,evidence:1,notes:0,loose:0},col:{code:1,source:1,dates:1,hours:1,priority:0,result:1,blocker:0,tlnote:1,url:1},off:{}}}
+  sec:{summary:1,sources:1,review:1,actions:1,time:1,evidence:1,notes:0,loose:0},col:{code:1,source:1,dates:1,hours:1,priority:0,result:1,blocker:0,tlnote:1,zero:0,url:1},off:{}}}
 function exS(){
   if(S.ex)return S.ex;
   const d=exDef();let o={};try{o=JSON.parse(localStorage.getItem(EX_KEY)||'{}')||{}}catch(e){o={}}
@@ -23799,7 +23799,7 @@ function exS(){
   if(!['moved','open','all'].includes(d.scope))d.scope='open';if(!['project','area','source','none'].includes(d.group))d.group='project';if(!['period','all'].includes(d.evid))d.evid='period';
   /* start on the week of the latest weekly review when it is recent, otherwise on this week */
   const t=todayS(),wr=(D().reviews||[]).filter(r=>r.review_type==='Weekly'&&r.period_start).map(r=>weekStart(r.period_start)).sort(),last=wr[wr.length-1];
-  d.ws=last&&last>=addD(weekStart(t),-14)&&last<=weekStart(t)?last:weekStart(t);d.pick=false;S.ex=d;return d}
+  d.ws=last&&last>=addD(weekStart(t),-14)&&last<=weekStart(t)?last:weekStart(t);d.pick=false;d.zopen={};S.ex=d;return d}
 function exSave(){const s=S.ex;if(!s)return;try{localStorage.setItem(EX_KEY,JSON.stringify({weeks:s.weeks,src:s.src,scope:s.scope,status:s.status,group:s.group,evid:s.evid,sec:s.sec,col:s.col,off:s.off,areaOff:s.areaOff,projOff:s.projOff}))}catch(e){}}
 /* which linked app an item belongs to; an item can be in more than one */
 function exSrc(r,ent){
@@ -23877,7 +23877,10 @@ function exActivity(r,d){
   if(s.sec.actions&&r.actions.length){any=true;
     h+=`<div class="exsh">Actions · ${r.done} of ${r.actions.length} done</div><table class="ext"><thead><tr><th style="width:62px">Date</th>${C.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:44px">%</th><th style="width:78px">Time</th>${C.result?'<th>Result</th>':''}${C.blocker?'<th>Blocker</th>':''}</tr></thead><tbody>${r.actions.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${C.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${esc(exName(x.title,x.code))}</td><td>${esc(x.status||'')}</td><td>${Math.round(num(x.progress))}</td><td class="exnw">${exMin(dMin(x))}</td>${C.result?`<td>${exTxt(x.result)}</td>`:''}${C.blocker?`<td>${exTxt(x.blocker)}</td>`:''}</tr>`).join('')}</tbody></table>`}
   if(s.sec.time&&r.logs.length){any=true;
-    h+=`<div class="exsh">Time log · ${exH(r.hrs)} in ${r.logs.length} entr${r.logs.length>1?'ies':'y'}</div><table class="ext"><thead><tr><th style="width:62px">Date</th><th style="width:54px">Hours</th><th style="width:92px">Source</th><th>Action</th>${C.tlnote?'<th>What was done</th>':''}</tr></thead><tbody>${r.logs.map(l=>{const x=l.daily_action_id?d.daBy.get(l.daily_action_id):null;return `<tr><td>${fmtS(l.log_date)}</td><td>${fmtN(num(l.hours),2)}</td><td>${esc(l.source||'')}</td><td>${x?esc(exName(x.title,x.code)):'<span class="exmut">—</span>'}</td>${C.tlnote?`<td>${exTxt(exName(l.note,x&&x.code))}</td>`:''}</tr>`}).join('')}</tbody></table>`}
+    /* entries with 0 hours (postponed, skipped) are folded away unless the reader opens them */
+    const nz=r.logs.filter(l=>!num(l.hours)).length,showZ=!!(C.zero||s.zopen[a.id]),logs=showZ?r.logs:r.logs.filter(l=>num(l.hours));
+    const fold=nz&&!C.zero?`<div class="exmut exnone" data-exzero>${showZ?'':`${nz} entr${nz>1?'ies':'y'} with 0 hours not shown. `}<button class="btn s noprint" data-act="exzero" data-id="${esc(a.id)}" aria-expanded="${showZ?'true':'false'}">${showZ?'Hide':'Open'} ${nz} entr${nz>1?'ies':'y'} with 0 hours</button></div>`:'';
+    h+=`<div class="exsh">Time log · ${exH(r.hrs)} in ${logs.length} entr${logs.length===1?'y':'ies'}</div>${logs.length?`<table class="ext"><thead><tr><th style="width:62px">Date</th><th style="width:54px">Hours</th><th style="width:92px">Source</th><th>Action</th>${C.tlnote?'<th>What was done</th>':''}</tr></thead><tbody>${logs.map(l=>{const x=l.daily_action_id?d.daBy.get(l.daily_action_id):null;return `<tr><td>${fmtS(l.log_date)}</td><td>${fmtN(num(l.hours),2)}</td><td>${esc(l.source||'')}</td><td>${x?esc(exName(x.title,x.code)):'<span class="exmut">—</span>'}</td>${C.tlnote?`<td>${exTxt(exName(l.note,x&&x.code))}</td>`:''}</tr>`}).join('')}</tbody></table>`:''}${fold}`}
   if(s.sec.evidence&&(r.ev.length||a.link)){any=true;
     const lk=u=>/^https?:\/\//i.test(String(u||''))?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(trunc(u,70))}</a>`:esc(trunc(u||'',70));
     const rowsE=r.ev.map(e=>`<tr><td>${e.evidence_date?fmtS(e.evidence_date):'—'}</td><td>${esc(e.title)}</td><td>${esc(e.type||'')}</td>${C.url?`<td class="exurl">${e.url?lk(e.url):e.file_path?'File: '+esc(String(e.file_path).split('/').pop()):'<span class="exmut">—</span>'}</td>`:''}</tr>`).join('')+(a.link?`<tr><td>—</td><td>Document link of the Activity</td><td>Link</td>${C.url?`<td class="exurl">${lk(a.link)}</td>`:''}</tr>`:'');
@@ -23971,6 +23974,7 @@ CHG.exset=el=>{const s=exS(),k=el.dataset.k,v=el.value;
   if(k==='ws'){if(!v)return;s.ws=v}else if(k==='weeks')s.weeks=+v||1;else s[k]=v;
   exSave();renderView()};
 ACT.exweek=el=>{const s=exS(),n=+el.dataset.n,t=weekStart(todayS());s.ws=n===0?t:addD(s.ws,n*7);if(s.ws>t)s.ws=t;renderView()};
+ACT.exzero=el=>{const s=exS(),id=el.dataset.id;if(s.zopen[id])delete s.zopen[id];else s.zopen[id]=1;renderView()};
 ACT.expick=()=>{const s=exS();s.pick=!s.pick;renderView()};
 ACT.exall=el=>{const s=exS(),d=exData();if(el.dataset.v==='1')d.cand.forEach(r=>{delete s.off[r.a.id]});else d.cand.forEach(r=>{s.off[r.a.id]=1});exSave();renderView()};
 ACT.exgrp=el=>{const s=exS(),g=el.dataset.g,d=exData(),m=g==='areaOff'?d.areaCount:g==='projOff'?d.projCount:null;if(!m)return;[...m.keys()].forEach(k=>{if(el.dataset.v==='1')delete s[g][k];else s[g][k]=1});exSave();renderView()};
