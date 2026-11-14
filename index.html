@@ -5068,7 +5068,7 @@ function icsRestore(){
 async function icsFetchText(){
   const link=icsLink();
   if(typeof olSource==='function'&&olSource()==='server-ics'){const d=await olInvoke({op:'ics'});return d.text}
-  if(!link)throw new Error('No calendar link is set. Add it under Settings → My Outlook.');
+  if(!link)throw new Error('No calendar link is set. Add it under Integrations → Connections → Outlook Calendar.');
   try{const r=await fetch(link,{mode:'cors',credentials:'omit',cache:'no-store'}),t=await r.text();if(!r.ok)throw new Error('The calendar answered HTTP '+r.status+(r.status===404||r.status===410?'. The link may have been unpublished.':'.'));return t}
   catch(e){if(e instanceof TypeError){if(DB.mode==='supabase')return proxyCall({url:link,method:'GET',headers:{Accept:'text/calendar'}});throw new Error('The browser could not read the calendar (blocked by CORS, or offline). Connect Supabase so Polaris One can fetch it through the Edge Function.')}throw e}}
 async function icsSync(force){
@@ -5107,8 +5107,8 @@ function icsDayList(day){
 const icsDetail=d=>{const ev=icsOnDate(d);return ev.length?`<div class="list" style="margin-bottom:8px">${ev.map(icsRow).join('')}</div>`:''};
 function outlookCard(){
   if(!icsConfigured()||!icsCfg().on)return '';icsRestore();const t=todayS(),tm1=addD(t,1),I=S.ics;
-  const ev=[...icsOnDate(t).map(e=>[e,'Today']),...icsOnDate(tm1).map(e=>[e,'Tomorrow'])].filter(x=>x[0].busy!=='FREE').slice(0,7);
-  return `<div class="card mt"><div class="ch"><h3>Outlook: today and tomorrow</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="execute" data-s="calendar">Calendar</button></div>${ev.length?`<div class="list">${ev.map(([e,w])=>`<div class="item" data-act="icsopen" data-i="${I.events.indexOf(e)}"><span class="badge ${w==='Today'?'b-blue':'b-slate'}">${w}</span><span class="t" style="flex:1;min-width:0">${esc(e.title)}</span><span class="sm mut">${e.allDay?'All day':e.st+'–'+e.et}</span></div>`).join('')}</div>`:`<div class="empty-mini">${I.err?esc(trunc(I.err.msg,140)):I.at?'Nothing in Outlook for today or tomorrow.':'Loading…'}</div>`}</div>`}
+  const ev=[];for(let i=0;i<7;i++){const d=addD(t,i),w=i===0?'Today':i===1?'Tomorrow':fmtS(d);icsOnDate(d).filter(e=>e.busy!=='FREE'&&(e.sd===d||i===0)).forEach(e=>ev.push([e,w]))}ev.splice(8);
+  return `<div class="card mt"><div class="ch"><h3>Calendar: next 7 days</h3><span class="sp"></span><button class="btn s" data-act="go" data-p="execute" data-s="calendar">Calendar</button></div>${ev.length?`<div class="list">${ev.map(([e,w])=>`<div class="item" data-act="icsopen" data-i="${I.events.indexOf(e)}"><span class="badge ${w==='Today'?'b-blue':'b-slate'}" style="min-width:62px;text-align:center">${w}</span><span class="t" style="flex:1;min-width:0">${esc(e.title)}</span><span class="sm mut">${e.allDay?'All day':e.st+'–'+e.et}</span></div>`).join('')}</div>`:`<div class="empty-mini">${I.err?esc(trunc(I.err.msg,140)):I.at?'Nothing in your calendar for the next 7 days.':'Loading…'}</div>`}</div>`}
 ACT.icsopen=el=>{const e=S.ics.events[+el.dataset.i];if(!e)return;
   openModal(esc(trunc(e.title,70)),`<dl class="kv"><dt>When</dt><dd>${e.allDay?`All day, ${fmtD(e.sd)}${e.ed!==e.sd?' – '+fmtD(e.ed):''}`:`${fmtD(e.sd)}, ${e.st} – ${e.et}${e.ed!==e.sd?' ('+fmtS(e.ed)+')':''}`}</dd><dt>Status</dt><dd>${esc(e.busy==='OOF'?'Out of office':e.busy==='FREE'?'Free':e.busy==='TENTATIVE'?'Tentative':'Busy')}${e.cancelled?' · cancelled':''}${e.rec?' · repeating event':''}</dd>${e.loc?`<dt>Where</dt><dd>${esc(e.loc)}</dd>`:''}${e.org?`<dt>Organizer</dt><dd>${esc(e.org)}${e.nAtt?` and ${e.nAtt} other attendee${e.nAtt>1?'s':''}`:''}</dd>`:''}${e.desc?`<dt>Details</dt><dd>${esc(e.desc)}</dd>`:''}</dl><p class="help" style="margin-top:10px">This comes from your Outlook calendar and is read-only here. Change it in Outlook.</p>`,'<button class="btn" data-act="closeModal">Close</button>')};
 /* out-of-office periods, offered as leave entries */
