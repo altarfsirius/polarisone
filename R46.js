@@ -53,6 +53,6 @@ const r=await p.evaluate(async()=>{const o={};
  await ngPlan();const w=S.ng.plan.push.find(x=>x.r.title==='M2');o.noOption=w&&w.why.join(';');o.noCatProp=w&&!w.props.Category;
  /* screens render */
  const app=connApp('notion-all');o.tabs=app.types.map(x=>x.id).join(',');
- o.db=app.types.find(x=>x.id==='db-goals').body().includes('Mapping');o.sy=app.types[0].body().includes('Preview');o.nTabs=app.types.length;
+ S.ng.sub={'db-goals':'m'};o.db=app.types.find(x=>x.id==='db-goals').body().includes('Mapping');S.ng.sub={'db-goals':'s'};o.sy=app.types.find(x=>x.id==='db-goals').body().includes('Preview');o.nTabs=app.types.length;
  return o});
 console.log(JSON.stringify(r,null,1));console.log('pageerrors',errs);await b.close()})();
