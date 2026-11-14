@@ -23817,9 +23817,9 @@ const ngStamp=()=>new Date(Date.now()+5000).toISOString();
 const ngReady=t=>{const c=ngCfg(t),k=S.ng.chk[t];return !!(c.schema&&ngTitleProp(c.schema)&&ngIdProp(t,c.schema))};
 const ngEqual=(a,b)=>String(a==null?'':a)===String(b==null?'':b);
 /* ---- Preview ---- */
-async function ngPlan(){const N=S.ng;N.busy='plan';N.err='';N.res='';N.plan=null;cdRefresh();
-  const pl={push:[],pull:[],conflicts:[],skip:[],blocked:[]};
-  try{for(const t of NG_T){const rows=ngRows(t);if(!rows.length&&!ngReady(t))continue;
+async function ngPlan(ts){const N=S.ng;N.busy='plan';N.err='';N.res='';N.plan=null;cdRefresh();
+  const pl={push:[],pull:[],conflicts:[],skip:[],blocked:[],tables:ts||NG_T,scope:ts&&ts.length===1?ts[0]:'all'};
+  try{for(const t of (ts||NG_T)){const rows=ngRows(t);if(!rows.length&&!ngReady(t))continue;
       if(!ngReady(t)){if(rows.length)pl.blocked.push(`${MOD[t].many}: ${rows.length} marked, but the Notion database is not connected or checked yet.`);continue}
       const c=ngCfg(t),mp=ngMap(t),ip=ngIdProp(t,c.schema);
       const since=c.lastPull?{timestamp:'last_edited_time',last_edited_time:{on_or_after:c.lastPull}}:null;
@@ -23858,7 +23858,7 @@ async function ngRun(limit){const N=S.ng,pl=N.plan;if(!pl||N.busy)return;N.busy=
     if(!limit)for(const x of pl.pull){try{const patch={};x.diff.forEach(d=>{const v=ngCoerce(d.m,d.to);if(v!==undefined)patch[d.m.f.k]=v});
         if(Object.keys(patch).length){patch.notion_synced_at=ngStamp();const row=await DB.update(x.t,x.r.id,patch);replaceRow(x.t,row);got++}}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
-    if(!limit)for(const t of NG_T){if(ngReady(t))await ngSave(t,{lastPull:new Date(Date.now()-120000).toISOString()})}
+    if(!limit)for(const t of (pl.tables||NG_T)){if(ngReady(t))await ngSave(t,{lastPull:new Date(Date.now()-120000).toISOString()})}
     N.res=`${sent} sent to Notion, ${got} brought back${fail.length?`, ${fail.length} failed: `+fail.slice(0,3).join(' · '):''}.`;N.plan=null}
   catch(e){N.err=e.message||String(e)}
   N.busy='';cdRefresh()}
@@ -23868,7 +23868,7 @@ ACT.ngsavedb=async el=>{const t=el.dataset.t,v=(document.getElementById('ngdb_'+
   if(!id){S.ng.err='That is not a Notion database link or id.';cdRefresh();return}
   S.ng.err='';await ngSave(t,{db:id,ds:'',schema:null,opts:null,lastPull:null});delete S.ng.chk[t];cdRefresh()};
 ACT.ngcheck=el=>ngCheck(el.dataset.t);
-ACT.ngplan=()=>ngPlan();ACT.ngrun=()=>ngRun();ACT.ngrun1=()=>ngRun(1);
+ACT.ngplan=el=>ngPlan(el&&el.dataset&&el.dataset.t?[el.dataset.t]:null);ACT.ngrun=()=>ngRun();ACT.ngrun1=()=>ngRun(1);
 ACT.ngforget=async el=>{const t=el.dataset.t;if(!await ask('Disconnect?',`Polaris One forgets the link to the ${MOD[t].many} database. Nothing in Notion or in your records is changed.`,'Disconnect'))return;await ngSave(t,{db:'',ds:'',schema:null,opts:null,lastPull:null});delete S.ng.chk[t];cdRefresh()};
 function ngDbBody(){const N=S.ng;
   return `<div class="cd-box"><p class="sm ink2" style="margin:0 0 8px">Create each database in Notion from its PDF, share it with your Notion integration, paste its link here, then press Check. Check only reads Notion.</p>
@@ -23878,14 +23878,14 @@ function ngDbBody(){const N=S.ng;
    ${r?`<div class="sm" style="margin-top:4px">${r.steps.map(s=>`<div style="color:${s.ok?'var(--green)':s.warn?'var(--amber,#8A5A00)':'var(--red)'}">${s.ok?'✓':s.warn?'!':'✗'} ${esc(s.t)}</div>`).join('')}</div>`:''}</div>`}).join('')}
   ${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>`}
 CHG.ngover=async el=>{const t=el.dataset.t,o=Object.assign({},ngCfg(t).over||{});o[el.dataset.f]=el.value==='__auto'?undefined:el.value;if(o[el.dataset.f]===undefined)delete o[el.dataset.f];await ngSave(t,{over:o});cdRefresh()};
-function ngTableBody(t){const N=S.ng,c=ngCfg(t),r=N.chk[t],n=ngRows(t).length,sc=c.schema,mp=ngMap(t)||[],ov=c.over||{};
+function ngTableBody(t,part){const h=ngTableBody0(t);const i=h.indexOf('<!--ngsplit-->');return part==='m'?(i<0?'':h.slice(i+14)||'<p class="sm mut">Check the database first. The mapping appears after it.</p>'):(i<0?h:h.slice(0,i))}
+function ngTableBody0(t){const N=S.ng,c=ngCfg(t),r=N.chk[t],n=ngRows(t).length,sc=c.schema,mp=ngMap(t)||[],ov=c.over||{};
   const props=sc?Object.keys(sc):[];
   return `<div class="cd-box"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>${esc(MOD[t].many)}</b>${ngReady(t)?badge('connected','green'):c.db?badge('not checked','amber'):badge('not set','gray')}<span class="mut sm">${n} marked “Send to Notion”</span></div>
   <p class="sm mut" style="margin:6px 0">Paste the link of the Notion database (shared with your integration) and press Check. Check only reads Notion.</p>
   <div class="cd-row" style="gap:6px"><input class="in" id="ngdb_${t}" aria-label="Notion database link for ${esc(MOD[t].many)}" placeholder="Paste the Notion database link" value="${c.db?esc(c.db):''}"><button class="btn" data-act="ngsavedb" data-t="${t}">Save</button><button class="btn p" data-act="ngcheck" data-t="${t}" ${c.db&&!N.busy?'':'disabled'}>Check</button>${c.db?`<button class="btn" data-act="ngforget" data-t="${t}">Disconnect</button>`:''}</div>
   ${r?`<div class="sm" style="margin-top:6px">${r.steps.map(s=>`<div style="color:${s.ok?'var(--green)':s.warn?'var(--amber,#8A5A00)':'var(--red)'}">${s.ok?'✓':s.warn?'!':'✗'} ${esc(s.t)}</div>`).join('')}</div>`:''}
-  ${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>
-  ${sc?`<div class="cd-box"><b>Mapping</b><p class="sm mut" style="margin:4px 0 8px">Matched by name. Change a row to pick another Notion column, or “Do not sync”.</p>
+  ${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div><!--ngsplit-->${sc?`<div class="cd-box"><b>Mapping</b><p class="sm mut" style="margin:4px 0 8px">Matched by name. Change a row to pick another Notion column, or “Do not sync”.</p>
   ${ngFields(t).map(f=>{const cur=mp.find(m=>m.f.k===f.k),val=ov[f.k]===''?'':(cur?cur.p:'');const ok=(NG_OK[f.t]||[]).concat(f.k===MOD[t].main?['title']:[]);
    const opts=props.filter(k=>ok.includes(sc[k])&&!nProt(k));
    return `<div class="cd-row" style="gap:8px;align-items:center;border-top:1px solid var(--line);padding:3px 0"><span style="flex:1 1 40%">${esc(f.l||f.k)}</span><span class="mut xs">${cur?(cur.dir==='both'?'⇄':cur.dir==='out'?'→':'←'):''}</span><select class="in" style="flex:1 1 45%" aria-label="Notion column for ${esc(f.l||f.k)}" data-change="ngover" data-t="${t}" data-f="${esc(f.k)}"><option value="__auto" ${ov[f.k]===undefined?'selected':''}>${cur&&ov[f.k]===undefined?'Automatic: '+esc(cur.p):'Automatic (no match)'}</option><option value="" ${ov[f.k]===''?'selected':''}>Do not sync</option>${opts.map(k=>`<option value="${esc(k)}" ${ov[f.k]===k?'selected':''}>${esc(k)} (${sc[k]})</option>`).join('')}</select></div>`}).join('')}</div>`:''}`}
@@ -23900,22 +23900,24 @@ async function ngAutoRun(){const N=S.ng,a=ngAuto();if(!a.on||N.busy||N.autoPause
   if(!pl.push.length&&!pl.pull.length){N.plan=null;N.autoMsg='Nothing to sync.';cdRefresh();return}
   await ngRun();N.autoFail=0;N.autoMsg=N.res;cdRefresh()}
 if(!window._ngTimer)window._ngTimer=setInterval(()=>{try{const a=ngAuto();if(a.on&&Date.now()-(S.ng.autoAt||S.ng.autoOn||0)>=a.min*60000)ngAutoRun()}catch(e){}},30000);
-function ngSyncBody(){const N=S.ng,pl=N.plan,a=ngAuto(),n=NG_T.reduce((s,t)=>s+ngRows(t).length,0);
+function ngSyncBody(T){const N=S.ng,a=ngAuto(),pl=N.plan&&(!T||N.plan.scope===T)?N.plan:null,TT=T?[T]:NG_T,n=TT.reduce((s,t)=>s+ngRows(t).length,0);
   const list=(arr,fn)=>arr.length?`<div class="sm" style="max-height:240px;overflow:auto" tabindex="0">${arr.slice(0,60).map(fn).join('')}${arr.length>60?`<p class="mut">+${arr.length-60} more</p>`:''}</div>`:'';
   const nm=x=>esc(x.r[MOD[x.t].main]||x.r.id);
   return `<div class="cd-box"><b>How it syncs</b><div class="cd-row" style="flex-wrap:wrap;gap:8px;align-items:center"><label class="sm" for="ng_mode">Mode</label><select class="in" id="ng_mode" data-change="ngauto" data-w="mode"><option value="manual" ${a.on?'':'selected'}>Manual only (Preview, then Run)</option><option value="auto" ${a.on?'selected':''}>Manual and automatic</option></select><label class="sm" for="ng_min">Every</label><select class="in" id="ng_min" data-change="ngauto" data-w="min" ${a.on?'':'disabled'}>${NG_MIN.map(m=>`<option value="${m}" ${a.min===m?'selected':''}>${m} minutes</option>`).join('')}</select></div>
-  <p class="xs mut">Automatic runs only while Polaris One is open and visible, only for records marked “Send to Notion”, and never decides a conflict for you. After 3 failures in a row it stops.</p>
+  <p class="xs mut">${T?'The mode applies to all databases. ':''}Automatic runs only while Polaris One is open and visible, only for records marked “Send to Notion”, and never decides a conflict for you. After 3 failures in a row it stops.</p>
   ${a.on&&N.autoPaused?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.autoMsg||'Stopped.')} <button class="btn" data-act="ngresume">Resume</button></p>`:(N.autoMsg?`<p class="sm" role="status">${esc(N.autoMsg)}</p>`:'')}</div>
-  <div class="cd-box"><p class="sm mut">${n} record${n===1?'':'s'} marked “Send to Notion” across ${NG_T.filter(t=>ngRows(t).length).length} database${NG_T.filter(t=>ngRows(t).length).length===1?'':'s'}.</p>
-  <div class="cd-row"><button class="btn p" data-act="ngplan" ${N.busy||!ngLive()?'disabled':''}>Preview</button>${pl&&pl.push.length?`<button class="btn" data-act="ngrun1" ${N.busy?'disabled':''}>Test with one record</button>`:''}${pl&&(pl.push.length||pl.pull.length)?`<button class="btn p" data-act="ngrun" ${N.busy?'disabled':''}>Run (${pl.push.length} out, ${pl.pull.length} back)</button>`:''}</div>
+  <div class="cd-box"><p class="sm mut">${n} record${n===1?'':'s'} marked “Send to Notion”${T?'':' across '+NG_T.filter(t=>ngRows(t).length).length+' databases'}.</p>
+  <div class="cd-row"><button class="btn p" data-act="ngplan" ${T?`data-t="${T}"`:''} ${N.busy||!ngLive()?'disabled':''}>Preview</button>${pl&&pl.push.length?`<button class="btn" data-act="ngrun1" ${N.busy?'disabled':''}>Test with one record</button>`:''}${pl&&(pl.push.length||pl.pull.length)?`<button class="btn p" data-act="ngrun" ${N.busy?'disabled':''}>Run (${pl.push.length} out, ${pl.pull.length} back)</button>`:''}</div>
   ${N.busy==='plan'||N.busy==='run'?'<p class="sm" role="status">Working…</p>':''}
   ${pl?`${pl.blocked.map(b=>`<p class="sm" style="color:var(--red)" role="alert">${esc(b)}</p>`).join('')}
    <h5>To send to Notion (${pl.push.length})</h5>${list(pl.push,x=>`<div style="border-top:1px solid var(--line);padding:3px 0">${badge(x.op==='create'?'new':'update',x.op==='create'?'green':'blue')} ${nm(x)} <span class="mut">${esc(MOD[x.t].many)}</span>${x.why.map(w=>`<div class="xs mut">${esc(w)}</div>`).join('')}</div>`)||'<p class="sm mut">Nothing.</p>'}
    <h5>To bring back from Notion (${pl.pull.length})</h5>${list(pl.pull,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> <span class="mut">${esc(MOD[x.t].many)}</span><br>${x.diff.map(d=>`<span class="xs">${esc(d.m.f.l||d.m.f.k)}: ${esc(d.from==null?'∅':d.from)} → <b>${esc(d.to==null?'∅':d.to)}</b></span>`).join(' · ')}</div>`)||'<p class="sm mut">Nothing.</p>'}
    ${pl.conflicts.length?`<h5>Conflicts (${pl.conflicts.length})</h5><p class="sm mut">Changed here and in Notion since the last sync. Left alone.</p>${list(pl.conflicts,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> · ${esc(x.d.m.f.l||x.d.m.f.k)}</div>`)}`:''}`:''}
   ${N.res?`<p class="sm" role="status">${esc(N.res)}</p>`:''}${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>`}
-connAdd({id:'notion-all',group:'notes',name:'Notion · all databases (two-way)',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.',state:()=>NG_T.some(ngReady)?'on':'off',types:[
-  {id:'sync',name:'Other databases · Preview & sync',sub:'All databases except Activities and Daily Actions',beta:true,title:'Sync with Notion',lead:'Send, then bring back',text:'The preview lists what would be created or updated in Notion and what would come back. Run applies exactly that list. Uses the same Notion token as the Activity Log.',body:ngSyncBody}].concat(NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:ngReady(t)?'Connected':'Link, check, mapping',title:'Notion '+MOD[t].many,lead:'Connect, check and map',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row.',body:()=>ngTableBody(t),state:()=>ngReady(t)?'on':'off'})))});
+connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.',state:()=>NG_T.some(ngReady)?'on':'off',types:NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:'Connect, mapping, sync',beta:true,title:'Notion '+MOD[t].many,lead:'Own database, own mapping',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row. Uses the same Notion token as the Activity Log.',
+  body:()=>{S.ng.sub=S.ng.sub||{};const k='db-'+t,subs=[['c','Connect & check'],['m','Mapping'],['s','Preview & sync']],cur=S.ng.sub[k]||'c';
+    return `<div class="cd-row" role="tablist" aria-label="${esc(MOD[t].many)}" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${subs.map(([id,l])=>`<button class="btn ${id===cur?'p':''}" role="tab" aria-selected="${id===cur}" data-act="ngsub" data-g="${k}" data-s="${id}">${l}</button>`).join('')}</div>`+(cur==='m'?ngTableBody(t,'m'):cur==='s'?ngSyncBody(t):ngTableBody(t,'c'))},
+  state:()=>ngReady(t)?'on':'off'}))});
 /* r47: the two older Notion connections become tabs of this one, then they are removed (one place for every Notion database) */
 (function(){const me=connApp('notion-all'),add=(id,label)=>{const old=connApp(id);if(!old)return[];return old.types.map(x=>Object.assign({},x,{id:id+'-'+x.id,name:label+' · '+x.name,sub:x.sub}))};
   /* one menu item each for Activities and Daily Actions; their four screens are a sub menu inside the right-hand box */
@@ -23924,11 +23926,11 @@ connAdd({id:'notion-all',group:'notes',name:'Notion · all databases (two-way)',
       body:()=>{S.ng.sub=S.ng.sub||{};const cur=old.types.find(x=>x.id===S.ng.sub[id])||old.types[0];
         return `<div class="cd-row" role="tablist" aria-label="${esc(label)}" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${old.types.map(x=>`<button class="btn ${x.id===cur.id?'p':''}" role="tab" aria-selected="${x.id===cur.id}" data-act="ngsub" data-g="${id}" data-s="${x.id}">${esc(x.name)}</button>`).join('')}</div>`+cur.body()}}};
   const extra=[grp('notion','Activities','Activities go to your Notion Activity Log. Notion does the work and the results come back.'),grp('notion-da2','Daily Actions','Daily Actions go to your Notion Daily Actions database. Life area = Domain.')].filter(Boolean);
-  me.types=me.types.slice(0,1).concat(extra,me.types.slice(1));
+  me.types=extra.concat(me.types);
   ACT.ngsub=el=>{S.ng.sub=S.ng.sub||{};S.ng.sub[el.dataset.g]=el.dataset.s;cdRefresh()};
   me.state=()=>(NG_T.some(ngReady)||withNT('activities',()=>nCfg().schema&&Object.keys(nMaps()).length)||withNT('daily_actions',()=>nCfg().schema&&Object.keys(nMaps()).length))?'on':'off';
   me.desc='Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.';
-  me.name='Notion · all databases (two-way)';
+  me.name='Notion';
   [ 'notion','notion-da2' ].forEach(id=>{const i=CONN.findIndex(x=>x.id===id);if(i>=0)CONN.splice(i,1)})})();
 
 /* ---- r14: 99_zzzzzzzzzzzzzzzzzzzzzzz_methods.js ---- */
