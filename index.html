@@ -5132,8 +5132,11 @@ async function autoOutlook(){
     const patch={};if(m.title!==e.title.slice(0,160))patch.title=e.title.slice(0,160);if(m.meeting_date!==e.sd)patch.meeting_date=e.sd;if(tm(m.start_time)!==e.st)patch.start_time=e.st;if(tm(m.end_time)!==e.et)patch.end_time=e.et;if((m.location||'')!==(e.loc||''))patch.location=e.loc||null;
     if(m.status==='Planned'&&e.endMs<now)patch.status='Held';
     if(Object.keys(patch).length&&canDo('meetings','edit')==='allow'){const r=await DB.update('meetings',m.id,patch);replaceRow('meetings',r);changed++}}
-  /* removed or cancelled in Outlook → mark the future, still-planned meeting as cancelled */
-  for(const m of mine){if(canDo('meetings','edit')==='allow'&&m.status==='Planned'&&m.meeting_date>=t&&!live.has(m.ext_key)&&m.meeting_date<=addD(t,c.ahead-1)){const r=await DB.update('meetings',m.id,{status:'Cancelled'});replaceRow('meetings',r);changed++}}
+  /* removed or cancelled in Outlook → mark the future, still-planned meeting as cancelled.
+     r53: not when the calendar source has just changed (another link or provider): events missing from a new source are not cancelled events. */
+  const sig=(typeof icsProv==='function'?icsProv():'')+'|'+(typeof olSource==='function'?olSource():''),sigNew=(prefs().icsSrcSig||'')!==sig;
+  if(sigNew)await setPrefs({icsSrcSig:sig});
+  for(const m of (sigNew?[]:mine)){if(canDo('meetings','edit')==='allow'&&m.status==='Planned'&&m.meeting_date>=t&&!live.has(m.ext_key)&&m.meeting_date<=addD(t,c.ahead-1)){const r=await DB.update('meetings',m.id,{status:'Cancelled'});replaceRow('meetings',r);changed++}}
   if(rows.length){const ins=await DB.insertMany('meetings',rows);D().meetings=(D().meetings||[]).concat(ins)}
   if(newSeen.length)await setPrefs({icsSeen:[...(prefs().icsSeen||[]),...newSeen].slice(-2000)});
   return rows.length+changed}
@@ -9671,49 +9674,33 @@ VIEWS['settings/outlook']=()=>{
    <label class="chk"><input type="checkbox" data-change="calopt" data-k="busyOnly" ${c.busyOnly?'checked':''}> Only create Meetings for events that are not marked “Free”</label>
    <label class="chk"><input type="checkbox" data-change="calopt" data-k="privateAsBusy" ${c.privateAsBusy?'checked':''}> Show private events as “Private appointment”</label>
    <div class="fgrid" style="margin:8px 0"><div class="fld"><label for="cal_past">Look back</label><select class="in" id="cal_past" data-change="calopt" data-k="past">${[0,7,14,30].map(n=>`<option value="${n}" ${c.past===n?'selected':''}>${n?n+' days':'Today only'}</option>`).join('')}</select></div><div class="fld"><label for="cal_ahead">Look ahead</label><select class="in" id="cal_ahead" data-change="calopt" data-k="ahead">${[14,30,60,90].map(n=>`<option value="${n}" ${c.ahead===n?'selected':''}>${n} days</option>`).join('')}</select></div></div>
-   ${!demo&&conn?`<h4 style="margin:12px 0 4px">Mail</h4><label class="chk"><input type="checkbox" data-change="olflag" data-k="mail_on" ${r.mail_on!==false?'checked':''}> Show my inbox under Execute → Mail</label><div class="fld" style="margin-top:6px"><label for="ol_top">Messages to show</label><select class="in" id="ol_top" data-change="olflag" data-k="mail_top" style="width:auto">${[10,20,30,50].map(n=>`<option value="${n}" ${(r.mail_top||20)===n?'selected':''}>${n}</option>`).join('')}</select></div>`:''}
-   <p class="sm mut" style="margin-top:8px">${ok?(I.at?`${I.events.length} events in range · synced ${esc(ago(I.at))} · source: ${src==='graph'?'your Outlook account':src==='server-ics'?'your private link (server)':'a link on this device'}`:'Not synced yet.'):'Connect Outlook or save a calendar link to see events here.'}</p>
+      <p class="sm mut" style="margin-top:8px">${ok?(I.at?`${I.events.length} events in range · synced ${esc(ago(I.at))} · source: ${src==='graph'?'your Outlook account':src==='server-ics'?'your private link (server)':'a link on this device'}`:'Not synced yet.'):'Connect Outlook or save a calendar link to see events here.'}</p>
    ${ok?`<div class="row" style="margin-top:6px"><button class="btn" data-act="icssync">${ic('refresh',15)} Sync now</button></div>`:''}
    ${upcoming.length?`<div class="list" style="margin-top:8px">${upcoming.map(icsRow).join('')}</div>`:''}</div></div>`};
 AFTER['settings/outlook']=()=>{const key=S.route.p+'/'+S.route.s;if(icsConfigured())icsSync(false).then(ch=>{if(ch&&S.route.p+'/'+S.route.s===key&&!$('#layer').lastElementChild)renderView()})};
 
-/* ---------- Execute → Mail ---------- */
-async function olMailLoad(force){
-  const M=S.ol.mail;if(M.loading)return M.loading;
-  if(!force&&M.at&&Date.now()-M.at<3*60e3&&!M.err)return false;
-  if(!force&&M.err&&Date.now()-M.err.at<120e3)return false;   // after an error wait two minutes (or Refresh), do not retry on every redraw
-  M.loading=(async()=>{try{const d=await olInvoke({op:'mail',top:(S.ol.row&&S.ol.row.mail_top)||20});M.items=d.messages||[];M.unread=d.unread;M.total=d.total;M.at=Date.now();M.err=null;return true}
-    catch(e){M.err={msg:e.message,at:Date.now()};return true}finally{M.loading=null}})();
-  return M.loading}
-const mailOn=()=>!olDemo()&&S.ol.row&&S.ol.row.connected&&S.ol.row.mail_on!==false;
+/* ---------- Execute → Email drafts (r53) ----------
+   The inbox view is gone. This page lists the Daily Actions that ask for an email: “Email to” filled in. Notion AI writes the subject and the draft;
+   they come back on the next sync. Polaris One never sends the mail: copy it or open it in your mail app. */
+const emRows=()=>(D().daily_actions||[]).filter(a=>String(a.email_to||'').trim()||String(a.ai_email_subject||'').trim()||String(a.ai_email_body||'').trim()).sort((x,y)=>String(y.action_date||'').localeCompare(String(x.action_date||''))||String(y.created_at||'').localeCompare(String(x.created_at||'')));
 VIEWS['execute/mail']=()=>{
-  const M=S.ol.mail,r=S.ol.row,only=!!S.ui.mailUnread;
-  if(olDemo())return `<div class="card"><div class="empty"><b>Mail needs the Supabase database</b>Outlook sign-in is kept on the server, so it works only when Polaris One is connected to Supabase.<br><button class="btn" data-act="go" data-p="settings" data-s="outlook">Open My Outlook</button></div></div>`;
-  if(!r||!r.connected)return `<div class="card"><div class="empty"><b>Connect your Outlook to see your inbox here</b>Your mail is private to you: only you can read it in Polaris One, and it is never saved.<br><button class="btn p" data-act="go" data-p="settings" data-s="outlook">${ic('link',15)} Connect Outlook</button></div></div>`;
-  if(r.mail_on===false)return `<div class="card"><div class="empty"><b>Mail is switched off</b>Turn it on in Integrations → Connections → Outlook Display.<br><button class="btn" data-act="go" data-p="settings" data-s="outlook">Open My Outlook</button></div></div>`;
-  const items=only?M.items.filter(m=>!m.read):M.items;
-  return `<div class="toolbar noprint"><label class="chk" style="padding:0"><input type="checkbox" data-change="mailunread" ${only?'checked':''}> Unread only</label><span class="sp"></span><span class="sm mut">${M.unread!=null?M.unread+' unread':''}${M.at?` · updated ${esc(ago(M.at))}`:''}</span><button class="btn" data-act="mailrefresh">${ic('refresh',15)} Refresh</button></div>
-  ${M.err?`<div class="callout warn">${ic('alert')}<div>${esc(M.err.msg)}</div></div>`:''}
-  ${items.length?`<div class="list">${items.map((m,i)=>`<div class="item" style="align-items:flex-start;gap:10px"><span class="badge b-${m.read?'slate':'blue'}" style="margin-top:2px">${m.read?'Read':'New'}</span><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;${m.read?'':'font-weight:700'}">${esc(m.subject)}${m.high?` <span class="badge b-red">High</span>`:''}${m.att?` ${ic('clip',13)}`:''}</div><div class="xs mut">${esc(m.from)}${m.at?' · '+esc(ago(Date.parse(m.at))):''}</div>${m.preview?`<div class="sm ink2" style="margin-top:2px">${esc(trunc(m.preview,160))}</div>`:''}</div><div class="row" style="gap:6px;flex-wrap:wrap">${canDo('daily_actions','create')==='deny'?'':`<button class="btn s" data-act="mail2act" data-i="${S.ol.mail.items.indexOf(m)}">${ic('bolt',14)} Make an action</button>`}${m.link?`<a class="btn s" href="${esc(m.link)}" target="_blank" rel="noopener noreferrer">${ic('link',14)} Open</a>`:''}</div></div>`).join('')}</div>`:`<div class="card"><div class="empty"><b>${M.at?(only?'No unread mail':'Your inbox is empty'):'Loading your inbox…'}</b></div></div>`}
-  <p class="xs mut" style="margin-top:8px">Read live from your Outlook. Nothing is saved in Polaris One unless you press “Make an action”.</p>`};
-AFTER['execute/mail']=()=>{if(!mailOn())return;olMailLoad(false).then(ch=>{if(ch&&S.route.p==='execute'&&S.route.s==='mail'&&!$('#layer').lastElementChild)renderView()})};
-ACT.mailrefresh=async el=>{el.disabled=true;await olMailLoad(true);const e=S.ol.mail.err;toast(e?trunc(e.msg,140):'Inbox refreshed',!!e);renderView()};
-CHG.mailunread=el=>{S.ui.mailUnread=el.checked;renderView()};
-ACT.mail2act=async el=>{
-  const m=S.ol.mail.items[+el.dataset.i];if(!m)return;const key='ol:'+hash36(m.id);
-  if((D().daily_actions||[]).some(a=>a.ext_key===key))return toast('This mail already has an action.');
-  el.disabled=true;
-  try{const row=await saveRow('daily_actions',{action_date:todayS(),title:trunc('Reply: '+m.subject,140),description:`From ${m.from}${m.address?' <'+m.address+'>':''}${m.at?', '+fmtD(m.at.slice(0,10)):''}${m.preview?'\n'+m.preview:''}${m.link?'\n'+m.link:''}`.slice(0,1500),priority:m.high?'High':'Medium',time_cat:'Work',status:'Not Started',progress:0,pomodoros:0,ext_key:key});
-    if(row)toast('Action added for today: '+trunc(row.title,50))}
-  catch(e){if(e&&e.pending)toast(e.message);else{console.error(e);toast(e.message||'Could not add the action',1)}}
-  el.disabled=false};
+  const rows=emRows(),ready=rows.filter(a=>String(a.ai_email_body||'').trim()).length;
+  return `<div class="toolbar noprint"><span class="sm mut">${rows.length} email draft${rows.length===1?'':'s'} · ${ready} ready · ${rows.length-ready} waiting for Notion AI</span><span class="sp"></span><button class="btn p" data-act="emnew">${ic('plus',15)} New email draft</button></div>
+  ${rows.length?`<div class="list">${rows.map(a=>{const has=String(a.ai_email_body||'').trim();return `<div class="item" style="align-items:flex-start;gap:10px"><span class="badge b-${has?'green':'amber'}" style="margin-top:2px">${has?'Ready':'Waiting'}</span><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;font-weight:700">${esc(a.ai_email_subject||a.title||'(no subject yet)')}</div><div class="xs mut">To: ${esc(a.email_to||'—')} · Action: ${esc(a.title||'')} · ${esc(fmtD(a.action_date))}</div>${has?`<div class="sm ink2" style="margin-top:4px;white-space:pre-wrap">${esc(trunc(a.ai_email_body,220))}</div>`:`<div class="xs mut" style="margin-top:4px">${a.share_with_notion?'Sent to Notion. The draft appears after the next sync.':'Tick “Send to Notion” on the Action so Notion AI can write it.'}</div>`}</div>
+   <div class="row noprint" style="gap:6px;flex-wrap:wrap"><button class="btn sm" data-act="emopen2" data-id="${a.id}">Open action</button>${has?`<button class="btn sm" data-act="emcopy2" data-id="${a.id}">${ic('copy',14)} Copy</button><button class="btn sm" data-act="emmail2" data-id="${a.id}">Mail app</button>`:''}</div></div>`}).join('')}</div>`
+  :`<div class="card"><div class="empty"><b>No email drafts yet</b>Fill “Email to” on a Daily Action and tick “Send to Notion”. Notion AI writes the draft from the Action and it appears here.<br><button class="btn p" data-act="emnew">${ic('plus',15)} New email draft</button></div></div>`}
+  <p class="xs mut" style="margin-top:8px">Polaris One never sends email and never reads your inbox. Copy the draft or open it in your mail app.</p>`};
+ACT.emnew=()=>openForm('daily_actions',null,{action_date:todayS(),title:'Email: ',priority:'Medium',status:'Not Started',progress:0,share_with_notion:true});
+ACT.emopen2=el=>openDetail('daily_actions',el.dataset.id);
+ACT.emcopy2=async el=>{const a=byId('daily_actions',el.dataset.id);if(!a)return;const t=(a.ai_email_subject?'Subject: '+a.ai_email_subject+'\n\n':'')+(a.ai_email_body||'');try{await navigator.clipboard.writeText(t);toast('Draft copied')}catch(e){toast('Open the action and copy the text by hand.',true)}};
+ACT.emmail2=el=>{const a=byId('daily_actions',el.dataset.id);if(!a)return;const to=/@/.test(a.email_to||'')?String(a.email_to).trim():'';window.location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(a.ai_email_subject||'')+'&body='+encodeURIComponent(a.ai_email_body||'')};
 
 /* ---------- navigation and help ---------- */
 (function(){const st=navP('settings'),i=st.subs.findIndex(x=>x[0]==='calendars');if(i>=0)st.subs[i]=['outlook','My Outlook'];else st.subs.splice(Math.max(0,st.subs.findIndex(x=>x[0]==='connection')),0,['outlook','My Outlook']);
-  const ex=navP('execute'),j=ex.subs.findIndex(x=>x[0]==='calendar');ex.subs.splice(j<0?ex.subs.length:j+1,0,['mail','Mail'])})();
+  const ex=navP('execute'),j=ex.subs.findIndex(x=>x[0]==='calendar');ex.subs.splice(j<0?ex.subs.length:j+1,0,['mail','Email drafts'])})();
 Object.assign(PAGEHELP,{
  'settings/outlook':'Connect your own personal Outlook (@outlook.com, @hotmail.com, @live.com). Your calendar then appears on the Calendar and Daily Action and can become Meetings; your inbox appears under Execute → Mail. It is private to you: not even an admin can see it.',
- 'execute/mail':'Your own inbox, read live from Outlook. Press “Make an action” to turn a message into a Daily Action for today. Mail is never stored in Polaris One.'});
+ 'execute/mail':'The Daily Actions that ask for an email. Notion AI writes the draft; copy it or open it in your mail app. Polaris One never sends or reads your mail.'});
 FAQ.push(['Who can see my Outlook calendar and mail?','Only you. Each person connects their own Microsoft account. The sign-in is stored where no browser and no admin screen can read it, and mail is read live and never saved. An admin registers the app with Microsoft once, but cannot open anyone’s mailbox or calendar. You can switch your own calendar or inbox off in Settings → My Outlook.']);
 
 /* ---- r14: 80_apihub.js ---- */
@@ -10460,8 +10447,8 @@ const RELEASE_NOTES=[
    ['One form for every secret key','Connections → API & server → Keys & server builds a single api-secrets.txt. Keys never go into the app or into config.json.','integrations','keys','Open Keys & server',1],
    ['Links that follow the app','The built-in links (holidays, prayer times, exchange rates, news, crypto) are refreshed automatically when a new revision changes them. Your own connections are never touched.','integrations','connections','Open Connections',1]]},
   {t:'Outlook, private to each user',items:[
-   ['Your own calendar and mail','Integrations → Connections → Outlook Email: sign in with your own Microsoft account. Your calendar appears on the Calendar and Daily Action; your inbox appears under Execute → Mail. Mail is read live and never stored. Not even an admin can see it.','settings','outlook','Open My Outlook'],
-   ['Mail becomes an action in one press','In Execute → Mail press “Make an action” to turn a message into a Daily Action for today.','execute','mail','Open Mail'],
+   ['Your own calendar and mail','Integrations → Connections → Outlook Calendar: paste your calendar link. Your calendar appears on the Calendar and Daily Action; your inbox appears under Execute → Mail. Mail is read live and never stored. Not even an admin can see it.','settings','outlook','Open My Outlook'],
+   ['An email draft from a Daily Action','Fill “Email to” on a Daily Action and tick “Send to Notion”. Notion AI writes the draft and it appears under Execute → Email drafts.','execute','mail','Open Email drafts'],
    ['A calendar link still works','If your organisation does not allow sign-in, paste your private calendar link in My Outlook instead (calendar only, no mail).']]},
   {t:'Activities, actions and improvement',items:[
    ['Descriptions','Activities and Daily Actions now have a Description: what you intend to do and why. It is shown on the card, in the detail view and in lists.','execute','activities','Open Activities'],
@@ -10549,7 +10536,7 @@ setMod('Productivity Toolkit',['Productivity Toolkit (built-in guides)','Daily p
 setMod('Outlook calendar and mail',['Outlook calendar and mail (extra tab)','Your own Outlook, private to you: the calendar on the Calendar and Daily Action, the inbox under Mail, optionally imported as Meetings','settings','outlook']);
 setMod('Financial / Investment',['Personal Finance','Your own money: ledger, accounts, budget, savings goals, business totals, monthly Finance review and the nine money rules','finance','ledger']);
 putMod(['Notes (brainstorm)','Free-form notes with text and pictures, attached to an Activity or Daily Action, lines turned into actions','execute','notes'],'Time log');
-putMod(['Mail (extra tab)','Your own inbox, read live from Outlook, turn a message into a Daily Action','execute','mail'],'Notes (brainstorm)');
+putMod(['Email drafts (extra tab)','Daily Actions that ask for an email: Notion AI writes the draft, you copy it or open it in your mail app','execute','mail'],'Notes (brainstorm)');
 putMod(['Finance review (extra tab)','Monthly money check-up with a health score and next steps','finance','review'],'Financial / Investment');
 putMod(['Analysis journal (extra tab)','Every Market Analysis run with the decision, the reason and the result (Market Desk)','market','journal'],'Finance review');
 putMod(['Shared data (extra tab)','Records an admin shared with you, read-only','performance','shared'],'Analysis journal');
@@ -20827,18 +20814,6 @@ connAdd({id:'ocal',group:'cal',name:'Outlook Calendar',mono:'O',tint:CONN_TINT.o
   {id:'ics',name:'Calendar link (ICS)',sub:'Read only · private to you',title:'Outlook Calendar (ICS)',lead:'Show your Outlook calendar here',text:'Publish your personal Outlook.com calendar and paste its ICS link. It works with @outlook.com, @hotmail.com and @live.com. Company (Microsoft 365) accounts are not supported.',uses:['See events on Home, Calendar and Daily Action','Create Meetings from events (optional)','No Microsoft sign-in needed'],
    state:()=>icsOn()&&icsProv()!=='google'?'on':'off',
    body:()=>icsBody('outlook','https://outlook.live.com/owa/calendar/…/calendar.ics',['Open Outlook on the web → <b>Settings → Calendar → Shared calendars</b>.','Under <b>Publish a calendar</b> choose your calendar and “Can view all details”, then <b>Publish</b>.','Copy the <b>ICS</b> link, paste it below and press Save.'])}]});
-connAdd({id:'gmail',group:'mail',name:'Gmail',mono:'M',tint:CONN_TINT.m,desc:'Read your Gmail inbox in Polaris One.',state:()=>'soon',types:[
-  {id:'oauth',name:'Gmail inbox',sub:'Read only · needs a server function',soon:true,title:'Gmail',lead:'Not available yet',text:'Reading Gmail needs a Google sign-in (OAuth) that is kept on your Supabase server, the same way the Outlook sign-in is. That server part is not included in this version, so Gmail cannot be connected today, and nothing is asked of you here.<br><br>Your Google <b>Calendar</b> works now through its private iCal address.',uses:['Tell me when you want it added: it needs a new Edge Function and a Google OAuth client id.'],
-   foot:()=>`<button class="btn" data-act="conn" data-id="gcal">Open Google Calendar</button>`}]});
-connAdd({id:'omail',group:'mail',name:'Outlook Email',mono:'O',tint:CONN_TINT.o,desc:'Read your personal @outlook.com / @hotmail.com inbox.',state:()=>S.ol&&S.ol.row&&S.ol.row.connected?'on':'off',types:[
-  {id:'ms',name:'Personal Microsoft account',sub:'Read only · private to you',title:'Outlook Email',lead:'Read your personal inbox',text:'Sign in with your own Microsoft account (@outlook.com, @hotmail.com, @live.com). Polaris One asks to <b>read</b> your calendar and mail; it cannot send, change or delete anything. The sign-in is kept on the server for you alone; not even an admin can open it. Company email accounts are not supported.',uses:['Show your inbox under Execute → Mail','Show your calendar too (read only)','Disconnect at any time: the sign-in is deleted from the server'],
-   state:()=>S.ol&&S.ol.row&&S.ol.row.connected?'on':'off',
-   body:()=>{const r=S.ol&&S.ol.row,sv=S.ol&&S.ol.server,demo=DB.mode!=='supabase';
-     const need=demo?'Needs the Supabase database, because the sign-in is kept on the server.':S.ol&&S.ol.missing?'The database does not have the Outlook tables yet: run the latest schema.sql once.':sv&&!sv.configured?'The administrator has not set up the Microsoft app yet ('+esc((sv.missing||['MS_CLIENT_ID','MS_CLIENT_SECRET']).join(' and '))+' on the server). Register one Azure app for <b>personal Microsoft accounts</b>; steps are under Keys & server.':'';
-     return `<div class="cd-box">${r&&r.connected?`<b>${esc(r.display_name||r.account||'Connected')}</b><div class="sm mut">${esc(r.account||'')}${r.connected_at?' · connected '+esc(ago(Date.parse(r.connected_at))):''}</div>`:`<b>Not connected</b>`}
-       ${need?`<div class="callout warn" style="background:var(--ambersoft);color:#6B4400;margin-top:8px">${ic('info')}<div>${need}</div></div>`:''}
-       <div class="cd-row">${r&&r.connected?`<button class="btn" data-act="olconnect">${ic('refresh',15)} Sign in again</button><button class="btn d" data-act="oldisconnect">Disconnect</button>`:`<button class="btn p" data-act="olconnect" ${need?'disabled':''}>${ic('link',15)} Connect Outlook</button>`}<button class="btn" data-act="cdgo" data-p="settings" data-s="outlook">Mail and calendar options</button></div></div>`}}]});
-(function(){const o=ACT.oldisconnect;if(o)ACT.oldisconnect=async function(){const r=await o.apply(this,arguments);cdRefresh();return r}})();
 
 /* ---------- 6. Altair Project Management (the production link, contract altair-vega/1, Amendment A) ---------- */
 function ordoBody(){
@@ -23808,12 +23783,16 @@ connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,b
   const cut=(h,m)=>{const i=h.indexOf(m);return i<0?'':h.slice(i,h.lastIndexOf('</div>'))};
   const showHtml=()=>cut(VIEWS['settings/outlook'](),'<div class="card"><div class="ch"><h3>What to show');
   const holHtml=()=>cut(VIEWS['settings/location'](),'<div class="card"><div class="ch"><h3>Indonesian public holidays').replace(/<button class="btn" data-act="go" data-p="integrations" data-s="hub">Open Connections<\/button>/,'');
+  const olCan=()=>(D().meetings||[]).filter(m=>String(m.ext_key||'').indexOf('auto:ics:')===0&&m.status==='Cancelled'&&m.meeting_date>=todayS());
+  const olRestoreBox=()=>{const n=olCan().length;return n?`<div class="card mt"><div class="ch"><h3>Meetings marked Cancelled by sync</h3><span class="badge b-amber">${n}</span></div><p class="sm ink2">These came from Outlook and were marked Cancelled because they were missing from the calendar link at sync time, for example after the link was changed. If they will still take place, restore them.</p><div class="row"><button class="btn p" data-act="olrestore">Restore ${n} meeting${n===1?'':'s'} to Planned</button></div></div>`:''};
+  ACT.olrestore=async()=>{const l=olCan();if(!l.length)return;if(!await ask('Restore meetings?',l.length+' meeting'+(l.length===1?'':'s')+' will be set back to Planned: '+l.slice(0,3).map(m=>m.title).join(', ')+(l.length>3?' …':''),'Restore'))return;
+    for(const m of l){const r=await DB.update('meetings',m.id,{status:'Planned'});replaceRow('meetings',r)}toast(l.length+' restored');cdRefresh()};
   const later=f=>{try{Promise.resolve(f()).then(()=>cdRefresh(),()=>{})}catch(e){}};
   const yr=()=>new Date().getFullYear();
   connAdd({id:'ocal-show',group:'cal',name:'Outlook Display',mono:'O',tint:CONN_TINT.o,desc:'What the Calendar and Daily Action show from Outlook: events, meetings, look back and ahead. Sync now.',
     state:()=>{try{return icsOn()?'on':'off'}catch(e){return 'off'}},
     open(){later(async()=>{await PRE['settings/outlook']();if(icsConfigured())await icsSync(false)})},
-    types:[{id:'show',name:'What to show',sub:'Calendar, meetings, mail',title:'Outlook Display',lead:'Choose what Outlook shows here',text:'The calendar link is kept in Outlook Calendar. Signing in with Microsoft is in Outlook Email.',body:showHtml}]});
+    types:[{id:'show',name:'What to show',sub:'Calendar, meetings, mail',title:'Outlook Display',lead:'Choose what Outlook shows here',text:'The calendar link is kept in Outlook Calendar. The calendar link is all it needs.',body:()=>showHtml()+olRestoreBox()}]});
   connAdd({id:'prayer',group:'cal',name:'Prayer times',mono:'P',tint:CONN_TINT.a,desc:'Your place for the prayer times on the Calendar, Daily Action and Home (Aladhan, Kemenag method).',
     state:()=>prefs().geo?'on':'off',
     open(){later(()=>feedsAfter({years:yearsAround(todayS()),dates:[todayS()]}))},
