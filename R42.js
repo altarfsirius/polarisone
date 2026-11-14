@@ -1,7 +1,7 @@
 const {chromium}=require('playwright');
 (async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:1280,height:900}});
 const errs=[];p.on('pageerror',e=>errs.push(e.message.slice(0,300)));
-await p.goto('file://'+require('path').resolve(__dirname,'../index.html')+'');await p.waitForTimeout(2000);await p.getByText('Demo Admin').click();await p.waitForTimeout(4000);
+await p.goto('file://'+require('path').resolve(__dirname,'index.html')+'');await p.waitForTimeout(2000);await p.getByText('Demo Admin').click();await p.waitForTimeout(4000);
 const r=await p.evaluate(async()=>{const o={};
  const W=(D().portfolios||[]).find(x=>x.name==='Work')||await saveRow('portfolios',{name:'Work',icon:'💼',color:'#0E7C66',sort_order:1});
  const prop=nDomainProp();
