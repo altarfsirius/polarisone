@@ -23915,7 +23915,15 @@ function ngSyncBody(){const N=S.ng,pl=N.plan,a=ngAuto(),n=NG_T.reduce((s,t)=>s+n
    ${pl.conflicts.length?`<h5>Conflicts (${pl.conflicts.length})</h5><p class="sm mut">Changed here and in Notion since the last sync. Left alone.</p>${list(pl.conflicts,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> · ${esc(x.d.m.f.l||x.d.m.f.k)}</div>`)}`:''}`:''}
   ${N.res?`<p class="sm" role="status">${esc(N.res)}</p>`:''}${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>`}
 connAdd({id:'notion-all',group:'notes',name:'Notion · all databases (two-way)',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.',state:()=>NG_T.some(ngReady)?'on':'off',types:[
-  {id:'sync',name:'Preview & sync',sub:'All connected databases',beta:true,title:'Sync with Notion',lead:'Send, then bring back',text:'The preview lists what would be created or updated in Notion and what would come back. Run applies exactly that list. Uses the same Notion token as the Activity Log.',body:ngSyncBody}].concat(NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:ngReady(t)?'Connected':'Link, check, mapping',title:'Notion '+MOD[t].many,lead:'Connect, check and map',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row.',body:()=>ngTableBody(t),state:()=>ngReady(t)?'on':'off'})))});
+  {id:'sync',name:'Other databases · Preview & sync',sub:'All databases except Activities and Daily Actions',beta:true,title:'Sync with Notion',lead:'Send, then bring back',text:'The preview lists what would be created or updated in Notion and what would come back. Run applies exactly that list. Uses the same Notion token as the Activity Log.',body:ngSyncBody}].concat(NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:ngReady(t)?'Connected':'Link, check, mapping',title:'Notion '+MOD[t].many,lead:'Connect, check and map',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row.',body:()=>ngTableBody(t),state:()=>ngReady(t)?'on':'off'})))});
+/* r47: the two older Notion connections become tabs of this one, then they are removed (one place for every Notion database) */
+(function(){const me=connApp('notion-all'),add=(id,label)=>{const old=connApp(id);if(!old)return[];return old.types.map(x=>Object.assign({},x,{id:id+'-'+x.id,name:label+' · '+x.name,sub:x.sub}))};
+  const extra=add('notion','Activities').concat(add('notion-da2','Daily Actions'));
+  me.types=me.types.slice(0,1).concat(extra,me.types.slice(1));
+  me.state=()=>(NG_T.some(ngReady)||withNT('activities',()=>nCfg().schema&&Object.keys(nMaps()).length)||withNT('daily_actions',()=>nCfg().schema&&Object.keys(nMaps()).length))?'on':'off';
+  me.desc='Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.';
+  me.name='Notion · all databases (two-way)';
+  [ 'notion','notion-da2' ].forEach(id=>{const i=CONN.findIndex(x=>x.id===id);if(i>=0)CONN.splice(i,1)})})();
 
 /* ---- r14: 99_zzzzzzzzzzzzzzzzzzzzzzz_methods.js ---- */
 /* =====================================================================
