@@ -41,9 +41,9 @@ const r=await p.evaluate(async()=>{const o={};
  /* the screens */
  const html=aTabs=>aTabs;
  const app=connApp('notion-all');o.tabs=app.types.map(x=>x.id).join(',');
- const dm=app.types.find(x=>x.id==='notion-da2-map').body(),dv=app.types.find(x=>x.id==='notion-da2-values').body(),ds=app.types.find(x=>x.id==='notion-da2-sync').body(),dc=app.types.find(x=>x.id==='notion-da2-connect').body();
- o.mapRows=(dm.match(/data-change="dnmap"/g)||[]).length;o.noOldHandlers=!/data-(act|change)="n[a-z]/.test(dm+dv+ds+dc);o.valuesHasStatus=/ns_Not Started/.test(dv);o.valuesHasArea=/Life area = Domain/.test(dv)&&/narea|dnarea/.test(dv);
+ const sub=(g,id)=>{S.ng.sub=S.ng.sub||{};S.ng.sub[g]=id;return connApp('notion-all').types.find(x=>x.id==='g-'+g).body()};const dm=sub('notion-da2','map'),dv=sub('notion-da2','values'),ds=sub('notion-da2','sync'),dc=sub('notion-da2','connect');
+ o.mapRows=(dm.match(/data-change="dnmap"/g)||[]).length;o.noOldHandlers=!/data-(act|change)="n(?!gsub)[a-z]/.test(dm+dv+ds+dc);o.valuesHasStatus=/ns_Not Started/.test(dv);o.valuesHasArea=/Life area = Domain/.test(dv)&&/narea|dnarea/.test(dv);
  o.syncWords=/Daily Action marked/.test(ds);o.connectWords=/Daily Actions/.test(dc)&&!/Action Log/.test(dc);
- const a1=connApp('notion-all').types.find(x=>x.id==='notion-map-activities').body();o.actMapRows=(a1.match(/data-change="nmap"/g)||[]).length;
+ const a1=sub('notion','map-activities');o.actMapRows=(a1.match(/data-change="nmap"/g)||[]).length;
  return o});
 console.log(JSON.stringify(r,null,1));console.log('ERRS',errs);await b.close()})();
