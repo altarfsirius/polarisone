@@ -23918,8 +23918,14 @@ connAdd({id:'notion-all',group:'notes',name:'Notion · all databases (two-way)',
   {id:'sync',name:'Other databases · Preview & sync',sub:'All databases except Activities and Daily Actions',beta:true,title:'Sync with Notion',lead:'Send, then bring back',text:'The preview lists what would be created or updated in Notion and what would come back. Run applies exactly that list. Uses the same Notion token as the Activity Log.',body:ngSyncBody}].concat(NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:ngReady(t)?'Connected':'Link, check, mapping',title:'Notion '+MOD[t].many,lead:'Connect, check and map',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row.',body:()=>ngTableBody(t),state:()=>ngReady(t)?'on':'off'})))});
 /* r47: the two older Notion connections become tabs of this one, then they are removed (one place for every Notion database) */
 (function(){const me=connApp('notion-all'),add=(id,label)=>{const old=connApp(id);if(!old)return[];return old.types.map(x=>Object.assign({},x,{id:id+'-'+x.id,name:label+' · '+x.name,sub:x.sub}))};
-  const extra=add('notion','Activities').concat(add('notion-da2','Daily Actions'));
+  /* one menu item each for Activities and Daily Actions; their four screens are a sub menu inside the right-hand box */
+  const grp=(id,label,sub)=>{const old=connApp(id);if(!old)return null;
+    return {id:'g-'+id,name:label,sub:'Connect, mapping, values, sync',beta:true,title:'Notion '+label,lead:'Own database, own mapping',text:sub,
+      body:()=>{S.ng.sub=S.ng.sub||{};const cur=old.types.find(x=>x.id===S.ng.sub[id])||old.types[0];
+        return `<div class="cd-row" role="tablist" aria-label="${esc(label)}" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${old.types.map(x=>`<button class="btn ${x.id===cur.id?'p':''}" role="tab" aria-selected="${x.id===cur.id}" data-act="ngsub" data-g="${id}" data-s="${x.id}">${esc(x.name)}</button>`).join('')}</div>`+cur.body()}}};
+  const extra=[grp('notion','Activities','Activities go to your Notion Activity Log. Notion does the work and the results come back.'),grp('notion-da2','Daily Actions','Daily Actions go to your Notion Daily Actions database. Life area = Domain.')].filter(Boolean);
   me.types=me.types.slice(0,1).concat(extra,me.types.slice(1));
+  ACT.ngsub=el=>{S.ng.sub=S.ng.sub||{};S.ng.sub[el.dataset.g]=el.dataset.s;cdRefresh()};
   me.state=()=>(NG_T.some(ngReady)||withNT('activities',()=>nCfg().schema&&Object.keys(nMaps()).length)||withNT('daily_actions',()=>nCfg().schema&&Object.keys(nMaps()).length))?'on':'off';
   me.desc='Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.';
   me.name='Notion · all databases (two-way)';
