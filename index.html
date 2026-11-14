@@ -3621,14 +3621,36 @@ function parseHolidays(text){
     const d=String(h.date).slice(0,10),joint=!!(+h.is_joint_leave)||/cuti/i.test(h.type||'');
     (map[d]=map[d]||[]).push({name:h.name||'Holiday',type:h.type||'nasional',joint,desc:h.description||''})});
   return map}
+/* r41: the cause is read from the answer, never guessed from the fact that the first route failed */
+function holWhy(why){
+  const w=String(why||'');
+  if(!w)return 'none';
+  if(/No server-side secret/i.test(w))return 'nosecret';
+  if(/HTTP\s+40[13]\b/.test(w))return 'rejected';
+  if(/HTTP\s+429\b/.test(w))return 'rate';
+  if(/HTTP\s+5\d\d\b/.test(w)||/timed? ?out|timeout/i.test(w))return 'down';
+  if(/could not be reached|not deployed/i.test(w))return 'nofn';
+  if(/sign-in was not accepted/i.test(w))return 'session';
+  return 'other'}
+function holMsg(cls,why){
+  const adm=isAdmin(),fix=adm?' Store a valid key on the server (Connections → API & server → Keys & server) or enter one on this device.':' Please ask an admin.';
+  switch(cls){
+    case 'nosecret':return 'Holiday key not available: the server has no key named “apiindonesia”.'+fix;
+    case 'rejected':return 'The holiday service rejected the key (HTTP 401/403): the key on the server is invalid, expired or has no permission for this endpoint. It is not missing.'+fix+(why?' ['+String(why).slice(0,200)+']':'');
+    case 'rate':return 'The holiday service is limiting requests (HTTP 429). Saved holidays stay in use; it retries later.';
+    case 'down':return 'The holiday service did not answer correctly (timeout or server error). Saved holidays stay in use; it retries later.'+(why?' ['+String(why).slice(0,200)+']':'');
+    case 'nofn':return 'The server function “api-proxy” cannot be reached, so the key could not be used.'+(why?' ['+String(why).slice(0,200)+']':'')+fix;
+    case 'session':return 'Your sign-in was not accepted by the server function. Sign out and in again.';
+    case 'none':return 'Holiday key not available (no server connection in this mode).'+fix;
+    default:return 'The holiday request failed: '+String(why||'').slice(0,200)}}
 async function fetchHolidays(y,force){
   const c=holCache(y);if(!force&&c&&Date.now()-c.at<7*864e5)return c;
   const url=FEED_HOL.url+'?tahun='+y,headers={Accept:'application/json'};let text=null,why='';
   if(DB.mode==='supabase'){
     try{text=await proxyCall({url,method:'GET',headers,secretName:FEED_HOL.secretName})}catch(e){why=e.message}}
   if(text==null){
-    const k=getSecret(FEED_HOL.deviceKey);
-    if(!k)throw new Error('Holiday key not available. '+(why?why+' ':'')+(isAdmin()?'Store it on the server (see Connections → API & server → Keys & server) or enter it on this device.':'Please ask an admin to set it up.'));
+    const k=getSecret(FEED_HOL.deviceKey),cls=holWhy(why);
+    if(!k)throw new Error(holMsg(cls,why));
     try{const r=await fetch(url,{headers:Object.assign({[FEED_HOL.header]:k},headers),mode:'cors',credentials:'omit',cache:'no-store'});text=await r.text();
       if(!r.ok)throw new Error('The holiday API answered HTTP '+r.status+(r.status===401||r.status===403?' — check the API key.':'.'))}
     catch(e){throw new Error(e instanceof TypeError?'The browser could not reach the holiday API (CORS or offline). Store the key on the server instead (Connections → API & server → Keys & server).':e.message)}}
@@ -8962,6 +8984,7 @@ function dgWorkOn(day){
   if(typeof leavesOn==='function'&&leavesOn(day).some(l=>!l.half_day))return false;
   return true}
 function dgDayNote(day){
+  if(!dgPray(day).known){const e=typeof prayErr==='function'?prayErr(day):'';return 'Prayer times for this day are not loaded'+(e?' ('+esc(e)+')':'')+'. The times shown for the prayer stops are estimates, not verified times. Check Settings → Data feeds.'}
   const h=holidayOn(day).filter(x=>!x.joint),l=typeof leavesOn==='function'?leavesOn(day):[];
   if(l.length&&l.some(x=>!x.half_day))return `You are on leave this day (${esc(lvShort(l[0].leave_type))}). The work stops are left out.`;
   if(h.length)return `Public holiday: ${esc(h[0].name)}. The work stops are left out.`;
@@ -9016,6 +9039,17 @@ function dgWindows(day,cfg,pr,work){
     if(x.b<=x.a)x.b=x.a+5;
     cur=x.b;out.push(x)});
   out.fajr=F;out.sunrise=SR;return out}
+/* r41: a prayer is placed by WHICH prayer it is (stable identity from prayerOf), never by the Ibadah category.
+   Fajr → Subuh stop, Dhuhr → noon stop, Asr → the stop that holds the Asr time, Maghrib → Maghrib stop, Isha → evening stop. */
+function dgPrayWin(W,day,title){
+  const k=typeof prayerOf==='function'?prayerOf(title):'';if(!k)return null;
+  const ids=new Set(W.map(x=>x.id));
+  if(k==='Fajr')return ids.has('subuh')?'subuh':null;
+  if(k==='Maghrib')return ids.has('maghrib')?'maghrib':null;
+  if(k==='Isha')return ids.has('night')?'night':null;
+  const pr=dgPray(day),m=pr[k];
+  if(k==='Dhuhr'){const x=W.find(w=>m>=w.a&&m<w.b);return x?x.id:(ids.has('noon')?'noon':null)}
+  const x=W.find(w=>m>=w.a&&m<w.b);return x?x.id:null}
 function dgSlotId(W,m,pref){
   const ids=new Set(W.map(x=>x.id));
   if(m!=null){if(m<W[0].a)return W.fajr!=null&&m>=W.fajr-5&&m<W.sunrise&&ids.has('subuh')?'subuh':W[0].id;for(const x of W)if(m>=x.a&&m<x.b)return x.id;return W[W.length-1].id}
@@ -9114,7 +9148,7 @@ function dgCollect(day,cfg,W,work,skip,lines){
   DA.filter(x=>x.action_date===day&&!isLight(x)&&!skip.has(x.id)).forEach(x=>{
     const area=areaOf('daily_actions',x),k=dgTrackOf(area,x.time_cat,null),m=x.start_time?mins(x.start_time):null,a=x.activity_id?byId('activities',x.activity_id):null,g=dgGroupOf(area,x.time_cat||'Other');
     const meta=[dgRange(x),x.time_cat&&x.time_cat!=='Other'?esc(x.time_cat):'',a?'↳ '+esc(trunc(a.name,32)):'',x.pomodoros?x.pomodoros+' focus':''].filter(Boolean).join(' · ');
-    U.push({t:'action',k:'daily_actions',id:x.id,title:x.title,meta,m,done:dgFin(x),g,win:slot(m,k),star:!!x.is_top3,pri:x.priority,prayer:/^auto:pray:/.test(String(x.ext_key||'')),ord:m==null?5000:m})});
+    U.push({t:'action',k:'daily_actions',id:x.id,title:x.title,meta,m,done:dgFin(x),g,win:dgPrayWin(W,day,x.title)||slot(m,k),star:!!x.is_top3,pri:x.priority,prayer:/^auto:pray:/.test(String(x.ext_key||'')),ord:m==null?5000:m})});
   /* activities that are running, planned over this day, or due soon */
   const more={},t3=addD(day,3),withAct=new Set(DA.filter(x=>x.action_date===day&&dgOpen(x)&&x.activity_id).map(x=>x.activity_id)),perG={};
   const acts=FD('activities').filter(a=>a.status!=='Cancelled');
@@ -9139,7 +9173,7 @@ function dgCollect(day,cfg,W,work,skip,lines){
     if(!dn&&wk>=tgt)return;
     const pk=typeof prayerOf==='function'?prayerOf(h.name):'';if(pk&&prayerKeys.has(pk))return;
     const g=dgGroupOf(null,h.category||'Other'),st=typeof streak==='function'?streak(h,logs):0;
-    U.push({t:'habit',k:'habits',id:h.id,title:(h.icon&&h.icon!=='✅'?h.icon+' ':'')+h.name,meta:[esc(h.category||''),tgt<7?wk+'/'+tgt+' this week':'',st?st+'-day streak':''].filter(Boolean).join(' · '),m:null,done:dn,g,win:slot(null,null,dgHabitPref(h,work))||'any',ord:7000})});
+    U.push({t:'habit',k:'habits',id:h.id,title:(h.icon&&h.icon!=='✅'?h.icon+' ':'')+h.name,meta:[esc(h.category||''),tgt<7?wk+'/'+tgt+' this week':'',st?st+'-day streak':''].filter(Boolean).join(' · '),m:null,done:dn,g,win:dgPrayWin(W,day,h.name)||slot(null,null,dgHabitPref(h,work))||'any',ord:7000})});
   /* periodic routines that are late or due soon (only for today: a tick records today) */
   if(isT&&typeof perList==='function')perList().forEach(h=>{
     let s;try{s=perState(h)}catch(e){return}
@@ -20817,7 +20851,7 @@ function ordoBody(){
     <div class="cd-row"><button class="btn p" data-act="sysync" ${S.sync.busy?'disabled':''}>${ic('refresh',14)} Sync now</button><button class="btn" data-act="sydry" ${S.sync.busy?'disabled':''}>Dry-run</button><button class="btn" data-act="sypause">${link.status==='active'?'Pause':'Resume'}</button><button class="btn" data-act="cdgo" data-p="integrations" data-s="altair">Conflicts and failed events</button></div></div>`}
 connAdd({id:'ordo',group:'apps',name:'Altair Project Management',mono:'Pm',tint:CONN_TINT.a,admin:true,desc:'Project management. Projects come from here; activities and actions sync both ways.',
   open:()=>polarisLoad(),state:()=>S.sync&&S.sync.link&&S.sync.link.status!=='revoked'?'on':'off',types:[
-  {id:'link',name:'Activities & actions',sub:'Two-way · contract altair-vega/1',title:'Altair Project Management',lead:'Activities and actions, both ways',text:'Altair Project Management is the project centre. Items in your <b>Work</b> or <b>Freelance</b> Life Areas that you share travel both ways: name, notes, priority, dates, status and progress. Level 1 is an Activity, level 2 a sub-activity, level 3 a Daily Action. The later edit of each field wins on both sides.',uses:['Update status, dates and progress here and see it in Altair Project Management, and the other way round','Only Work and Freelance items ever leave this app','Pause the link at any time without losing changes'],
+  {id:'link',name:'Activities & actions',sub:'Two-way · contract altair-vega/1',title:'Altair Project Management',lead:'Activities and actions, both ways',text:'Altair Project Management is the project centre. Items in any Life Area that you share travel both ways: name, notes, priority, dates, status and progress. Level 1 is an Activity, level 2 a sub-activity, level 3 a Daily Action. The later edit of each field wins on both sides.',uses:['Update status, dates and progress here and see it in Altair Project Management, and the other way round','Only items you share, with a Life Area, ever leave this app','Pause the link at any time without losing changes'],
    state:()=>S.sync&&S.sync.link&&S.sync.link.status!=='revoked'?'on':'off',body:ordoBody},
   {id:'projects',name:'Projects',sub:'From Altair Project Management to here',title:'Projects come from Altair Project Management',lead:'Polaris One does not create projects',text:'A project exists here only when Altair Project Management sends it. The <b>New project</b> button is therefore turned off while you use the database. You can still open a project, link activities to it and follow its progress. To start a project, create it in Altair Project Management: it appears here after the next sync.',uses:['Projects, their dates and priority arrive from Altair Project Management','Activities you link to a project roll up into its progress','Nothing here can create or delete a project in Altair Project Management'],
    state:()=>S.sync&&S.sync.link?'on':'off',foot:()=>`<button class="btn" data-act="cdgo" data-p="plan" data-s="projects">Open Projects</button>`}]});
@@ -20942,7 +20976,7 @@ async function nValidate(){
 
 /* ===== fields on the two modules: the switch, and where the page lives in Notion ===== */
 ['activities','daily_actions'].forEach(t=>MOD[t].fields.push(
-  F('share_with_notion','Send to Notion','check','Only Life Area Work or Freelance is ever sent. The fields you mapped in Settings → Connections → Notion go to your Action Log database; the fields Notion fills in come back.'),
+  F('share_with_notion','Send to Notion','check','Every Life Area can be sent once it is paired with a Notion Domain. The fields you mapped in Settings → Connections → Notion go to your Action Log database; the fields Notion fills in come back.'),
   F('notion_page_id','Notion page','hidden','',{sql:'text'}),F('notion_synced_at','Notion synced at','hidden','',{sql:'text'})));
 
 /* ===== the fields that can be mapped, per module =====
@@ -20964,6 +20998,17 @@ async function nSave(patch){await setPrefs({notion:Object.assign({},nCfg(),patch
 /* Notion properties that belong to Notion’s own automation or are computed: never offered, never written */
 const NPROTECT=/^(sync status|source updated from|last sync|sync notes|standard activity id|progress \(%\)|hours worked|actual start|actual end|date plan|last activity date|🆔|🔢)/i;
 const nProt=n=>NPROTECT.test(String(n||'').trim());
+/* r42: Progress that Notion computes (a formula or a rollup) is read-only data for Polaris One: it comes back, it is never written, and it never conflicts. */
+const nDerT=ty=>ty==='formula'||ty==='rollup';
+const nDer=(f,prop)=>f==='progress'&&nDerT((nSchema()||{})[prop]);
+const nOkTypes=(k,f)=>k==='number'&&f==='progress'?['number','formula','rollup']:(NKIND_OK[k]||[]);
+const nProtF=(f,prop)=>nProt(prop)&&!nDer(f,prop);
+/* progress from a computed property: scale is explicit (setting progScale: 'fraction' 0–1 = default, or 'percent' 0–100); out of range or empty = unresolved, never 0 */
+function nProgIn(v,rev,title){
+  if(v==null||typeof v!=='number'||!isFinite(v)){if(rev)rev.push('“'+title+'”: Notion has no computed progress yet (empty), so progress is left as it is');return undefined}
+  const sc=nCfg().progScale==='percent'?'percent':'fraction',max=sc==='percent'?100:1;
+  if(v<0||v>max){if(rev)rev.push('“'+title+'”: computed progress '+v+' is outside 0–'+max+' for the scale “'+sc+'”, so it is not applied');return undefined}
+  return Math.round(sc==='percent'?v:v*100)}
 const NSTAT_DEF={'Not Started':'Not Started','In Progress':'In Progress','On Hold':'In Hold','Completed':'Done'};   /* Cancelled has no counterpart: it is not synced */
 const NPRIO_DEF={Low:'Low',Medium:'Normal',High:'High',Critical:'Critical'};
 const NALIAS={hobby:'Hobby/Sport',investment:'Finance & Investment',financial:'Finance & Investment',trading:'Finance & Investment',family:'Private',ibadah:'Private'};
@@ -20983,11 +21028,10 @@ function nAreaRows(){
       else{const al=NALIAS[nNorm(p.name)];if(al&&opts.includes(al)){domain=al;st='Proposed';why='A suggestion only (an alias). Approve it, or choose another.'}}}
     return {p,st,domain,why,ok:cur&&cur.approved&&!!cur.domain}})}
 function nAreaToDomain(t,row){
-  let ac=row;if(t==='daily_actions')ac=row.activity_id?byId('activities',row.activity_id):null;
-  if(!ac||!ac.portfolio_id)return null;const x=(nCfg().areaMap||{})[ac.portfolio_id];return x&&x.approved&&x.domain?x.domain:null}
+  const ck=nAreaCheck(t,row);if(!ck.ok)return null;const x=(nCfg().areaMap||{})[ck.area.id];return x&&x.approved&&x.domain?x.domain:null}
 /* Notion Domain → a life area: keep the current one if it still fits, else one approved candidate, else the default you chose, else “ambiguous” */
 function nDomainToArea(domain,currentId){
-  const am=nCfg().areaMap||{},ok=Object.keys(am).filter(id=>am[id].approved&&am[id].domain===domain&&byId('portfolios',id)&&/^(work|freelance)$/i.test(byId('portfolios',id).name));
+  const am=nCfg().areaMap||{},ok=Object.keys(am).filter(id=>am[id].approved&&am[id].domain===domain&&byId('portfolios',id));
   if(currentId&&ok.includes(currentId))return {id:currentId};
   if(ok.length===1)return {id:ok[0]};
   const d=(nCfg().areaDefault||{})[domain];if(d&&ok.includes(d))return {id:d};
@@ -21023,23 +21067,50 @@ function nInVal(t,f,pv,prop,ctx){
     if(f==='priority'){const m=nPrioMap(),hit=Object.keys(m).find(x=>nNorm(m[x])===nNorm(nm));return hit||undefined}
     return nm}
   if(ty==='multi_select')return (pv.multi_select||[]).map(o=>o.name).filter(Boolean).join(', ');
+  if(f==='progress'&&(ty==='formula'||ty==='rollup')){const o=pv[ty]||{};return nProgIn(o.type==='number'?o.number:null,ctx&&ctx.rev,ctx&&ctx.title)}
   if(ty==='formula'){const fo=pv.formula||{};return fo.type==='string'?(fo.string||''):fo.type==='number'&&fo.number!=null?String(fo.number):undefined}
   return undefined}
 /* page properties for one record, from the mapping */
 function nBuild(t,row,m,schema,rev){
   const out={};
   Object.entries(m).forEach(([f,x])=>{if(!x||!x.prop||x.dir==='in')return;const pdef=schema[x.prop];if(!pdef)return;
-    if(nProt(x.prop))return;const val=nOutVal(t,f,row,pdef.type,pdef,rev);if(!val)return;
+    if(nProtF(f,x.prop)||nDer(f,x.prop))return;const val=nOutVal(t,f,row,pdef.type,pdef,rev);if(!val)return;
     if(val.date&&out[x.prop]&&out[x.prop].date){out[x.prop]={date:Object.assign({},out[x.prop].date,(f==='planned_finish'||f==='completed_on')?{end:val.date.start}:{start:val.date.start})}}
     else if(val.date&&(f==='planned_finish')){out[x.prop]={date:{start:val.date.start,end:val.date.start}}}
     else out[x.prop]=val});
   return out}
-/* which record may go: Work or Freelance only */
-function nAreaOk(t,row){
-  let ac=row;if(t==='daily_actions')ac=row.activity_id?byId('activities',row.activity_id):null;
-  if(!ac)return false;if(ac.parent_id&&!ac.portfolio_id){const p=byId('activities',ac.parent_id);if(p)ac=p}
-  const pf=ac.portfolio_id?byId('portfolios',ac.portfolio_id):null;return !!pf&&/^(work|freelance)$/i.test(pf.name||'')}
+/* r41: which record may go. Any Life Area, if it can be resolved without guessing. Consent (share_with_notion) is checked by nItems.
+   Returns {ok:true,area} or {ok:false,code,why}. A sub-activity uses its own Life Area, else its parent's (nested, with a cycle guard).
+   No Life Area name is hard-coded: a Life Area added later is eligible as soon as it is paired with a Notion Domain. */
+function nAreaCheck(t,row){
+  let ac=row;
+  if(t==='daily_actions'){ac=row.activity_id?byId('activities',row.activity_id):null;if(!ac)return {ok:false,code:'unresolved',why:'no Life Area source (the action has no Activity)'}}
+  const seen=new Set();let hops=0;
+  while(ac&&!ac.portfolio_id){
+    if(seen.has(ac.id))return {ok:false,code:'cycle',why:'parent cycle: the Life Area cannot be resolved'};
+    seen.add(ac.id);if(!ac.parent_id)return {ok:false,code:'nolifearea',why:'no Life Area (set one on the item or its parent)'};
+    const p=byId('activities',ac.parent_id);if(!p)return {ok:false,code:'noparent',why:'parent Activity not found, so its Life Area is unknown'};
+    ac=p;if(++hops>50)return {ok:false,code:'cycle',why:'parent chain too deep'}}
+  if(!ac)return {ok:false,code:'nolifearea',why:'no Life Area'};
+  const pf=byId('portfolios',ac.portfolio_id);if(!pf)return {ok:false,code:'noarea',why:'the Life Area no longer exists'};
+  const x=(nCfg().areaMap||{})[pf.id];
+  if(!x||!x.domain)return {ok:false,code:'needsmap',why:'needs mapping: Life Area “'+pf.name+'” has no Notion Domain pairing (Settings → Connections → Notion → Life area = Domain)'};
+  if(!x.approved)return {ok:false,code:'needsmap',why:'needs mapping: the pairing “'+pf.name+'” → “'+x.domain+'” is not approved yet'};
+  const o=nDomainOpts?nDomainOpts():[];if(o.length&&!o.some(v=>nNorm(v)===nNorm(x.domain)))return {ok:false,code:'needsmap',why:'needs mapping: the Notion Domain “'+x.domain+'” does not exist in the database'};
+  return {ok:true,area:pf}}
+const nAreaOk=(t,row)=>nAreaCheck(t,row).ok;
 const nItems=t=>(D()[t]||[]).filter(r=>r.share_with_notion);
+/* r42: when Notion computes the progress of a linked Activity, the Polaris One slider is read-only (the formula is never overwritten) */
+function nProgDerived(row){
+  if(!row||!row.notion_page_id)return false;const m=((nCfg().maps||{}).activities||{}).progress;
+  return !!(m&&m.prop&&m.dir!=='out'&&nDer('progress',m.prop))}
+(function(){const b=MOD.activities.before;MOD.activities.before=function(d,o){
+  if(b)b.call(this,d,o);
+  if(o&&d&&d.progress!=null&&+d.progress!==+(o.progress||0)&&nProgDerived(o)&&!S.notion.pullingProgress)throw new Error('Progress of this Activity is calculated by your Notion formula. Change the work items in Notion; it comes back on the next sync.')}})();
+(function(){const o=openForm;openForm=function(){const r=o.apply(this,arguments);
+  try{const form=$('#form');if(form&&S.form&&S.form.key==='activities'){const row=S.form.id?byId('activities',S.form.id):null,el=form.elements.progress;
+    if(el&&nProgDerived(row)){el.disabled=true;const f=el.closest('.fld'),h=f&&f.querySelector('.help');if(h)h.textContent='Calculated by your Notion formula. Read-only here; it updates from Notion.'}}}catch(e){}
+  return r}})();
 
 /* ----- the plan: what would be written and what would come back (nothing is changed here) ----- */
 const kindNum=(t,f)=>nKind(t,f)==='number';
@@ -21064,7 +21135,7 @@ async function nPlan(){
       if(!m[tf]||!m[tf].prop||m[tf].dir==='in'){plan.blocked.push(`${NMOD[t]}: map the ${tf==='name'?'activity name':'action title'} to the Notion title property so pages can be created.`);continue}
       const titleProp=m[tf].prop;
       items.forEach(r=>{
-        if(!nAreaOk(t,r)){plan.skip.push({t,r,why:'not in a Work or Freelance life area'});return}
+        const ck=nAreaCheck(t,r);if(!ck.ok){plan.skip.push({t,r,why:ck.why,code:ck.code});return}
         const props=nBuild(t,r,m,fmtSchema,plan.review);
         const synced=r.notion_synced_at?Date.parse(r.notion_synced_at):0,edited=r.updated_at?Date.parse(r.updated_at):0;
         if(!r.notion_page_id){
@@ -21079,12 +21150,13 @@ async function nPlan(){
     pages.forEach(pg=>{const hit=byPage[String(pg.id).replace(/-/g,'')];if(!hit)return;const {t,r}=hit,m=(c.maps||{})[t]||{};
       const synced=r.notion_synced_at?Date.parse(r.notion_synced_at):0,pe=Date.parse(pg.last_edited_time);if(pe<=synced+4000)return;
       const edited=r.updated_at?Date.parse(r.updated_at):0,patch={},diff=[],ctx={row:r,title:nTitleOf(t,r),rev:plan.review};
-      Object.entries(m).forEach(([f,x])=>{if(!x||!x.prop||x.dir==='out'||nProt(x.prop))return;
+      Object.entries(m).forEach(([f,x])=>{if(!x||!x.prop||x.dir==='out'||nProtF(f,x.prop))return;
         const nv=nInVal(t,f,pg.properties[x.prop],x.prop,ctx);if(nv===undefined)return;
         const isDate=/date|planned_start|planned_finish|completed_on/.test(f),cur=r[f]==null?'':String(r[f]).slice(0,isDate?10:9999),nn=nv==null?'':String(nv);
         if(nn===cur||(f==='progress'&&+nn===+cur))return;
         const d={f,from:f==='portfolio_id'?((byId('portfolios',cur)||{}).name||''):cur,to:f==='portfolio_id'?((byId('portfolios',nn)||{}).name||nn):nn};
-        if(x.dir==='both'&&edited>synced+4000){plan.conflicts.push({t,r,d});return}      /* changed on both sides: you decide, never “last write wins” */
+        if(f==='status'&&nv==='Completed'&&r.status!=='Completed'){plan.review.push('“'+nTitleOf(t,r)+'”: Notion says “'+(nStatMap().Completed||'Done')+'”. Polaris One does not close an item from Notion by itself (evidence and sub-items must be checked): set Completed here if it is really done');return}
+        if(x.dir==='both'&&!nDer(f,x.prop)&&edited>synced+4000){plan.conflicts.push({t,r,d});return}      /* changed on both sides: you decide, never “last write wins” */
         patch[f]=(kindNum(t,f)&&nv!=null)?+nv:(nv===''?null:nv);diff.push(d)});
       if(diff.length)plan.pull.push({t,r,patch,diff,page:pg.id})});
     plan.review=[...new Set(plan.review)];
@@ -21130,12 +21202,12 @@ function nSuggest(){
   const sc=nSchema()||{},maps={};
   Object.keys(NFIELDS).forEach(t=>{maps[t]={};const taken=new Set();
     NFIELDS[t].forEach(([f,l,k,only])=>{
-      const ok=NKIND_OK[k]||[];const cands=Object.keys(sc).filter(n=>ok.includes(sc[n])&&!nProt(n));
+      const ok=nOkTypes(k,f);const cands=Object.keys(sc).filter(n=>ok.includes(sc[n])&&(!nProt(n)||(f==='progress'&&nDerT(sc[n]))));
       let pick=cands.find(n=>NHINT[f]&&NHINT[f].test(n)&&!taken.has(n));
       if(!pick&&(f==='name'||f==='title'))pick=Object.keys(sc).find(n=>sc[n]==='title');
       if(!pick&&(f==='planned_finish'||f==='planned_start')){const d=cands.filter(n=>sc[n]==='date');if(d.length===1)pick=d[0]}
       if(!pick)return;if(sc[pick]!=='date')taken.add(pick);
-      maps[t][f]={prop:pick,dir:only||NDEF_DIR[f]||'out'}})});
+      maps[t][f]={prop:pick,dir:nDerT(sc[pick])&&f==='progress'?'in':(only||NDEF_DIR[f]||'out')}})});
   return maps}
 ACT.nsuggest=async()=>{const cur=nMaps(),sug=nSuggest();const merged={};Object.keys(NFIELDS).forEach(t=>{merged[t]=Object.assign({},sug[t],cur[t]||{})});await nSave({maps:merged});cdRefresh()};
 CHG.nmap=async el=>{
@@ -21144,7 +21216,7 @@ CHG.nmap=async el=>{
   if(what==='prop'){cur.prop=el.value}else cur.dir=el.value;
   if(!cur.prop)delete maps[t][f];else maps[t][f]=cur;
   await nSave({maps});S.notion.plan=null;cdRefresh()};
-ACT.nplan=()=>nPlan();ACT.nrun=async()=>{const p=S.notion.plan;if(p&&await ask('Run the sync?',`${p.push.length} to send to Notion, ${p.pull.length} to bring back, ${p.link.filter(x=>x.approved).length} to link. Only Work and Freelance items marked “Send to Notion” are included.`,'Run'))nRun()};
+ACT.nplan=()=>nPlan();ACT.nrun=async()=>{const p=S.notion.plan;if(p&&await ask('Run the sync?',`${p.push.length} to send to Notion, ${p.pull.length} to bring back, ${p.link.filter(x=>x.approved).length} to link. Only items marked “Send to Notion” whose Life Area is paired with a Notion Domain are included.`,'Run'))nRun()};
 ACT.nidssave=async()=>{const N=S.notion;N.idErr='';N.idOk='';const c=nCfg(),get=i=>{const v=String((document.getElementById(i)||{}).value||'').trim();if(!v)return '';const m=v.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}/i);return m?nId(m[0]):null};
   const db=get('n_db'),ds=get('n_ds'),pg=get('n_pg');
   if(!db||!ds){N.idErr='The database id and the data source id are both required (32 hexadecimal characters each).';cdRefresh();return}
@@ -21163,8 +21235,7 @@ ACT.nforget=async()=>{if(!await ask('Forget the Notion pages?','Polaris One will
 function nMapBody(t){
   const sc=nSchema(),m=nMaps()[t]||{};
   if(!sc)return `<div class="callout warn" style="background:var(--ambersoft);color:#6B4400">${ic('info')}<div>Check the database first (Connect &amp; check): the Notion columns are read from Notion.</div></div>`;
-  const props=Object.keys(sc).filter(n=>!nProt(n));
-  const rows=NFIELDS[t].map(([f,l,k,only])=>{const x=m[f]||{prop:'',dir:only||NDEF_DIR[f]||'out'},ok=props.filter(n=>(NKIND_OK[k]||[]).includes(sc[n]));
+  const rows=NFIELDS[t].map(([f,l,k,only0])=>{const x=m[f]||{prop:'',dir:only0||NDEF_DIR[f]||'out'},only=(f==='progress'&&x.prop&&nDerT(sc[x.prop]))?'in':only0,ok=Object.keys(sc).filter(n=>nOkTypes(k,f).includes(sc[n])&&(!nProt(n)||(f==='progress'&&nDerT(sc[n]))));
     return `<tr><th scope="row" style="text-align:left;font-weight:600">${esc(l)}</th>
      <td><label class="sr" for="np_${t}_${f}">Notion column for ${esc(l)}</label><select class="in" id="np_${t}_${f}" data-change="nmap" data-t="${t}" data-f="${f}" data-w="prop"><option value="">— not used —</option>${ok.map(n=>`<option value="${esc(n)}" ${x.prop===n?'selected':''}>${esc(n)} (${esc(sc[n])})</option>`).join('')}${x.prop&&!ok.includes(x.prop)?`<option value="${esc(x.prop)}" selected>${esc(x.prop)} (missing)</option>`:''}</select></td>
      <td><label class="sr" for="nd_${t}_${f}">Direction for ${esc(l)}</label><select class="in" id="nd_${t}_${f}" data-change="nmap" data-t="${t}" data-f="${f}" data-w="dir" ${x.prop?'':'disabled'}>${Object.entries(NDIR).filter(([d])=>!(only==='out'&&d!=='out')&&!(only==='in'&&d!=='in')).map(([d,lab])=>`<option value="${d}" ${x.dir===d?'selected':''}>${lab}</option>`).join('')}</select></td></tr>`}).join('');
@@ -21237,7 +21308,7 @@ async function nAuto(){
   const pl=N.plan;if(!pl){return}
   if(pl.blocked.length){N.autoMsg='Automatic sync waits: '+pl.blocked[0];cdRefresh();return}
   const todo=pl.push.length+pl.pull.length+pl.link.filter(x=>x.approved).length,wait=pl.link.filter(x=>!x.approved).length+pl.conflicts.length+pl.review.length;
-  if(!todo){N.plan=null;N.autoFail=0;const nm=nItems('activities').length;N.autoMsg=`Nothing to send${nm?` (${nm} marked${pl.skip.length?`, ${pl.skip.length} skipped because they are not in a Work or Freelance life area`:''})`:' — no Activity is marked “Send to Notion” yet'}${wait?` · ${wait} item${wait===1?'':'s'} waiting for your decision`:''}.`;cdRefresh();return}
+  if(!todo){N.plan=null;N.autoFail=0;const nm=nItems('activities').length;N.autoMsg=`Nothing to send${nm?` (${nm} marked${pl.skip.length?`, ${pl.skip.length} skipped (see the reasons)`:''})`:' — no Activity is marked “Send to Notion” yet'}${wait?` · ${wait} item${wait===1?'':'s'} waiting for your decision`:''}.`;cdRefresh();return}
   await nRun();N.autoFail=0;N.autoMsg=`${N.res||'Done.'}${wait?` ${wait} item${wait===1?'':'s'} waiting for your decision.`:''}`;cdRefresh()}
 function nAutoTick(){const a=nAutoCfg(),N=S.notion;if(!a.on||N.autoPaused)return;if(Date.now()-(N.autoAt||N.autoOn||0)>=a.min*60000)nAuto()}
 if(!window._nAutoTimer)window._nAutoTimer=setInterval(()=>{try{nAutoTick()}catch(e){}},30000);
@@ -21253,14 +21324,14 @@ function nAutoBox(){
    <div class="cd-row" style="flex-wrap:wrap;gap:8px;align-items:center">
     <label class="sm" for="n_mode">Mode</label><select class="in" id="n_mode" data-change="nauto" data-w="mode" ${nLive()?'':'disabled'}><option value="manual" ${a.on?'':'selected'}>Manual only (Preview, then Run)</option><option value="auto" ${a.on?'selected':''}>Manual and automatic</option></select>
     <label class="sm" for="n_min">Every</label><select class="in" id="n_min" data-change="nauto" data-w="min" ${a.on?'':'disabled'}>${NAUTO_MIN.map(m=>`<option value="${m}" ${a.min===m?'selected':''}>${m} minutes</option>`).join('')}</select></div>
-   <p class="xs mut" style="margin:6px 0 0">Automatic runs only while Polaris One is open and visible, and only for items marked “Send to Notion” (Work or Freelance). It never makes a decision for you: same-title pages, conflicts and review items wait. After 3 failures in a row it stops. Manual Preview and Run stay available.${ok?'':' Check the database and set the mapping first.'}</p>
+   <p class="xs mut" style="margin:6px 0 0">Automatic runs only while Polaris One is open and visible, and only for items marked “Send to Notion” (any Life Area with an approved Domain pairing). It never makes a decision for you: same-title pages, conflicts and review items wait. After 3 failures in a row it stops. Manual Preview and Run stay available.${ok?'':' Check the database and set the mapping first.'}</p>
    ${a.on&&N.autoPaused?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.autoMsg||'Stopped.')} <button class="btn" data-act="nautoresume">Resume</button></p>`:(N.autoMsg?`<p class="sm" role="status" style="margin:6px 0 0">${esc(N.autoMsg)}${N.autoAt?` <span class="mut">(${new Date(N.autoAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})})</span>`:''}</p>`:'')}</div>`}
 function nSyncBody(){
   const N=S.notion,pl=N.plan,c=nCfg();
   const n=Object.keys(NFIELDS).map(t=>nItems(t).length).reduce((a,b)=>a+b,0);
   const list=(arr,fn)=>arr.length?`<div class="sm" style="margin-top:6px;max-height:240px;overflow:auto" tabindex="0">${arr.slice(0,60).map(fn).join('')}${arr.length>60?`<p class="mut">+${arr.length-60} more</p>`:''}</div>`:'';
   const nm=x=>esc(nTitleOf(x.t,x.r));
-  return nAutoBox()+`<div class="cd-box"><p class="sm ink2" style="margin:0 0 8px">Polaris One sends the mapped fields of every Activity marked <b>Send to Notion</b> (Work or Freelance only). Notion does the processing; what you changed there comes back into the fields you mapped as “Notion → Polaris One”. Fields mapped “Both ways” that changed on both sides are listed as conflicts and left alone until you decide. Preview first; nothing changes until you press Run.</p>
+  return nAutoBox()+`<div class="cd-box"><p class="sm ink2" style="margin:0 0 8px">Polaris One sends the mapped fields of every Activity marked <b>Send to Notion</b> (any Life Area with an approved Domain pairing). Notion does the processing; what you changed there comes back into the fields you mapped as “Notion → Polaris One”. Fields mapped “Both ways” that changed on both sides are listed as conflicts and left alone until you decide. Preview first; nothing changes until you press Run.</p>
    <div class="sm mut">${n} item${n===1?'':'s'} marked “Send to Notion” · ${c.schema?'database checked':'database not checked yet'}</div>
    <div class="cd-row"><button class="btn p" data-act="nplan" ${N.busy||DB.mode!=='supabase'?'disabled':''}>Preview</button>${pl&&pl.push.length?`<button class="btn" data-act="nrun1" ${N.busy?'disabled':''}>Test with one item</button>`:''}${pl&&(pl.push.length||pl.pull.length||pl.link.some(x=>x.approved))?`<button class="btn p" data-act="nrun" ${N.busy?'disabled':''}>Run (${pl.push.length} out · ${pl.pull.length} back${pl.link.some(x=>x.approved)?' · '+pl.link.filter(x=>x.approved).length+' links':''})</button>`:''}<button class="btn d" data-act="nforget">Forget Notion pages</button></div>
    ${pl?`${pl.blocked.map(b=>`<p class="sm" style="color:var(--red)" role="alert">${esc(b)}</p>`).join('')}
@@ -21269,11 +21340,11 @@ function nSyncBody(){
     <h5>To bring back from Notion (${pl.pull.length})</h5>${list(pl.pull,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> <span class="mut">${esc(NMOD[x.t])}</span><br>${x.diff.map(d=>`<span class="xs">${esc(d.f)}: ${esc(d.from||'∅')} → <b>${esc(d.to||'∅')}</b></span>`).join(' · ')}</div>`)||'<p class="sm mut">Nothing came back.</p>'}
     ${pl.conflicts.length?`<h5>Conflicts (${pl.conflicts.length})</h5><p class="sm mut">Changed here and in Notion since the last sync. Left alone. Change the direction of the field to pick a source of truth.</p>${list(pl.conflicts,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> · ${esc(x.d.f)}: here “${esc(x.d.from||'∅')}”, Notion “${esc(x.d.to||'∅')}”</div>`)}`:''}
     ${pl.review.length?`<h5>Review (${pl.review.length})</h5>${list(pl.review,x=>`<div class="sm" style="border-top:1px solid var(--line);padding:3px 0">${esc(x)}</div>`)}`:''}
-    ${pl.skip.length?`<h5>Skipped (${pl.skip.length})</h5><p class="sm mut">Only Work and Freelance items are sent. These are marked “Send to Notion” but are not in one of those life areas (a sub-activity follows its parent). Change the life area of the item, or untick the mark.</p>${list(pl.skip,x=>{const a=x.r.portfolio_id?byId('portfolios',x.r.portfolio_id):null,p=!a&&x.r.parent_id?byId('activities',x.r.parent_id):null,pa=p&&p.portfolio_id?byId('portfolios',p.portfolio_id):null;return `<div class="sm" style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> <span class="mut">· life area: ${esc((a&&a.name)||(pa&&pa.name+' (from parent)')||'none')}</span></div>`})}`:''}`:''}
+    ${pl.skip.length?`<h5>Skipped (${pl.skip.length})</h5><p class="sm mut">These are marked “Send to Notion” but cannot be sent yet. Every Life Area can be sent once its Notion Domain pairing is approved; a sub-activity uses its own Life Area, otherwise its parent’s. The reason is shown on each line. Nothing is changed for you.</p>${list(pl.skip,x=>{const a=x.r.portfolio_id?byId('portfolios',x.r.portfolio_id):null,p=!a&&x.r.parent_id?byId('activities',x.r.parent_id):null,pa=p&&p.portfolio_id?byId('portfolios',p.portfolio_id):null;return `<div class="sm" style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> <span class="mut">· life area: ${esc((a&&a.name)||(pa&&pa.name+' (from parent)')||'none')}</span></div>`})}`:''}`:''}
    ${N.res?`<p class="sm" role="status">${esc(N.res)}</p>`:''}
    ${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>`}
 connAdd({id:'notion',group:'notes',name:'Notion Activity Log',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Send Activities to your Notion Activity Log; Notion does the work and the results come back.',state:()=>nCfg().schema&&Object.keys(nMaps()).length?'on':'off',types:[
-  {id:'connect',name:'Connect & check',sub:'Token, database, data source',beta:true,title:'Notion Action Log',lead:'Input from Polaris One, processing in Notion',text:'Polaris One sends your Activities to the Activity Log database through the Notion API. Notion processes them; the results you map come back to the same records. The database is checked with Notion before anything is written. Personal Life Areas are never sent.',uses:['Validates the database id and the data source id first','Reads the real Notion columns for the mapping','Only Work and Freelance items you mark “Send to Notion”'],body:nConnectBody},
+  {id:'connect',name:'Connect & check',sub:'Token, database, data source',beta:true,title:'Notion Action Log',lead:'Input from Polaris One, processing in Notion',text:'Polaris One sends your Activities to the Activity Log database through the Notion API. Notion processes them; the results you map come back to the same records. The database is checked with Notion before anything is written. Every Life Area can be sent once it is paired with a Notion Domain; nothing is sent without your “Send to Notion” mark.',uses:['Validates the database id and the data source id first','Reads the real Notion columns for the mapping','Items you mark “Send to Notion”, in any Life Area paired with a Notion Domain'],body:nConnectBody},
   {id:'map-activities',name:'Activities mapping',sub:'Polaris fields ⇄ Notion columns',title:'Activities mapping',lead:'Which field goes to which Notion column',text:'Each row is one Polaris One field. Pick the Notion column and the direction.',body:()=>nMapBody('activities')},
   {id:'values',name:'Life area, status, priority',sub:'Approved pairings',title:'Life area = Domain, status and priority',lead:'Explicit pairings, never guessed',text:'These pairings decide what a Life area, a status and a priority become in Notion and back.',body:nValuesBody},
   {id:'sync',name:'Preview & sync',sub:'See it first, then run',title:'Sync with Notion',lead:'Send, process, bring back',text:'The preview lists what would be created or updated in Notion and what would come back. Run applies exactly that list.',body:nSyncBody}]});
