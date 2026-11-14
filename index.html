@@ -8983,6 +8983,11 @@ function dgWorkOn(day){
   if(holidayOn(day).some(h=>!h.joint))return false;
   if(typeof leavesOn==='function'&&leavesOn(day).some(l=>!l.half_day))return false;
   return true}
+/* r43: where the prayer times of the day come from, so a wrong time can be traced to the location or the service at once */
+function dgSrcLine(M){
+  try{const p=prayerFor(M.day);if(!p)return '';const g=geo(),def=g===DEFAULT_GEO;
+    const t=PRAYER_NAMES.map(([k,n])=>n+' <b>'+(p[k]||'—')+'</b>').join(' · ');
+    return `<p class="xs mut" style="margin:6px 0 0">Prayer times from Aladhan (Kemenag method) for <b>${esc(g.name||'your location')}</b>${p.tz?' · '+esc(p.tz):''}: ${t}.${def?' <b>This is the default location (Jakarta).</b> Set your own in Settings → Data feeds.':''}</p>`}catch(e){return ''}}
 function dgDayNote(day){
   if(!dgPray(day).known){const e=typeof prayErr==='function'?prayErr(day):'';return 'Prayer times for this day are not loaded'+(e?' ('+esc(e)+')':'')+'. The times shown for the prayer stops are estimates, not verified times. Check Settings → Data feeds.'}
   const h=holidayOn(day).filter(x=>!x.joint),l=typeof leavesOn==='function'?leavesOn(day):[];
@@ -9351,7 +9356,7 @@ function dgPage(){
   const stops=M.W.map(w=>dgWinHtml(w,M,show)).join('');
   const fin=show?'':(M.hidden?`<p class="sm mut" style="margin:6px 0">${M.hidden} finished or past item${M.hidden===1?' is':'s are'} hidden so the next step is easy to see. <button type="button" class="link" data-act="dgshow">Show completed</button></p>`:'');
   const foot=`<p class="xs mut" style="margin-top:10px">The market windows are common practice among experienced traders and investors, not advice and not a promise; exchanges change hours and holidays. Sleep rules: 10-10-10 and 3-3-3 (Dr. Christian Poensgen and Eric Partaker). Prayer times come from your location in Settings. Only your wake time, minutes to fall asleep, markets and today’s ticks are saved.</p>`;
-  return `<div data-dgroot>${bar}${head}${note}${nextH}${lateH}${anyH}${stops}${fin}${foot}</div>`}
+  return `<div data-dgroot>${bar}${head}${note}${dgSrcLine(M)}${nextH}${lateH}${anyH}${stops}${fin}${foot}</div>`}
 VIEWS['guide/activity']=dgPage;
 PAGEHELP['guide/activity']='Your whole day on one page, from waking up to sleep: prayers, work, freelance and business, family, when to read and trade each market, the money review and your sleep. Only life areas with something open appear, and finished items are hidden so the next step is easy to see.';
 AFTER['guide/activity']=()=>{
