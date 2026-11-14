@@ -5265,7 +5265,7 @@ VIEWS['settings/workday']=()=>{
    ${[['Morning block',R(s.s,s.m1),'Focus','b-blue'],['Morning break',R(s.m1,s.m1+s.L),'Lowest priority','b-green'],['Morning block, part 2',R(s.m1+s.L,s.ls),'Collaboration','b-blue'],['Lunch',R(s.ls,s.le),'Dzuhur, eat, rest','b-slate'],['Afternoon block',R(s.le,s.m2),'Focus','b-blue'],['Afternoon break',R(s.m2,s.m2+s.L),'Lowest priority','b-green'],['Wrap-up',R(s.m2+s.L,s.e),'Finish and close','b-blue']].map(r=>`<div class="item"><span class="t" style="flex:1">${r[0]}</span><span class="sm mut">${r[1]}</span><span class="badge ${r[3]}">${r[2]}</span></div>`).join('')}</div>
    <div class="callout" style="margin-top:12px">${ic('info')}<div>A break sits in the <b>middle</b> of each block. It has the <b>lowest priority</b>: it never counts as workload or progress, never pushes other items aside on the timeline, and any task can take its time. Use it to <b>refresh</b>, <b>cool down</b>, pray <b>Sholat Dhuha</b> or simply <b>rest</b>. Tap the matching button on the break in Daily Action.</div></div>
    <p class="sm mut" style="margin-top:8px">${mine.length} break${mine.length===1?'':'s'} created so far.</p></div></div><div class="card mt"><div class="ch"><h3>Life areas outside work</h3></div><p class="sm mut" style="margin:0 0 8px">When you give a reason for not doing an action, it moves to the next working day: Saturday, Sunday, public holidays and leave are skipped. Actions in the life areas ticked here can be done in your free time, so they only move one calendar day.</p>
-   <div class="row" style="flex-wrap:wrap;gap:6px 16px">${(D().portfolios||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<label class="chk" style="padding:4px 0"><input type="checkbox" name="freearea" value="${esc(p.name)}" data-change="freearea" ${t3FreeAreas().includes(p.name)?'checked':''}> ${esc(p.name)}</label>`).join('')||'<span class="sm mut">No life areas yet.</span>'}</div></div><div class="g g2 mt">${geoCardHtml()}</div>`};
+   <div class="row" style="flex-wrap:wrap;gap:6px 16px">${(D().portfolios||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(p=>`<label class="chk" style="padding:4px 0"><input type="checkbox" name="freearea" value="${esc(p.name)}" data-change="freearea" ${t3FreeAreas().includes(p.name)?'checked':''}> ${esc(p.name)}</label>`).join('')||'<span class="sm mut">No life areas yet.</span>'}</div></div>`};
 CHG.freearea=async()=>{const v=[...document.querySelectorAll('input[name=freearea]:checked')].map(x=>x.value);await setPrefs({work:Object.assign({},prefs().work||{},{freeAreas:v})});toast('Saved')};
 AFTER['settings/workday']=()=>feedsAfter({years:[],dates:[todayS()]});
 ACT.worksave=async()=>{
@@ -9690,7 +9690,7 @@ VIEWS['execute/mail']=()=>{
   const M=S.ol.mail,r=S.ol.row,only=!!S.ui.mailUnread;
   if(olDemo())return `<div class="card"><div class="empty"><b>Mail needs the Supabase database</b>Outlook sign-in is kept on the server, so it works only when Polaris One is connected to Supabase.<br><button class="btn" data-act="go" data-p="settings" data-s="outlook">Open My Outlook</button></div></div>`;
   if(!r||!r.connected)return `<div class="card"><div class="empty"><b>Connect your Outlook to see your inbox here</b>Your mail is private to you: only you can read it in Polaris One, and it is never saved.<br><button class="btn p" data-act="go" data-p="settings" data-s="outlook">${ic('link',15)} Connect Outlook</button></div></div>`;
-  if(r.mail_on===false)return `<div class="card"><div class="empty"><b>Mail is switched off</b>Turn it on in My Outlook.<br><button class="btn" data-act="go" data-p="settings" data-s="outlook">Open My Outlook</button></div></div>`;
+  if(r.mail_on===false)return `<div class="card"><div class="empty"><b>Mail is switched off</b>Turn it on in Integrations → Connections → Outlook Display.<br><button class="btn" data-act="go" data-p="settings" data-s="outlook">Open My Outlook</button></div></div>`;
   const items=only?M.items.filter(m=>!m.read):M.items;
   return `<div class="toolbar noprint"><label class="chk" style="padding:0"><input type="checkbox" data-change="mailunread" ${only?'checked':''}> Unread only</label><span class="sp"></span><span class="sm mut">${M.unread!=null?M.unread+' unread':''}${M.at?` · updated ${esc(ago(M.at))}`:''}</span><button class="btn" data-act="mailrefresh">${ic('refresh',15)} Refresh</button></div>
   ${M.err?`<div class="callout warn">${ic('alert')}<div>${esc(M.err.msg)}</div></div>`:''}
@@ -10460,7 +10460,7 @@ const RELEASE_NOTES=[
    ['One form for every secret key','Connections → API & server → Keys & server builds a single api-secrets.txt. Keys never go into the app or into config.json.','integrations','keys','Open Keys & server',1],
    ['Links that follow the app','The built-in links (holidays, prayer times, exchange rates, news, crypto) are refreshed automatically when a new revision changes them. Your own connections are never touched.','integrations','connections','Open Connections',1]]},
   {t:'Outlook, private to each user',items:[
-   ['Your own calendar and mail','Settings → My Outlook: sign in with your own Microsoft account. Your calendar appears on the Calendar and Daily Action; your inbox appears under Execute → Mail. Mail is read live and never stored. Not even an admin can see it.','settings','outlook','Open My Outlook'],
+   ['Your own calendar and mail','Integrations → Connections → Outlook Email: sign in with your own Microsoft account. Your calendar appears on the Calendar and Daily Action; your inbox appears under Execute → Mail. Mail is read live and never stored. Not even an admin can see it.','settings','outlook','Open My Outlook'],
    ['Mail becomes an action in one press','In Execute → Mail press “Make an action” to turn a message into a Daily Action for today.','execute','mail','Open Mail'],
    ['A calendar link still works','If your organisation does not allow sign-in, paste your private calendar link in My Outlook instead (calendar only, no mail).']]},
   {t:'Activities, actions and improvement',items:[
@@ -23312,6 +23312,25 @@ const AI_FIELDS=[['ai_summary','AI summary','Notion AI summary'],['ai_key_info',
     const has=AI_FIELDS.some(x=>vals&&String(vals[x[0]]||'').trim());if(!has)return ''}
   return o.apply(this,arguments)}})();
 
+/* r51: email draft written by Notion AI from a Daily Action. “Email to” goes out; Subject and Draft come back, read only. Polaris One never sends the mail. */
+MOD.daily_actions.fields.push(
+  F('_em','Email draft','heading','Fill “Email to” to ask Notion AI for a draft of the email this Action needs. The draft appears here after the next sync. Polaris One never sends email: copy it or open it in your mail app.'),
+  F('email_to','Email to','text','Name or address of the person this Action must write to. Leave empty if no email is needed.',{sql:'text',wide:1}),
+  F('ai_email_subject','Email subject (Notion AI)','text','',{ro:1,sql:'text',wide:1}),
+  F('ai_email_body','Email draft (Notion AI)','textarea','',{ro:1,rows:8,sql:'text',wide:1}));
+COL_NEWER.daily_actions=(COL_NEWER.daily_actions||[]).concat(['email_to','ai_email_subject','ai_email_body']);
+Object.assign(NHINT,{email_to:/(email.?to|kepada|recipient|penerima)/i,ai_email_subject:/(email.?subject|subjek)/i,ai_email_body:/(email.?draft|draft.?email|email.?body)/i});
+NFIELDS.daily_actions.push(['email_to','Email to','text','out'],['ai_email_subject','Notion AI email subject','ai','in'],['ai_email_body','Notion AI email draft','ai','in']);
+(function(){const o=fieldHtml;fieldHtml=function(f,val,vals){
+  if(f&&/^ai_email_(subject|body)$/.test(f.k||'')){if(!(vals&&(String(vals.ai_email_subject||'').trim()||String(vals.ai_email_body||'').trim())))return '';
+    const h=o.apply(this,arguments);
+    return f.k==='ai_email_body'?h+`<div class="noprint" style="margin:-4px 0 10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="emcopy">${ic('copy',14)} Copy draft</button><button type="button" class="btn sm" data-act="emopen">Open in my mail app</button></div>`:h}
+  if(f&&f.k==='_em'){return o.apply(this,arguments)}
+  return o.apply(this,arguments)}})();
+const emVals=()=>{const g=n=>((document.querySelector('[name='+n+']')||{}).value||'');return{to:g('email_to'),sub:g('ai_email_subject'),body:g('ai_email_body')}};
+ACT.emcopy=async()=>{const v=emVals(),t=(v.sub?'Subject: '+v.sub+'\n\n':'')+v.body;try{await navigator.clipboard.writeText(t);toast('Draft copied')}catch(e){toast('Select the text and copy it by hand.',true)}};
+ACT.emopen=()=>{const v=emVals(),to=/@/.test(v.to)?v.to.trim():'';window.location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(v.sub)+'&body='+encodeURIComponent(v.body)};
+
 /* Activities mapping: three rows, Notion → Polaris One only */
 AI_FIELDS.forEach(([k,l,lab])=>NFIELDS.activities.push([k,lab,'ai','in']));
 
@@ -23781,6 +23800,38 @@ connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,b
   me.desc='Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.';
   me.name='Notion';
   [ 'notion','notion-da2' ].forEach(id=>{const i=CONN.findIndex(x=>x.id===id);if(i>=0)CONN.splice(i,1)})})();
+/* =====================================================================
+   r52 · Connections now hold what used to sit on three Settings tabs:
+   Outlook display (What to show), Prayer times (location) and Indonesian holidays. The Settings tabs “Location & prayer” and “My Outlook” are gone;
+   the old “Your Outlook account” card is gone too (sign-in lives in Outlook Email, the calendar link in Outlook Calendar).
+   ===================================================================== */
+(function(){
+  const cut=(h,m)=>{const i=h.indexOf(m);return i<0?'':h.slice(i,h.lastIndexOf('</div>'))};
+  const showHtml=()=>cut(VIEWS['settings/outlook'](),'<div class="card"><div class="ch"><h3>What to show');
+  const holHtml=()=>cut(VIEWS['settings/location'](),'<div class="card"><div class="ch"><h3>Indonesian public holidays').replace(/<button class="btn" data-act="go" data-p="integrations" data-s="hub">Open Connections<\/button>/,'');
+  const later=f=>{try{Promise.resolve(f()).then(()=>cdRefresh(),()=>{})}catch(e){}};
+  const yr=()=>new Date().getFullYear();
+  connAdd({id:'ocal-show',group:'cal',name:'Outlook Display',mono:'O',tint:CONN_TINT.o,desc:'What the Calendar and Daily Action show from Outlook: events, meetings, look back and ahead. Sync now.',
+    state:()=>{try{return icsOn()?'on':'off'}catch(e){return 'off'}},
+    open(){later(async()=>{await PRE['settings/outlook']();if(icsConfigured())await icsSync(false)})},
+    types:[{id:'show',name:'What to show',sub:'Calendar, meetings, mail',title:'Outlook Display',lead:'Choose what Outlook shows here',text:'The calendar link is kept in Outlook Calendar. Signing in with Microsoft is in Outlook Email.',body:showHtml}]});
+  connAdd({id:'prayer',group:'cal',name:'Prayer times',mono:'P',tint:CONN_TINT.a,desc:'Your place for the prayer times on the Calendar, Daily Action and Home (Aladhan, Kemenag method).',
+    state:()=>prefs().geo?'on':'off',
+    open(){later(()=>feedsAfter({years:yearsAround(todayS()),dates:[todayS()]}))},
+    types:[{id:'loc',name:'Location',sub:'Coordinates and today’s times',title:'Prayer times',lead:'Set your place',text:'Times come from the Aladhan service with the Kemenag method.',body:()=>geoCardHtml()}]});
+  connAdd({id:'holidays',group:'cal',name:'Indonesian holidays',mono:'H',tint:CONN_TINT.d,desc:'Public holidays and joint leave from apiindonesia.id on the Calendar, Daily Action and Home.',
+    state:()=>S.hol&&S.hol[yr()]?'on':'off',
+    open(){later(()=>feedsAfter({years:yearsAround(todayS()),dates:[todayS()]}))},
+    types:[{id:'hol',name:'Holidays',sub:'Status and refresh',title:'Indonesian holidays',lead:'Same for everybody',text:'The key is kept on the server by the admin.',body:holHtml}]});
+  /* these handlers repaint the page behind; inside a connection window the window must be repainted too */
+  ['icssync','savegeo','geolocate','feedrefresh','olicssave','olicsclear'].forEach(k=>{const o=ACT[k];if(typeof o==='function')ACT[k]=async function(){const r=await o.apply(this,arguments);cdRefresh();return r}});
+  ['calopt','olflag'].forEach(k=>{const o=CHG[k];if(typeof o==='function')CHG[k]=async function(){const r=await o.apply(this,arguments);cdRefresh();return r}});
+  /* the tabs and the old addresses */
+  const st=navP('settings');st.subs=st.subs.filter(x=>x[0]!=='location'&&x[0]!=='outlook');
+  const g=()=>['integrations','gallery'];
+  Object.assign(REDIR,{'settings/outlook':g,'settings/location':g,'settings/calendars':g,'settings/feeds':()=>isAdmin()?['integrations','keys']:g()});
+})();
+
 
 /* ---- r14: 99_zzzzzzzzzzzzzzzzzzzzzzz_methods.js ---- */
 /* =====================================================================
