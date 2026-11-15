@@ -1544,6 +1544,7 @@ const fmtVal=v=>v==null||v===''?'—':fmtN(v,2);
 
 /* ---------- toast / modal / confirm ---------- */
 let toastT;
+function warn(where,e){try{const m=String((e&&(e.message||e.m))||e||'');console.warn('[polaris]',where,m);(S.diag=S.diag||[]).unshift({at:new Date().toISOString(),where,m:m.slice(0,200)});if(S.diag.length>50)S.diag.length=50}catch(_){}}
 function toast(msg,err){if(typeof msg==='string'&&/^(Sent to the admin|Already waiting for approval)/.test(msg))err=0;const old=$('.toast');if(old)old.remove();const d=document.createElement('div');d.className='toast'+(err?' err':'');d.setAttribute('role',err?'alert':'status');d.setAttribute('aria-live',err?'assertive':'polite');d.textContent=msg;document.body.appendChild(d);clearTimeout(toastT);toastT=setTimeout(()=>d.remove(),err?5000:2600)}
 let MID=0;
 function openModal(title,body,foot,cls){title=String(title==null?'':title).replace(/<(?=[a-zA-Z\/!?])/g,'&lt;');const id='mt'+(++MID),prev=document.activeElement,d=document.createElement('div');d._prev=prev;d.className='mback';d.innerHTML=`<div class="modal ${cls||''}" role="dialog" aria-modal="true" aria-labelledby="${id}"><div class="mh"><h3 id="${id}">${title}</h3><button class="iconbtn" data-act="closeModal" aria-label="Close">${ic('x')}</button></div><div class="mb">${body}</div>${foot?`<div class="mf">${foot}</div>`:''}</div>`;$('#layer').appendChild(d);a11yPass(d);const f=$('input:not([type=hidden]),select,textarea',d)||$('.mf .btn.p,.mf .btn',d)||$('.iconbtn',d);if(f&&!/Mobi|Android/i.test(navigator.userAgent))f.focus();return d}
@@ -4879,7 +4880,7 @@ async function syncDaily(row,old){
 function reopenPrompt(table,row,old){
   const cur=byId(table,row.id)||row,isA=table==='activities',since=Date.parse(cur.reopened_at)||Date.now();
   if(!cur.reopen_open)return;
-  const clear=async()=>{try{const r=await DB.update(table,cur.id,{reopen_open:false});replaceRow(table,r)}catch(e){}};
+  const clear=async()=>{try{const r=await DB.update(table,cur.id,{reopen_open:false});replaceRow(table,r)}catch(e){warn('reopen flag',e)}};
   const have=isA?fmtN(cur.actual_hours||0,2)+' h':(cur.actual_min||0)+' min';
   const d=openModal('Add the time since you reopened it',`<p class="sm ink2">“${esc(trunc(isA?cur.name:cur.title,60))}” was reopened ${ago(since)} and is now completed again. ${have} is saved so far. How many ${isA?'hours':'minutes'} did you spend since reopening? It will be added on top.</p><div class="fgrid" style="margin-top:12px"><div class="fld"><label for="rp_n">${isA?'Hours':'Minutes'} to add</label><input class="in" id="rp_n" type="number" min="0" step="${isA?'0.25':'5'}" inputmode="decimal"><p class="help">Press Skip if you already updated the time.</p></div><div class="fld wide"><label for="rp_note">What you did</label><input class="in" id="rp_note"><p class="help">Shown in the time log.</p></div></div>`,`<button class="btn" data-x="skip">Skip</button><button class="btn p" data-x="add">Add time</button>`,'sm');
   d.addEventListener('click',async e=>{
@@ -5222,7 +5223,7 @@ async function autoBreaks(){
   const c=workCfg();if(!c.breaks)return 0;
   const sl=workSlots(),seen=seenSet(),t=todayS(),rows=[],keys=[],yrs=new Set();
   for(let i=0;i<c.ahead;i++)yrs.add(+addD(t,i).slice(0,4));
-  try{await ensureHolidays([...yrs])}catch(e){}
+  try{await ensureHolidays([...yrs])}catch(e){warn('holidays',e)}
   for(let i=0;i<c.ahead;i++){
     const d=addD(t,i);if(!isWorkDay(d)||seen.has('brk:'+d))continue;
     if(holidayOn(d).some(h=>!h.joint))continue;
@@ -5755,7 +5756,7 @@ CHG.role=async el=>{const ok=await attempt(()=>DB.adminSetRole(el.dataset.id,el.
 ACT.ustatus=async el=>{const u=userOf(el.dataset.id),to=el.dataset.to;if(to==='disabled'&&!await ask('Switch off '+uname(u)+'?','They are signed out of their access at once and cannot sign in. Nothing is deleted; you can switch them on again.','Switch off',true))return;await attempt(()=>DB.adminSetStatus(u.id,to),to==='active'?'Account switched on':'Account switched off');await usersRefresh()};
 ACT.uapprove=async el=>{await attempt(()=>DB.adminSetStatus(el.dataset.id,'active'),'Account approved');await usersRefresh()};
 ACT.upass=async el=>{const u=userOf(el.dataset.id);if(!u)return;
-  if(DB.mode==='supabase'){if(!await ask('Send a password reset email?',`${uname(u)} (${u.email}) gets an email with a link to choose a new password.`,'Send email'))return;await attempt(()=>DB.adminResetPassword(u),'Reset email sent');return}
+  if(DB.mode==='supabase'){if(!await ask('Send a password reset email?',`${esc(uname(u))} (${esc(u.email)}) gets an email with a link to choose a new password.`,'Send email'))return;await attempt(()=>DB.adminResetPassword(u),'Reset email sent');return}
   const pw=rand(10);openModal('Set a new password',`<form id="pform" onsubmit="return false"><div class="fld"><label for="np">New password for ${esc(uname(u))}</label><div class="row"><input class="in" id="np" name="np" value="${pw}" style="flex:1"><button class="btn" data-act="genpw" data-target="np">Generate</button></div><p class="help">At least 6 characters. Demo mode keeps passwords in this browser only.</p></div></form>`,`<button class="btn" data-act="closeModal">Cancel</button><button class="btn p" data-act="upassok" data-id="${u.id}">Save password</button>`,'sm')};
 ACT.genpw=el=>{const t=document.getElementById(el.dataset.target);if(t)t.value=rand(12)};
 ACT.upassok=async el=>{const v=($('#np').value||'').trim();if(v.length<6)return toast('Use at least 6 characters.',1);if(await attempt(()=>DB.adminResetPassword(userOf(el.dataset.id),v),'Password saved')){closeModal(true)}};
@@ -20554,7 +20555,7 @@ let syTimer=null;
 function syNudge(){if(!syLinked()||S.sync.link.status!=='active'||DB.mode!=='supabase')return;clearTimeout(syTimer);syTimer=setTimeout(()=>{DB.sb.functions.invoke(SY_FN+'/run',{body:{mode:'push'}}).then(()=>syLoad()).catch(()=>{})},4000)}
 ['activities','daily_actions'].forEach(t=>{const m=MOD[t],a=m.after;m.after=async function(row,old){const r=a?await a.apply(this,arguments):undefined;if((row&&row.share_with_altair)||(old&&old.share_with_altair))syNudge();return r}});
 /* load the link once the data is in */
-(function(){const o=DB.loadAll;if(typeof o==='function')DB.loadAll=async function(){const r=await o.apply(this,arguments);try{await syLoad()}catch(e){}return r}})();
+(function(){const o=DB.loadAll;if(typeof o==='function')DB.loadAll=async function(){const r=await o.apply(this,arguments);try{await syLoad()}catch(e){warn('load data',e)}return r}})();
 
 /* ---------- help and notes ---------- */
 putFaq('How does the Altair Project Management link work?','Under the Integrations menu, open Altair Project Management link. Tick “Share with Altair Project Management” on an activity, sub-activity or daily action in any Life Area. A main activity is level 1 in Altair Project Management, a sub-activity level 2, and a daily action level 3. Title, notes, priority, dates, status and progress go both ways; the later edit of each field wins. Time, result and blocker stay here. Only the items you switch on are shared; every Life Area can be shared with Altair Project Management.');
@@ -20805,7 +20806,7 @@ ACT.cdicssave=async el=>{
   await ACT.olicssave(el);
   if(raw&&normIcs(raw)&&!(S.ics&&S.ics.err)&&icsOn())await setPrefs({icsProvider:el.dataset.prov});
   cdRefresh()};
-ACT.cdicsclear=async()=>{await ACT.olicsclear();try{await setPrefs({icsProvider:''})}catch(e){}cdRefresh()};
+ACT.cdicsclear=async()=>{await ACT.olicsclear();try{await setPrefs({icsProvider:''})}catch(e){warn('save calendar pref',e)}cdRefresh()};
 connAdd({id:'gcal',group:'cal',name:'Google Calendar',mono:'G',tint:CONN_TINT.g,desc:'See your Google Calendar on the Calendar, Daily Action and Home.',state:()=>icsOn()&&icsProv()==='google'?'on':'off',types:[
   {id:'ics',name:'Calendar link (iCal)',sub:'Read only · private to you',title:'Google Calendar',lead:'Show your Google Calendar events here',text:'Use the private iCal address of your calendar. Polaris One reads it and shows the events next to your plan. Nothing is written back to Google.',uses:['See today’s events on Home and Daily Action','Turn events into Meetings automatically (optional)','Plan around your real availability'],
    state:()=>icsOn()&&icsProv()==='google'?'on':'off',
@@ -21394,7 +21395,7 @@ async function hubLoad(){
   S.ph.states={};
   if(typeof hubAreasLoad==='function')await hubAreasLoad();
   if(S.ph.ov&&S.ph.ov.peers&&S.ph.ov.peers.length){
-    try{const rows=await syRpc('hub_item_states');(rows||[]).forEach(r=>{S.ph.states[r.peer+'|'+r.entity+'|'+r.local_id]=r.state})}catch(e){}}}
+    try{const rows=await syRpc('hub_item_states');(rows||[]).forEach(r=>{S.ph.states[r.peer+'|'+r.entity+'|'+r.local_id]=r.state})}catch(e){warn('hub item states',e)}}}
 const hubPeer=k=>((S.ph.ov&&S.ph.ov.peers)||[]).find(p=>p.peer===k);
 const hubOn=k=>{const p=hubPeer(k);return p&&p.status!=='revoked'};
 function hubChip(peer,entity,id){const s=S.ph.states[peer+'|'+entity+'|'+id];return s?badge(HUB_PEERS[peer].name+(s==='synced'?' ✓':' …'),s==='synced'?'green':'amber'):''}
@@ -23131,7 +23132,7 @@ async function pdfOcr(file,password,onProgress){
     return M.get(a.portfolio_id+'|Annual|'+PT.period('Annual',s).start)||null}
   window.plansUnlinked=()=>{const M=pool();return (D().activities||[]).filter(a=>!a.plan_id&&target(a,M))};
   window.plansLink=async function(limit){const M=pool();let n=0;
-    for(const a of (D().activities||[]).filter(a=>!a.plan_id)){if(n>=(limit||150))break;const t=target(a,M);if(!t)continue;try{await patchRow('activities',a.id,{plan_id:t.id});n++}catch(e){}}return n};
+    for(const a of (D().activities||[]).filter(a=>!a.plan_id)){if(n>=(limit||150))break;const t=target(a,M);if(!t)continue;try{await patchRow('activities',a.id,{plan_id:t.id});n++}catch(e){warn('link activity to plan',e)}}return n};
   AUTO_TASKS.push({id:'pll',need:'activities',on:()=>!!S.profile&&prefs().plansauto!==false&&!window.__noT3&&plansUnlinked().length>0,run:()=>plansLink(150),txt:n=>n+' activit'+(n>1?'ies':'y')+' linked to a plan'});
   const _m=ACT.plmake;ACT.plmake=el=>busy(el,async()=>{const n=await plansCreate(400),k=await plansLink(400);toast((n?n+' plan'+(n>1?'s':'')+' created':'No plan to create')+(k?' · '+k+' activit'+(k>1?'ies':'y')+' linked':''));render()});
   const _v=VIEWS['plan/planning'];VIEWS['plan/planning']=()=>{const h=_v(),u=plansUnlinked().length;return u?h.replace('Create missing plans</button>','Create missing plans</button><span class="xs mut">'+u+' activit'+(u>1?'ies':'y')+' will be linked</span>'):h};
@@ -23183,7 +23184,7 @@ const HC_OLD={'Golongan darah':'Blood type','Alergi':'Allergy','Kondisi yang say
 AUTO_TASKS.push({id:'hcm',need:'health_records',on:()=>!!S.profile&&(D().health_records||[]).some(r=>['kind','status','provenance','relation','unit'].some(k=>HC_OLD[r[k]])),
   run:async()=>{let n=0;for(const r of (D().health_records||[]).filter(r=>['kind','status','provenance','relation','unit'].some(k=>HC_OLD[r[k]])).slice(0,120)){
     const patch={};['kind','status','provenance','relation','unit'].forEach(k=>{if(HC_OLD[r[k]])patch[k]=HC_OLD[r[k]]});
-    try{const row=await DB.update('health_records',r.id,patch);const i=D().health_records.findIndex(x=>x.id===r.id);if(i>=0)D().health_records[i]=row;n++}catch(e){}}return n},
+    try{const row=await DB.update('health_records',r.id,patch);const i=D().health_records.findIndex(x=>x.id===r.id);if(i>=0)D().health_records[i]=row;n++}catch(e){warn('health record update',e)}}return n},
   txt:n=>n+' health record'+(n>1?'s':'')+' translated to English'});
 
 /* ---- r14: 99_zzzzzzzzzzzzzzzzz_backup.js ---- */
@@ -23260,6 +23261,7 @@ AUTO_TASKS.push({id:'hcm',need:'health_records',on:()=>!!S.profile&&(D().health_
      <label class="chk"><input type="checkbox" data-change="remindon" ${c.on?'checked':''} ${perm==='unsupported'?'disabled':''}> Remind me on this device</label>
      <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:8px"><label class="sm">Morning <input class="in" type="time" id="rm_am" value="${esc(c.morning)}" data-change="remindtime" style="width:auto"></label><label class="sm">Evening <input class="in" type="time" id="rm_pm" value="${esc(c.evening)}" data-change="remindtime" style="width:auto"></label><button class="btn" data-act="remindtest">Send a test</button></div></div>`};
   const _s=VIEWS['settings/data'];VIEWS['settings/data']=()=>_s()+card();
+  {const _p=VIEWS['settings/data'];VIEWS['settings/data']=()=>{const d=S.diag||[];return _p()+`<div class="card" style="margin-top:12px"><div class="ch"><h3>Recent problems (this session)</h3></div>${d.length?`<ul class="sm" style="margin:0 0 0 18px">${d.slice(0,10).map(x=>`<li>${esc(x.where)}: ${esc(x.m)} <span class="xs mut">${esc(x.at.slice(11,19))}</span></li>`).join('')}</ul>`:'<p class="sm ink2">Nothing failed quietly in this session.</p>'}</div>`}}
   CHG.remindon=async el=>{if(el.checked&&supported()&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(e){}}await setPrefs({remind:Object.assign(cfg(),{on:el.checked})});renderView()};
   CHG.remindtime=async()=>{const a=document.getElementById('rm_am'),p=document.getElementById('rm_pm');await setPrefs({remind:Object.assign(cfg(),{morning:a&&a.value||'08:00',evening:p&&p.value||'17:00'})});toast('Times saved')};
   ACT.remindtest=async()=>{if(supported()&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(e){}}const ok=await show('Polaris One','This is a test reminder.','test');toast(ok?'Test sent':'Notifications are not allowed on this device.',!ok)};
@@ -23339,7 +23341,7 @@ async function ndaiPull(auto){
       Object.keys(tot).forEach(k=>tot[k]+=(r.summary&&r.summary[k])||0);(r.notFound||[]).forEach(x=>nf.add(x));
       if(r.next==null)break;off=r.next}
     N.res=Object.assign({},tot,{notFound:[...nf]});
-    if(tot.updated){try{await DB.loadAll()}catch(e){}}
+    if(tot.updated){try{await DB.loadAll()}catch(e){warn('reload after sync',e)}}
     N.msg=tot.updated?tot.updated+' Daily Action'+(tot.updated>1?'s':'')+' got new AI text.':'Nothing new.'}
   catch(e){N.err=e.message||String(e)}
   N.busy=false;cdRefresh();return tot.updated}
@@ -23578,8 +23580,9 @@ const NG_SKIP=new Set(['heading','secret','file','dynref','hidden']);
 const NG_OK={text:['title','rich_text'],textarea:['rich_text','title'],time:['rich_text'],color:['rich_text'],number:['number'],range:['number'],select:['select','status','multi_select','rich_text'],nsel:['select','status','multi_select','rich_text'],date:['date'],check:['checkbox'],url:['url','rich_text'],ref:['relation']};
 const ngN=x=>String(x||'').toLowerCase().replace(/[\s_\-()]/g,'');
 const ngCfgAll=()=>(S.profile&&prefs().notion_all)||{};
-const ngCfg=t=>(ngCfgAll().t||{})[t]||{};
-async function ngSave(t,patch){const a=ngCfgAll(),tt=Object.assign({},a.t||{});if(t)tt[t]=Object.assign({},tt[t]||{},patch);await setPrefs({notion_all:Object.assign({},a,{t:tt})})}
+const NGX_T=['activities','daily_actions'];const ngxOn=t=>NGX_T.includes(t)&&NG_T.includes(t);
+const ngCfg=t=>{const s=(ngCfgAll().t||{})[t];return s&&Object.keys(s).length?s:(ngxOn(t)?ngLegacyCfg(t):{})};
+async function ngSave(t,patch){const a=ngCfgAll(),tt=Object.assign({},a.t||{});if(t)tt[t]=Object.assign({},ngCfg(t),patch);await setPrefs({notion_all:Object.assign({},a,{t:tt})})}
 async function ngSaveTop(patch){await setPrefs({notion_all:Object.assign({},ngCfgAll(),patch)})}
 S.ng=S.ng||{busy:'',msg:'',err:'',plan:null,chk:{},autoMsg:'',autoPaused:false,autoFail:0};
 const ngLive=()=>DB.mode==='supabase'||!!S.ng.fake;
@@ -23588,8 +23591,85 @@ function ngFind(schema,names){const ks=Object.keys(schema||{});for(const n of na
 function ngNames(t,f){const o=(NG_NAME[t]||{})[f.k];return o?[o]:[f.l||f.k,f.k]}
 function ngIdProp(t,schema){const o=(NG_NAME[t]||{}).__id;return ngFind(schema,o?[o]:['id','Polaris id','Polaris ID'])}
 function ngTitleProp(schema){return Object.keys(schema||{}).find(k=>schema[k]==='title')||''}
+/* ===== r56 · Activities and Daily Actions run on this engine too =====
+   The rules that only the older engine had are kept, once, here: a Life Area ↔ Domain pairing that you approve, your Status and Priority wording,
+   a computed Progress that stays read-only, a “link” step that joins a page that already exists, and Notion AI columns that only come back. */
+const NG_LEG={activities:'notion',daily_actions:'notion_da'};
+function ngLegacyCfg(t){const src=t==='daily_actions'?NDA:NOTION,p=(S.profile&&prefs()[NG_LEG[t]])||{};
+  return {db:p.db||src.db,ds:p.ds||src.ds,schema:p.schema||null,opts:p.opts||null,fmt:p.fmt||{},maps:(p.maps||{})[t]||null,areaMap:p.areaMap||{},areaDefault:p.areaDefault||{},statusMap:p.statusMap||null,prioMap:p.prioMap||null,progScale:p.progScale||null,lastPull:null,legacy:true}}
+const NG_PROT=/^(sync status|source updated from|last sync|sync notes|standard activity id|progress \(%\)|hours worked|actual start|actual end|date plan|last activity date|🆔|🔢)/i;
+const ngProt=n=>NG_PROT.test(String(n||'').trim());
+const ngDerT=ty=>ty==='formula'||ty==='rollup';
+const NG_STAT={'Not Started':'Not Started','In Progress':'In Progress','On Hold':'In Hold','Completed':'Done'};   /* Cancelled has no counterpart: it is not synced */
+const NG_PRIO={Low:'Low',Medium:'Normal',High:'High',Critical:'Critical'};
+const NG_ALIAS={hobby:'Hobby/Sport',investment:'Finance & Investment',financial:'Finance & Investment',trading:'Finance & Investment',family:'Private',ibadah:'Private'};
+const ngStatMap=t=>Object.assign({},NG_STAT,ngCfg(t).statusMap||{});
+const ngPrioMap=t=>Object.assign({},NG_PRIO,ngCfg(t).prioMap||{});
+const ngDomProp=t=>{const m=(ngCfg(t).maps||{}).portfolio_id;return m&&m.prop||''};
+const ngDomOpts=t=>(((ngCfg(t).opts||{})[ngDomProp(t)])||[]).map(o=>o.name);
+function ngAreaRows(t){const opts=ngDomOpts(t),am=ngCfg(t).areaMap||{},pf=(D().portfolios||[]),dup={};
+  pf.forEach(p=>{dup[ngN(p.name)]=(dup[ngN(p.name)]||0)+1});
+  return pf.map(p=>{const cur=am[p.id];let st='Unmapped',domain='',why='No counterpart in Notion: choose one or leave it out.';
+    if(cur&&cur.domain){domain=cur.domain;st=cur.approved?'Approved':'Proposed';why=cur.approved?'You approved this pairing.':'Waiting for your approval.'}
+    else if(dup[ngN(p.name)]>1){st='Ambiguous';why='Two life areas have this name: review before pairing.'}
+    else{const ex=opts.find(o=>ngN(o)===ngN(p.name));
+      if(ex){domain=ex;st='Exact';why='Same name in Notion. Approve to use it.'}
+      else{const al=NG_ALIAS[ngN(p.name)];if(al&&opts.includes(al)){domain=al;st='Proposed';why='A suggestion only (an alias). Approve it, or choose another.'}}}
+    return {p,st,domain,why,ok:!!(cur&&cur.approved&&cur.domain)}})}
+/* may this record go? A sub-activity uses its own Life Area, else its parent’s. Nothing is guessed. */
+function ngAreaCheck(t,row){
+  let ac=row;
+  if(t==='daily_actions'){ac=row.activity_id?byId('activities',row.activity_id):null;if(!ac)return {ok:false,code:'unresolved',why:'no Life Area source (the action has no Activity)'}}
+  const seen=new Set();let hops=0;
+  while(ac&&!ac.portfolio_id){
+    if(seen.has(ac.id))return {ok:false,code:'cycle',why:'parent cycle: the Life Area cannot be resolved'};
+    seen.add(ac.id);if(!ac.parent_id)return {ok:false,code:'nolifearea',why:'no Life Area (set one on the item or its parent)'};
+    const p=byId('activities',ac.parent_id);if(!p)return {ok:false,code:'noparent',why:'parent Activity not found, so its Life Area is unknown'};
+    ac=p;if(++hops>50)return {ok:false,code:'cycle',why:'parent chain too deep'}}
+  if(!ac)return {ok:false,code:'nolifearea',why:'no Life Area'};
+  const pf=byId('portfolios',ac.portfolio_id);if(!pf)return {ok:false,code:'noarea',why:'the Life Area no longer exists'};
+  const x=(ngCfg(t).areaMap||{})[pf.id];
+  if(!x||!x.domain)return {ok:false,code:'needsmap',why:'needs mapping: Life Area “'+pf.name+'” has no Notion Domain pairing'};
+  if(!x.approved)return {ok:false,code:'needsmap',why:'needs mapping: the pairing “'+pf.name+'” → “'+x.domain+'” is not approved yet'};
+  const o=ngDomOpts(t);if(o.length&&!o.some(v=>ngN(v)===ngN(x.domain)))return {ok:false,code:'needsmap',why:'needs mapping: the Notion Domain “'+x.domain+'” does not exist in the database'};
+  return {ok:true,area:pf}}
+function ngAreaToDomain(t,row){const ck=ngAreaCheck(t,row);if(!ck.ok)return null;const x=(ngCfg(t).areaMap||{})[ck.area.id];return x&&x.approved&&x.domain?x.domain:null}
+function ngDomainToArea(t,domain,currentId){
+  const am=ngCfg(t).areaMap||{},ok=Object.keys(am).filter(id=>am[id].approved&&am[id].domain===domain&&byId('portfolios',id));
+  if(currentId&&ok.includes(currentId))return {id:currentId};
+  if(ok.length===1)return {id:ok[0]};
+  const d=(ngCfg(t).areaDefault||{})[domain];if(d&&ok.includes(d))return {id:d};
+  return {why:ok.length?'ambiguous: several life areas share the Domain “'+domain+'”; choose a default':'no approved life area for the Domain “'+domain+'”'}}
+function ngProgIn(t,v,rev,title){
+  if(v==null||typeof v!=='number'||!isFinite(v)){if(rev)rev.push('“'+title+'”: Notion has no computed progress yet (empty), so progress is left as it is');return undefined}
+  const sc=ngCfg(t).progScale==='percent'?'percent':'fraction',max=sc==='percent'?100:1;
+  if(v<0||v>max){if(rev)rev.push('“'+title+'”: computed progress '+v+' is outside 0–'+max+' for the scale “'+sc+'”, so it is not applied');return undefined}
+  return Math.round(sc==='percent'?v:v*100)}
+const ngTitleOf=(t,r)=>r[MOD[t].main]||r.id;
+function ngMapX(t,c,sc){const m=[],list=ngFields(t).slice();
+  if(t==='daily_actions'&&!list.some(f=>f.k==='portfolio_id'))list.push({k:'portfolio_id',l:'Life area',t:'ref'});
+  list.forEach(f=>{const x=(c.maps||{})[f.k];if(!x||!x.prop||!sc[x.prop])return;const ty=sc[x.prop],isArea=f.k==='portfolio_id',isAi=/^ai_/.test(f.k),der=f.k==='progress'&&ngDerT(ty);
+    const ok=isArea?['select','status','rich_text']:isAi?['rich_text','title','select','multi_select','status','number','url','formula']:f.k==='progress'?['number','formula','rollup']:(NG_OK[f.t]||[]);
+    if(!ok.includes(ty)&&!(f.k===MOD[t].main&&ty==='title'))return;
+    if(ngProt(x.prop)&&!der)return;
+    let dir=x.dir==='in'||x.dir==='out'?x.dir:'both';if(isAi||der)dir='in';if(isArea&&t==='daily_actions')dir='out';
+    m.push({f:isArea?Object.assign({},f,{t:'area'}):f,p:x.prop,ty,dir,der})});
+  return m}
+/* the first suggestion of a mapping from the names of the Notion columns (only when none is saved yet) */
+function ngSuggestX(t,sc){const maps={},taken=new Set(),ok=k=>k==='area'?['select','status','rich_text']:NKIND_OK[k]||[];
+  NFIELDS[t].forEach(([f,l,k,only])=>{const cands=Object.keys(sc).filter(n=>(f==='progress'?['number','formula','rollup']:ok(k)).includes(sc[n])&&(!ngProt(n)||(f==='progress'&&ngDerT(sc[n]))));
+    let pick=cands.find(n=>NHINT[f]&&NHINT[f].test(n)&&!taken.has(n));
+    if(!pick&&(f==='name'||f==='title'))pick=Object.keys(sc).find(n=>sc[n]==='title');
+    if(!pick)return;if(sc[pick]!=='date')taken.add(pick);
+    maps[f]={prop:pick,dir:ngDerT(sc[pick])&&f==='progress'?'in':(only||NDEF_DIR[f]||'out')}});
+  return maps}
+function ngAreaOut(t,m,row,why){const nm=ngAreaToDomain(t,row);
+  if(!nm){why.push('Life area of “'+ngTitleOf(t,row)+'” is not paired with a Domain: the Domain is left empty');return null}
+  if(m.ty==='rich_text')return {rich_text:[{type:'text',text:{content:nm}}]};
+  const hit=((ngCfg(t).opts||{})[m.p]||[]).find(x=>ngN(x.name)===ngN(nm));return hit?{[m.ty]:{name:hit.name}}:null}   /* never creates an option */
+function ngLinkedPages(){const s=new Set();NGX_T.forEach(t=>(D()[t]||[]).forEach(r=>{if(r.notion_page_id)s.add(String(r.notion_page_id).replace(/-/g,''))}));return s}
 /* which Polaris field goes to which Notion property, with the direction */
-function ngMap(t){const c=ngCfg(t),sc=c.schema;if(!sc)return null;const m=[];
+function ngMap(t){const c=ngCfg(t),sc=c.schema;if(!sc)return null;if(c.maps&&NGX_T.includes(t))return ngMapX(t,c,sc);const m=[];
   const tp=ngTitleProp(sc);
   const ov=(ngCfg(t).over||{});ngFields(t).forEach(f=>{let p=ov[f.k]===''?'':(ov[f.k]&&sc[ov[f.k]]?ov[f.k]:(f.k===MOD[t].main?tp:ngFind(sc,ngNames(t,f))));if(!p)return;
     const ty=sc[p];if(!NG_OK[f.t].includes(ty)&&!(f.k===MOD[t].main&&ty==='title'))return;
@@ -23598,7 +23678,8 @@ function ngMap(t){const c=ngCfg(t),sc=c.schema;if(!sc)return null;const m=[];
   return m}
 /* ---- Notion → value ---- */
 const ngTxt=a=>(a||[]).map(x=>x.plain_text||'').join('');
-function ngRead(pr,m){const v=pr[m.p];if(!v)return undefined;const ty=v.type,f=m.f;
+function ngRead(pr,m,ctx){const v=pr[m.p];if(!v)return undefined;const ty=v.type,f=m.f,t=ctx&&ctx.t;
+  if(t&&NGX_T.includes(t)){const x=ngReadX(t,m,v,ctx);if(x!==NOX)return x}
   if(ty==='title'||ty==='rich_text')return ngTxt(v[ty])||null;
   if(ty==='number')return v.number;
   if(ty==='select')return v.select?v.select.name:null;
@@ -23608,8 +23689,29 @@ function ngRead(pr,m){const v=pr[m.p];if(!v)return undefined;const ty=v.type,f=m
   if(ty==='checkbox')return !!v.checkbox;
   if(ty==='url')return v.url||null;
   return undefined}
+const NOX={};
+function ngReadX(t,m,v,ctx){const ty=v.type,f=m.f,k=f.k,rev=ctx.rev,ttl=ctx.title;
+  if(f.t==='area'){const nm=ty==='rich_text'?ngTxt(v.rich_text):((v[ty]||{}).name||'');if(!nm)return undefined;
+    const r=ngDomainToArea(t,nm,ctx.row&&ctx.row.portfolio_id);if(r.id)return r.id;if(rev)rev.push('“'+ttl+'”: '+r.why);return undefined}
+  if(k==='progress'&&(ty==='formula'||ty==='rollup')){const o=v[ty]||{};return ngProgIn(t,o.type==='number'?o.number:null,rev,ttl)}
+  if(k==='progress'&&ty==='number'){return v.number==null?null:((ngCfg(t).fmt||{})[m.p]==='percent'?v.number*100:v.number)}
+  if(ty==='formula'){const fo=v.formula||{};return fo.type==='string'?(fo.string||''):fo.type==='number'&&fo.number!=null?String(fo.number):undefined}
+  if(ty==='multi_select')return (v.multi_select||[]).map(o=>o.name).filter(Boolean).join(', ')||null;
+  if(ty==='date'&&(k==='planned_finish'||k==='completed_on'))return v.date?String(v.date.end||v.date.start||'').slice(0,10):null;
+  if(k==='status'||k==='priority'){const nm=ty==='rich_text'?ngTxt(v.rich_text):ty==='title'?ngTxt(v.title):((v[ty]||{}).name||'');if(!String(nm).trim())return undefined;
+    if(t==='daily_actions'){const hit=(OPT[k]||[]).find(o=>ngN(o)===ngN(nm));if(!hit&&rev)rev.push('“'+ttl+'”: the Notion '+k+' “'+nm+'” is not a Polaris One '+k+', so it is left as it is');return hit}
+    const mp=k==='status'?ngStatMap(t):ngPrioMap(t),hit=Object.keys(mp).find(x=>ngN(mp[x])===ngN(nm));
+    if(!hit&&k==='status'&&rev)rev.push('“'+ttl+'”: the Notion status “'+nm+'” has no Polaris One counterpart, so the status is left as it is');return hit}
+  return NOX}
 /* ---- value → Notion property (null = do not write this property) ---- */
-function ngWrite(t,m,row,why){const c=ngCfg(t),v=row[m.f.k],ty=m.ty,name=m.p;
+function ngWrite(t,m,row,why){const c=ngCfg(t),ty=m.ty,name=m.p;let v=row[m.f.k];
+  if(m.f.t==='area')return ngAreaOut(t,m,row,why);
+  if(NGX_T.includes(t)){
+    if(m.f.k==='status'&&v){const w=ngStatMap(t)[v];if(!w){if(v==='Cancelled')why.push('“'+ngTitleOf(t,row)+'” is Cancelled: it has no Notion counterpart, so its status is not synced');return null}v=w}
+    else if(m.f.k==='priority'&&v)v=ngPrioMap(t)[v]||v;
+    else if(m.f.k==='progress'&&ty==='number'&&(c.fmt||{})[name]==='percent'&&v!==''&&v!=null)v=(+v)/100;
+    else if(m.f.k==='planned_finish'&&ty==='date'&&v)return {date:{start:String(v).slice(0,10),end:String(v).slice(0,10)}};
+    else if(ty==='select'&&/^ai_/.test(m.f.k))return null}
   const rt=s=>{s=String(s);const a=[];for(let i=0;i<s.length&&a.length<100;i+=2000)a.push({type:'text',text:{content:s.slice(i,i+2000)}});return a};
   if(ty==='title')return {title:rt(v==null?'':v)};
   if(ty==='rich_text')return {rich_text:v==null||v===''?[]:rt(v)};
@@ -23628,7 +23730,8 @@ function ngWrite(t,m,row,why){const c=ngCfg(t),v=row[m.f.k],ty=m.ty,name=m.p;
     return {relation:[{id:tg.notion_page_id}]}}
   return null}
 function ngProps(t,row,why){const mp=ngMap(t),sc=ngCfg(t).schema,out={};
-  mp.filter(m=>m.dir!=='in').forEach(m=>{const w=ngWrite(t,m,row,why);if(w)out[m.p]=w});
+  mp.filter(m=>m.dir!=='in').forEach(m=>{const w=ngWrite(t,m,row,why);if(!w)return;
+    if(w.date&&out[m.p]&&out[m.p].date){const a=out[m.p].date;out[m.p]={date:m.f.k==='planned_finish'?{start:a.start,end:w.date.start}:{start:w.date.start,end:a.end||a.start}}}else out[m.p]=w});
   const ip=ngIdProp(t,sc);if(ip)out[ip]={rich_text:[{type:'text',text:{content:String(row.id)}}]};
   const op=ngFind(sc,['owner']);if(op&&sc[op]==='rich_text')out[op]={rich_text:[{type:'text',text:{content:String(row.owner||'')}}]};
   const ls=ngFind(sc,['Last Sync']);if(ls&&sc[ls]==='date')out[ls]={date:{start:new Date().toISOString()}};
@@ -23648,13 +23751,14 @@ async function ngCheck(t){const N=S.ng,c=ngCfg(t);N.busy='chk:'+t;N.err='';cdRef
     const ds=list.length===1?nId(list[0].id):(c.ds&&list.some(x=>nId(x.id)===nId(c.ds))?nId(c.ds):nId(list[0].id));
     const d=await ngCall('GET','/v1/data_sources/'+ds),props=d.properties||{};
     const schema={},opts={};Object.entries(props).forEach(([k,p])=>{schema[k]=p.type;if(['select','status','multi_select'].includes(p.type))opts[k]=((p[p.type]||{}).options||[]).map(o=>({name:o.name}))});
-    await ngSave(t,{ds,schema,opts,checkedAt:new Date().toISOString()});
+    const fmt={};Object.entries(props).forEach(([k,p])=>{if(p.type==='number')fmt[k]=(p.number||{}).format||'number'});
+    await ngSave(t,Object.assign({ds,schema,opts,fmt,checkedAt:new Date().toISOString()},NGX_T.includes(t)&&!ngCfg(t).maps?{maps:ngSuggestX(t,schema)}:{}));
     const mp=ngMap(t)||[],fl=ngFields(t),miss=fl.filter(f=>!mp.some(m=>m.f.k===f.k));
     r.steps.push({ok:!!ngTitleProp(schema),t:ngTitleProp(schema)?'Title property: '+ngTitleProp(schema):'No title property found.'});
-    r.steps.push({ok:!!ngIdProp(t,schema),t:ngIdProp(t,schema)?'Matching key: '+ngIdProp(t,schema):'No “'+(((NG_NAME[t]||{}).__id)||'id')+'” text property: rows cannot be matched. Add it as a Text property.'});
+    r.steps.push({ok:!!ngIdProp(t,schema)||t==='activities',warn:t==='activities'&&!ngIdProp(t,schema),t:ngIdProp(t,schema)?'Matching key: '+ngIdProp(t,schema):'No “'+(((NG_NAME[t]||{}).__id)||'id')+'” text property: rows cannot be matched. Add it as a Text property.'});
     r.steps.push({ok:true,t:`${mp.length} of ${fl.length} fields match a Notion property.`});
     if(miss.length)r.steps.push({ok:false,warn:true,t:'Not matched (skipped, nothing is lost): '+miss.map(f=>f.l||f.k).join(', ')});
-    r.ok=!!ngTitleProp(schema)&&!!ngIdProp(t,schema)}
+    r.ok=!!ngTitleProp(schema)&&(!!ngIdProp(t,schema)||t==='activities')}
   catch(e){r.steps.push({ok:false,t:nFriendly?nFriendly(e,'the database'):(e.message||String(e))})}
   N.chk[t]=r;N.busy='';cdRefresh()}
 async function ngQuery(t,filter,max){const c=ngCfg(t),out=[];let cur;
@@ -23663,56 +23767,69 @@ async function ngQuery(t,filter,max){const c=ngCfg(t),out=[];let cur;
   return out}
 const ngRows=t=>(D()[t]||[]).filter(r=>r.share_with_notion===true);
 const ngStamp=()=>new Date(Date.now()+5000).toISOString();
-const ngReady=t=>{const c=ngCfg(t),k=S.ng.chk[t];return !!(c.schema&&ngTitleProp(c.schema)&&ngIdProp(t,c.schema))};
+const ngReady=t=>{const c=ngCfg(t);return !!(c.schema&&ngTitleProp(c.schema)&&(ngIdProp(t,c.schema)||t==='activities')&&(!NGX_T.includes(t)||(c.maps&&Object.keys(c.maps).length)))};
 const ngEqual=(a,b)=>String(a==null?'':a)===String(b==null?'':b);
 /* ---- Preview ---- */
 async function ngPlan(ts){const N=S.ng;N.busy='plan';N.err='';N.res='';N.plan=null;cdRefresh();
-  const pl={push:[],pull:[],conflicts:[],skip:[],blocked:[],tables:ts||NG_T,scope:ts&&ts.length===1?ts[0]:'all'};
+  const pl={push:[],pull:[],link:[],conflicts:[],skip:[],review:[],blocked:[],tables:ts||NG_T,scope:ts&&ts.length===1?ts[0]:'all'};
   try{for(const t of (ts||NG_T)){const rows=ngRows(t);if(!rows.length&&!ngReady(t))continue;
       if(!ngReady(t)){if(rows.length)pl.blocked.push(`${MOD[t].many}: ${rows.length} marked, but the Notion database is not connected or checked yet.`);continue}
-      const c=ngCfg(t),mp=ngMap(t),ip=ngIdProp(t,c.schema);
-      const since=c.lastPull?{timestamp:'last_edited_time',last_edited_time:{on_or_after:c.lastPull}}:null;
-      const pages=await ngQuery(t,since,5),byId={};
-      for(const pg of pages){const v=(pg.properties||{})[ip];const id=ngTxt(v&&v.rich_text).trim();if(id)byId[id]=pg}
-      for(const r of rows){const pg=byId[r.id],why=[];
-        const props=ngProps(t,r,why);
+      const c=ngCfg(t),mp=ngMap(t),ip=ngIdProp(t,c.schema),X=NGX_T.includes(t);
+      if(X&&!mp.some(m=>m.f.k===MOD[t].main&&m.dir!=='in')){pl.blocked.push(`${MOD[t].many}: map the title to the Notion title property so pages can be created.`);continue}
+      const needAll=X&&rows.some(r=>!r.notion_page_id);
+      const since=!needAll&&c.lastPull?{timestamp:'last_edited_time',last_edited_time:{on_or_after:c.lastPull}}:null;
+      const pages=await ngQuery(t,since,6),byId={},linked=X?ngLinkedPages():null,tp=X?(mp.find(m=>m.f.k===MOD[t].main)||{}).p:'';
+      for(const pg of pages){const v=ip?(pg.properties||{})[ip]:null;const id=ngTxt(v&&v.rich_text).trim().toLowerCase();if(id)byId[id]=pg}
+      const byPg={};pages.forEach(g=>{byPg[String(g.id).replace(/-/g,'')]=g});
+      for(const r of rows){const pg=byId[String(r.id).toLowerCase()]||(r.notion_page_id?byPg[String(r.notion_page_id).replace(/-/g,'')]:null),why=[];
+        if(X){const ck=ngAreaCheck(t,r);if(!ck.ok){pl.skip.push({t,r,why:ck.why,code:ck.code});continue}}
+        const props=ngProps(t,r,why);if(X)why.forEach(w=>pl.review.push(w));
         const changedHere=!r.notion_synced_at||String(r.updated_at||'')>String(r.notion_synced_at);
         if(!r.notion_page_id){
-          let hit=pg;if(!hit){const f=await ngQuery(t,{property:ip,rich_text:{equals:String(r.id)}},1);hit=f[0]}
+          let hit=pg;if(!hit&&ip){const f=await ngQuery(t,{property:ip,rich_text:{equals:String(r.id)}},1);hit=f[0]}
+          if(!hit&&X&&tp){const nt=ngN(ngTitleOf(t,r)),cands=pages.filter(g=>!linked.has(String(g.id).replace(/-/g,''))&&ngN(ngTxt(((g.properties||{})[tp]||{}).title))===nt),dec=(N.decisions||{})[r.id];
+            if(cands.length&&!dec){pl.link.push({t,r,cands:cands.map(x=>x.id),props,why});continue}
+            if(dec&&dec!=='new'){pl.link.push({t,r,cands:[dec],props,why,approved:true});continue}}
           pl.push.push({t,r,op:hit?'update':'create',page:hit?hit.id:null,props,why});continue}
         if(pg&&String(pg.last_edited_time||'')>String(r.notion_synced_at||'')){
-          const diff=[];mp.filter(m=>m.dir!=='out').forEach(m=>{const nv=ngRead(pg.properties,m);if(nv===undefined)return;const pv=r[m.f.k];
+          const diff=[];const ctx={t,row:r,title:ngTitleOf(t,r),rev:pl.review};
+          mp.filter(m=>m.dir!=='out').forEach(m=>{const nv=ngRead(pg.properties,m,ctx);if(nv===undefined)return;const pv=r[m.f.k];
+            if(X&&t==='activities'&&m.f.k==='status'&&nv==='Completed'&&pv!=='Completed'){pl.review.push('“'+ctx.title+'”: Notion says “'+(ngStatMap(t).Completed||'Done')+'”. Polaris One does not close an item from Notion by itself (evidence and sub-items must be checked): set Completed here if it is really done');return}
             if(m.f.t==='number'||m.f.t==='range'){if(!(nv==null&&(pv==null||pv===''))&&+nv!==+pv)diff.push({m,to:nv,from:pv})}
             else if(m.f.t==='select'||m.f.t==='nsel'){const o=(typeof opts_of==='function'?null:null);if(!ngEqual(nv,pv)&&!(nv&&pv&&ngN(nv)===ngN(pv)))diff.push({m,to:nv,from:pv})}
             else if(!ngEqual(nv,pv))diff.push({m,to:nv,from:pv})});
-          if(diff.length&&changedHere&&mp.some(m=>m.dir==='both'&&diff.some(d=>d.m===m))){pl.conflicts.push({t,r,d:diff.find(d=>d.m.dir==='both')});continue}
+          if(diff.length&&changedHere&&mp.some(m=>m.dir==='both'&&!m.der&&diff.some(d=>d.m===m))){pl.conflicts.push({t,r,d:diff.find(d=>d.m.dir==='both'&&!d.m.der)});continue}
           if(diff.length){pl.pull.push({t,r,diff,page:pg.id});}
           if(changedHere){pl.push.push({t,r,op:'update',page:r.notion_page_id,props,why})}
           continue}
         if(changedHere)pl.push.push({t,r,op:'update',page:r.notion_page_id,props,why})}}
-    N.plan=pl}
+    pl.review=[...new Set(pl.review)];N.plan=pl}
   catch(e){N.err=nFriendly?nFriendly(e,'Notion'):(e.message||String(e))}
   N.busy='';cdRefresh()}
 /* ---- Run ---- */
-function ngCoerce(m,to){const f=m.f;if(f.t==='number'||f.t==='range')return to==null?null:+to;if(f.t==='check')return !!to;
+function ngCoerce(m,to){const f=m.f;if(f.t==='area')return to;if(f.t==='number'||f.t==='range')return to==null?null:+to;if(f.t==='check')return !!to;
   if(f.t==='select'||f.t==='nsel'){const o=(OPT[f.opts]||f.opts);const list=Array.isArray(o)?o:null;if(to==null)return null;if(list){const h=list.find(x=>ngN(x)===ngN(to));return h===undefined?undefined:h}return to}
   return to==null?null:to}
 async function ngRun(limit){const N=S.ng,pl=N.plan;if(!pl||N.busy)return;N.busy='run';N.err='';cdRefresh();
   let sent=0,got=0,fail=[];const items=limit?pl.push.slice(0,limit):pl.push;
-  try{for(const x of items){try{const c=ngCfg(x.t);let page=x.page;
+  let linkedN=0;
+  try{if(!limit)for(const x of (pl.link||[]).filter(y=>y.approved)){try{const row=await DB.update(x.t,x.r.id,{notion_page_id:x.cands[0],notion_synced_at:ngStamp()});replaceRow(x.t,row);linkedN++}catch(e){fail.push(`${MOD[x.t].many} “${ngTitleOf(x.t,x.r)}”: ${e.message||e}`)}}
+    for(const x of items){try{const c=ngCfg(x.t);let page=x.page;
         if(x.op==='create'&&!page){const r=await ngCall('POST','/v1/pages',{parent:{type:'data_source_id',data_source_id:nId(c.ds)},properties:x.props});page=r.id}
         else await ngCall('PATCH','/v1/pages/'+page,{properties:x.props});
-        const row=await DB.update(x.t,x.r.id,{notion_page_id:page,notion_synced_at:ngStamp()});replaceRow(x.t,row);sent++}
+        const row=await DB.update(x.t,x.r.id,{notion_page_id:page,notion_synced_at:ngStamp()});replaceRow(x.t,row);sent++;if(!S.ng.fake&&NGX_T.includes(x.t))await nSleep(350)}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
     if(!limit)for(const x of pl.pull){try{const patch={};x.diff.forEach(d=>{const v=ngCoerce(d.m,d.to);if(v!==undefined)patch[d.m.f.k]=v});
         if(Object.keys(patch).length){patch.notion_synced_at=ngStamp();const row=await DB.update(x.t,x.r.id,patch);replaceRow(x.t,row);got++}}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
     if(!limit)for(const t of (pl.tables||NG_T)){if(ngReady(t))await ngSave(t,{lastPull:new Date(Date.now()-120000).toISOString()})}
-    N.res=`${sent} sent to Notion, ${got} brought back${fail.length?`, ${fail.length} failed: `+fail.slice(0,3).join(' · '):''}.`;N.plan=null}
+    N.res=`${sent} sent to Notion, ${got} brought back${linkedN?`, ${linkedN} linked`:''}${fail.length?`, ${fail.length} failed: `+fail.slice(0,3).join(' · '):''}.`;N.plan=null}
   catch(e){N.err=e.message||String(e)}
   N.busy='';cdRefresh()}
 /* ---- screens ---- */
 const ngIdOf=s=>{const m=String(s||'').match(/[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);return m?nId(m[0]):''};
+/* r56: Activities and Daily Actions join the list only when this switch is on (stage gate) */
+function ngEnableX(on){NGX_T.forEach(t=>{const i=NG_T.indexOf(t);if(on&&i<0&&MOD[t])NG_T.push(t);if(!on&&i>=0)NG_T.splice(i,1)})}
 ACT.ngsavedb=async el=>{const t=el.dataset.t,v=(document.getElementById('ngdb_'+t)||{}).value,id=ngIdOf(v);
   if(!id){S.ng.err='That is not a Notion database link or id.';cdRefresh();return}
   S.ng.err='';await ngSave(t,{db:id,ds:'',schema:null,opts:null,lastPull:null});delete S.ng.chk[t];cdRefresh()};
@@ -23741,7 +23858,7 @@ async function ngAutoRun(){const N=S.ng,a=ngAuto();if(!a.on||N.busy||N.autoPause
   const pl=N.plan;if(!pl||pl.blocked.length){N.autoMsg=pl&&pl.blocked[0]||'';cdRefresh();return}
   if(!pl.push.length&&!pl.pull.length){N.plan=null;N.autoMsg='Nothing to sync.';cdRefresh();return}
   await ngRun();N.autoFail=0;N.autoMsg=N.res;cdRefresh()}
-if(!window._ngTimer)window._ngTimer=setInterval(()=>{try{const a=ngAuto();if(a.on&&Date.now()-(S.ng.autoAt||S.ng.autoOn||0)>=a.min*60000)ngAutoRun()}catch(e){}},30000);
+if(!window._ngTimer)window._ngTimer=setInterval(()=>{try{const a=ngAuto();if(a.on&&Date.now()-(S.ng.autoAt||S.ng.autoOn||0)>=a.min*60000)Promise.resolve(ngAutoRun()).catch(e=>warn('Notion auto sync',e))}catch(e){warn('Notion auto timer',e)}},30000);
 function ngSyncBody(T){const N=S.ng,a=ngAuto(),pl=N.plan&&(!T||N.plan.scope===T)?N.plan:null,TT=T?[T]:NG_T,n=TT.reduce((s,t)=>s+ngRows(t).length,0);
   const list=(arr,fn)=>arr.length?`<div class="sm" style="max-height:240px;overflow:auto" tabindex="0">${arr.slice(0,60).map(fn).join('')}${arr.length>60?`<p class="mut">+${arr.length-60} more</p>`:''}</div>`:'';
   const nm=x=>esc(x.r[MOD[x.t].main]||x.r.id);
@@ -23785,7 +23902,7 @@ connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,b
   const holHtml=()=>cut(VIEWS['settings/location'](),'<div class="card"><div class="ch"><h3>Indonesian public holidays').replace(/<button class="btn" data-act="go" data-p="integrations" data-s="hub">Open Connections<\/button>/,'');
   const olCan=()=>(D().meetings||[]).filter(m=>String(m.ext_key||'').indexOf('auto:ics:')===0&&m.status==='Cancelled'&&m.meeting_date>=todayS());
   const olRestoreBox=()=>{const n=olCan().length;return n?`<div class="card mt"><div class="ch"><h3>Meetings marked Cancelled by sync</h3><span class="badge b-amber">${n}</span></div><p class="sm ink2">These came from Outlook and were marked Cancelled because they were missing from the calendar link at sync time, for example after the link was changed. If they will still take place, restore them.</p><div class="row"><button class="btn p" data-act="olrestore">Restore ${n} meeting${n===1?'':'s'} to Planned</button></div></div>`:''};
-  ACT.olrestore=async()=>{const l=olCan();if(!l.length)return;if(!await ask('Restore meetings?',l.length+' meeting'+(l.length===1?'':'s')+' will be set back to Planned: '+l.slice(0,3).map(m=>m.title).join(', ')+(l.length>3?' …':''),'Restore'))return;
+  ACT.olrestore=async()=>{const l=olCan();if(!l.length)return;if(!await ask('Restore meetings?',l.length+' meeting'+(l.length===1?'':'s')+' will be set back to Planned: '+l.slice(0,3).map(m=>esc(m.title)).join(', ')+(l.length>3?' …':''),'Restore'))return;
     for(const m of l){const r=await DB.update('meetings',m.id,{status:'Planned'});replaceRow('meetings',r)}toast(l.length+' restored');cdRefresh()};
   const later=f=>{try{Promise.resolve(f()).then(()=>cdRefresh(),()=>{})}catch(e){}};
   const yr=()=>new Date().getFullYear();
