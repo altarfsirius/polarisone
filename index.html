@@ -5220,7 +5220,7 @@ function dhuhaWindow(day){const p=typeof prayerFor==='function'?prayerFor(day):n
 DB.extKeysExisting=async function(keys){
   if(this.mode!=='supabase'||!this.sb||!keys||!keys.length)return new Set();
   try{const {data,error}=await this.sb.from('daily_actions').select('ext_key').in('ext_key',keys);if(error)throw error;return new Set((data||[]).map(r=>r.ext_key))}
-  catch(e){console.warn('extKeysExisting',e);return new Set()}};
+  catch(e){warn('extKeysExisting',e);return null}};   /* r66: null = the server could not be asked, so nothing may be created now */
 async function autoBreaks(){
   const c=workCfg();if(!c.breaks)return 0;
   const sl=workSlots(),seen=seenSet(),t=todayS(),rows=[],keys=[],yrs=new Set();
@@ -5236,7 +5236,9 @@ async function autoBreaks(){
       if((D().daily_actions||[]).some(x=>x.ext_key==='auto:brk:'+d+':'+k))return;
       rows.push({action_date:d,title,time_cat:'Break',priority:'Low',start_time:hhmm(b[0]),end_time:hhmm(b[1]),planned_min:sl.L,status:'Not Started',progress:0,pomodoros:0,ext_key:'auto:brk:'+d+':'+k})})}
   /* r37: another device or tab may have created the same break a moment ago: ask the server and skip those */
-  const have=rows.length?await DB.extKeysExisting(rows.map(r=>r.ext_key)):new Set(),fresh=rows.filter(r=>!have.has(r.ext_key));
+  const have=rows.length?await DB.extKeysExisting(rows.map(r=>r.ext_key)):new Set();
+  if(have===null)return 0;   /* r66: a failed check used to count as “none exist”, which made the same break twice from two devices */
+  const fresh=rows.filter(r=>!have.has(r.ext_key));
   if(fresh.length){const ins=await DB.insertMany('daily_actions',fresh);D().daily_actions=(D().daily_actions||[]).concat(ins)}
   await seenAdd(keys);return fresh.length}
 AUTO_TASKS.push({id:'brk',need:'daily_actions',on:()=>workCfg().breaks,run:autoBreaks,txt:n=>n+' break'+(n>1?'s':'')});
