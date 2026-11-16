@@ -2082,7 +2082,7 @@ VIEWS['execute/daily']=()=>{
   const head=`<div class="toolbar noprint"><button class="btn" data-act="dayshift" data-n="-1" aria-label="Previous day">${ic('cl')}</button><b style="min-width:170px;text-align:center">${fmtDay(day)}${day===t?' · Today':''}</b><button class="btn" data-act="dayshift" data-n="1" aria-label="Next day">${ic('cr')}</button>${day!==t?`<button class="btn" data-act="dayshift" data-n="0">Today</button>`:''}<input class="in" type="date" value="${day}" data-change="daypick" style="max-width:160px" aria-label="Pick a date">${dayOrdSel()}<span class="sp"></span>${canDo('daily_actions','create')==='deny'?'':`<button class="btn" data-act="actpick" data-mode="reuse" data-date="${day}">${ic('refresh',15)} Reuse an action</button>`}${backBtn('daily_actions')}<button class="btn hl" data-act="dayguide">${ic('book')} Activity guide</button><button class="btn p" data-act="new" data-k="daily_actions" data-add='${esc(JSON.stringify({action_date:day}))}'>${ic('plus')} Add action</button></div>`;
   const nd=nudges(real,day),nudgeHtml=nd.length?`<div class="g g3 g1m" style="margin-bottom:14px">${nd.slice(0,3).map(n=>`<div class="card flat" style="display:flex;gap:10px;padding:12px;background:var(--soft)"><span style="color:var(--brand)">${ic(n[2])}</span><div><b>${esc(n[0])}</b><div class="sm ink2">${esc(n[1])}</div></div></div>`).join('')}</div>`:'';
   const showDone=!!S.ui.showDone,vis=showDone?rows:rows.filter(x=>!isClosed(x)),nFin=rows.length-rows.filter(x=>!isClosed(x)).length;
-  const list=vis.length?`<div class="list">${vis.map(x=>`<div class="item" style="gap:12px"><input type="checkbox" style="width:20px;height:20px;accent-color:var(--brand)" data-act="toggleDone" data-id="${x.id}" ${x.status==='Completed'?'checked':''} aria-label="Done"><div style="flex:1;min-width:0" data-act="open" data-k="daily_actions" data-id="${x.id}"><div class="t" style="${x.status==='Completed'?'text-decoration:line-through;color:var(--mut)':''}">${esc(x.title)}</div>${x.description?`<div class="sm ink2" style="white-space:normal">${esc(trunc(x.description,140))}</div>`:''}<div class="sm mut">${x.start_time?tm(x.start_time)+(x.end_time?'–'+tm(x.end_time):'')+' · ':''}${esc(x.time_cat||'')}${x.activity_id?' · '+esc(trunc(refLabel('activities',x.activity_id),30)):''}${x.pomodoros?' · '+x.pomodoros+' focus':''}</div>${isSoftAction(x)?breakChips(x):''}</div>${isBack('daily_actions',x)?badge('Back-dated','slate'):''}${x.status!=='Completed'&&x.status!=='Not Started'?badge(x.status):''}${isSoftAction(x)?'':`<button class="iconbtn" style="border:0;color:${x.is_top3?'var(--saf,#F0A202)':'var(--mut)'}" data-act="toggleTop" data-id="${x.id}" aria-label="Top 3" title="Top 3">${ic('star',18)}</button>`}</div>`).join('')}</div>`:rows.length?`<div class="empty-mini">Everything on this day is done. Well done.</div>`:`<div class="empty"><b>No actions for this day</b>Plan the day: pick 3 priorities, then block time for them.<br><button class="btn p" data-act="new" data-k="daily_actions" data-add='${esc(JSON.stringify({action_date:day}))}'>${ic('plus')} Add first action</button></div>`;
+  const list=vis.length?`<div class="list">${vis.map(x=>`<div class="item" style="gap:12px"><input type="checkbox" style="width:20px;height:20px;accent-color:var(--brand)" data-act="toggleDone" data-id="${x.id}" ${x.status==='Completed'?'checked':''} aria-label="Done"><div style="flex:1;min-width:0" data-act="open" data-k="daily_actions" data-id="${x.id}"><div class="t" style="${x.status==='Completed'?'text-decoration:line-through;color:var(--mut)':''}">${esc(x.title)}</div>${x.description?`<div class="sm ink2" style="white-space:normal">${esc(trunc(x.description,140))}</div>`:''}<div class="sm mut">${x.start_time?tm(x.start_time)+(x.end_time?'–'+tm(x.end_time):'')+' · ':''}${esc(x.time_cat||'')}${x.activity_id?' · '+esc(trunc(refLabel('activities',x.activity_id),30)):''}${x.pomodoros?' · '+x.pomodoros+' focus':''}</div>${isSoftAction(x)?breakChips(x):''}</div>${isBack('daily_actions',x)?badge('Back-dated','slate'):''}${+x.postpone_count>0&&x.status!=='Completed'?`<span title="${esc(x.postpone_reason||'')}">${badge('Postponed '+x.postpone_count+'×','amber')}</span>`:''}${x.status!=='Completed'&&x.status!=='Not Started'?badge(x.status):''}${isSoftAction(x)?'':`<button class="iconbtn" style="border:0;color:${x.is_top3?'var(--saf,#F0A202)':'var(--mut)'}" data-act="toggleTop" data-id="${x.id}" aria-label="Top 3" title="Top 3">${ic('star',18)}</button>`}</div>`).join('')}</div>`:rows.length?`<div class="empty-mini">Everything on this day is done. Well done.</div>`:`<div class="empty"><b>No actions for this day</b>Plan the day: pick 3 priorities, then block time for them.<br><button class="btn p" data-act="new" data-k="daily_actions" data-add='${esc(JSON.stringify({action_date:day}))}'>${ic('plus')} Add first action</button></div>`;
   const left=`<div class="card"><div class="ch"><h3>Plan · Do · Check</h3><span class="sp"></span><span class="badge b-green">${done}/${real.length} done</span>${nFin?`<button class="btn s noprint" data-act="togdone" aria-pressed="${showDone}">${showDone?'Hide':'Show'} completed (${nFin})</button>`:''}</div>${list}</div>${typeof icsDayList==='function'?icsDayList(day):''}<div class="card mt"><div class="ch"><h3>Time blocks</h3><span class="sm mut">05:00 – 23:00</span></div>${vis.some(x=>x.start_time)||(typeof icsDayBlocks==='function'&&icsDayBlocks(day).length)||(D().meetings||[]).some(m=>m.meeting_date===day&&m.status!=='Cancelled'&&/\d{1,2}:\d{2}/.test(String(m.start_time||'')))?timeBlocks(vis):`<div class="empty-mini">${rows.some(x=>x.start_time)?'Every timed action is done.':'Add a start and end time to an action to see it here.'}</div>`}</div>`;
   const top3=rows.filter(x=>x.is_top3&&(showDone||!isClosed(x))).slice(0,3),top3all=rows.filter(x=>x.is_top3).length;
   const cats={};rows.forEach(x=>{cats[x.time_cat||'Other']=(cats[x.time_cat||'Other']||0)+dMin(x)});const used=sum(Object.values(cats));
@@ -2105,9 +2105,10 @@ ACT.toggleDone=async el=>{const x=byId('daily_actions',el.dataset.id);await patc
 ACT.toggleTop=async el=>{const x=byId('daily_actions',el.dataset.id);if(!x.is_top3&&(D().daily_actions||[]).filter(r=>r.action_date===x.action_date&&r.is_top3).length>=3)return toast('Keep it to 3 — unstar one first',1);await patchRow('daily_actions',x.id,{is_top3:!x.is_top3});renderView()};
 ACT.carry=async()=>{const day=S.ui.day,tom=addD(day,1),un=(D().daily_actions||[]).filter(x=>x.action_date===day&&!isLight(x)&&!['Completed','Cancelled'].includes(x.status));
   if(!un.length)return toast('Everything is done — nothing to carry over.');
-  if(!await ask('Carry over to '+fmtDay(tom)+'?',`${un.length} unfinished action${un.length>1?'s':''} will be copied to tomorrow.`,'Carry over'))return;
-  for(const x of un){const n=Object.assign({},x);['id','owner','created_at','updated_at','actual_min','result','energy'].forEach(k=>delete n[k]);n.action_date=tom;n.status='Not Started';n.progress=0;n.pomodoros=0;await saveRow('daily_actions',n)}
-  toast(un.length+' action(s) planned for tomorrow');renderView()};
+  if(!await ask('Carry over to '+fmtDay(tom)+'?',`${un.length} unfinished action${un.length>1?'s':''} will move to tomorrow, with their history. A window asks why they were not done.`,'Carry over'))return;
+  S.t3.bulk=[];try{for(const x of un){await patchRow('daily_actions',x.id,{action_date:tom,is_top3:false,start_time:null,end_time:null})}}
+  finally{const ids=S.t3.bulk.filter((v,i,a)=>a.indexOf(v)===i);S.t3.bulk=null;if(ids.length){S.t3.q.push({id:ids[0],ids,why:'Carried over to '+fmtD(tom)});setTimeout(t3Next,450)}}
+  toast(un.length+' action(s) moved to tomorrow');renderView()};
 ACT.dayreview=()=>{const day=S.ui.day,rows=(D().daily_actions||[]).filter(x=>x.action_date===day&&!isLight(x)),done=rows.filter(x=>x.status==='Completed');
   openForm('reviews',null,{review_type:'Daily',period_start:day,period_end:day,score:rows.length?Math.round(done.length/rows.length*100):70,wins:done.map(x=>'• '+x.title).join('\n'),gaps:rows.filter(x=>x.blocker).map(x=>'• '+x.blocker).join('\n'),insights:rows.filter(x=>x.lesson_learned).map(x=>'• '+x.lesson_learned).join('\n'),next_actions:rows.filter(x=>x.next_action).map(x=>'• '+x.next_action).join('\n')})};
 EXTRA.daily_actions=x=>{const a=x.activity_id?byId('activities',x.activity_id):null;return a?`<p class="sm" style="margin-top:12px">Linked activity: <a href="#" data-act="open" data-k="activities" data-id="${a.id}">${esc(labelOf('activities',a))}</a></p>`:''};
@@ -21607,6 +21608,9 @@ RELEASE_NOTES.unshift({rev:31,date:'2026-11-16',groups:[
  {t:'Calendar and Connections',items:[
   ['Calendar: next 7 days','The Outlook display card shows the next 7 days. Meetings that sync wrongly marked Cancelled can be restored in one click.'],
   ['Email drafts','Mail is now a list of email drafts written from Daily Actions (Notion AI writes the draft). Google sign-in and the Gmail and Outlook email connections are removed.']]},
+ {t:'Daily Actions',items:[
+  ['Meetings move your actions','When a meeting or calendar event takes the time of a timed action, the action moves to the first free slot after the event ends. The reason is written on the action. If the day has no room left it moves to the next working day.'],
+  ['A queue that does not forget','Critical, starred and Urgent actions go first; everything else waits in the order it was created (first in, first out). Each action shows how many times it was postponed and why, and Carry over now moves the same action instead of copying it.']]},
  {t:'Quality',items:[
   ['Problems are no longer hidden','Settings → Data & backup shows what failed quietly in this session. Two dialogs that showed names and meeting titles without escaping now escape them.']]}
 ]});
@@ -21882,6 +21886,8 @@ const T3_PRI={Critical:0,High:1,Medium:2,Low:3};
 S.t3=S.t3||{q:[],busy:false,last:null};
 const t3On=()=>prefs().top3auto!==false&&!window.__noT3;
 const t3Rank=x=>T3_PRI[x.priority]!=null?T3_PRI[x.priority]:2;
+/* the front of the queue: Critical, starred (Highlight) or its Activity marked Urgent. Everything else waits in order of age. */
+const t3Front=x=>{const a=x.activity_id?byId('activities',x.activity_id):null;return (x.priority==='Critical'||x.is_top3||(a&&a.urgent))?0:1};
 const t3Soft=x=>isLight(x)||x.time_cat==='Break'||x.time_cat==='Ibadah'||String(x.ext_key||'').indexOf('auto:')===0;
 /* a working day: Monday to Friday (your work settings), no holiday of any kind, no full day of leave */
 function t3Workday(d){
@@ -21921,11 +21927,11 @@ function t3Take(free,dur){
 function t3Candidates(day){
   const act=id=>id?byId('activities',id):null;
   return (D().daily_actions||[]).filter(x=>x.action_date<=day&&!isClosed(x)&&x.status!=='On Hold'&&!t3Soft(x)).sort((a,b)=>{
-    const ar=t3Rank(a),br=t3Rank(b);if(ar!==br)return ar-br;
-    const as=a.is_top3?0:1,bs=b.is_top3?0:1;if(as!==bs)return as-bs;
+    const ar=t3Front(a),br=t3Front(b);if(ar!==br)return ar-br;
+    if(ar===0){const x=t3Rank(a),y=t3Rank(b);if(x!==y)return x-y}
+    const ca=String(a.created_at||a.action_date||''),cb=String(b.created_at||b.action_date||'');if(ca!==cb)return ca<cb?-1:1;   /* first in, first out */
     const af=(act(a.activity_id)||{}).planned_finish||'9999',bf=(act(b.activity_id)||{}).planned_finish||'9999';if(af!==bf)return af<bf?-1:1;
-    if(a.action_date!==b.action_date)return a.action_date<b.action_date?-1:1;
-    return String(a.created_at||'').localeCompare(String(b.created_at||''))})}
+    return String(a.id).localeCompare(String(b.id))})}
 const t3Backlog=day=>t3Candidates(day).filter(x=>!(x.action_date===day&&x.is_top3))
 /* a reason was already written for this action today */
 const t3Asked=(id,day)=>(D().time_logs||[]).some(l=>l.source==='Postponed'&&l.daily_action_id===id&&l.log_date===day);
@@ -21985,13 +21991,17 @@ ACT.t3save=async el=>{
   try{
     const ids=(S.t3.q[0]&&S.t3.q[0].ids)||[el.dataset.id];
     for(const aid of ids){const y=byId('daily_actions',aid);if(!y||t3Asked(aid,todayS()))continue;
-      await saveRow('time_logs',{activity_id:y.activity_id||null,daily_action_id:aid,log_date:todayS(),hours:0,source:'Postponed',note:(trunc(y.title,80)+' · '+reason+(note.trim()?': '+note.trim():'')).slice(0,1000)})}
+      await saveRow('time_logs',{activity_id:y.activity_id||null,daily_action_id:aid,log_date:todayS(),hours:0,source:'Postponed',note:(trunc(y.title,80)+' · '+reason+(note.trim()?': '+note.trim():'')).slice(0,1000)});
+      await t3Note(aid,reason+(note.trim()?': '+note.trim():''))}
     let moved=0;
     for(const aid of ids){const y=byId('daily_actions',aid);if(!y||isClosed(y)||y.status==='On Hold'||y.status==='Cancelled'||t3Soft(y)||!y.action_date||y.action_date>todayS())continue;
       /* an action you already moved to a later date keeps the date you chose; one that is still today or late goes to the next free day */
       const to=t3PostponeTo(y,todayS());if(to!==y.action_date){await patchRow('daily_actions',aid,{action_date:to,is_top3:false,start_time:null,end_time:null});moved++}}
     S.t3.q.shift();S.t3.busy=false;finishModal();toast(moved?'Reason saved. '+(moved===1?'The action moved':moved+' actions moved')+' to the next free day':'Reason saved in the Time log');renderView();setTimeout(t3Next,300)}
   catch(e){el.disabled=false;if(err)err.textContent='Not saved: '+((e&&e.message)||e)}};
+/* append a dated line to the reasons written on the action itself (the newest 8 lines are kept) */
+async function t3Note(id,text){const y=byId('daily_actions',id);if(!y)return;const line=fmtS(todayS())+' · '+String(text).slice(0,200),all=((y.postpone_reason?y.postpone_reason+'\n':'')+line).split('\n').slice(-8).join('\n');
+  try{await patchRow('daily_actions',id,{postpone_reason:all})}catch(e){warn('postpone reason',e)}}
 const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('daily_actions',id);if(!x||t3Soft(x)||t3Asked(id,todayS()))return;if(!S.t3.q.some(q=>q.id===id))S.t3.q.push({id,why});setTimeout(t3Next,450)};
 /* postponed: moved to a later date, put on hold, or cancelled */
 (function(){
@@ -22002,7 +22012,7 @@ const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('d
     try{if(was&&row&&!S.t3.silent&&!was.closed){
       if(row.status==='On Hold'&&was.status!=='On Hold')t3Defer(id,'Put on hold');
       else if(row.status==='Cancelled')t3Defer(id,'Cancelled');
-      else if(row.action_date&&was.date&&row.action_date>was.date&&row.status!=='Completed')t3Defer(id,'Moved from '+fmtD(was.date)+' to '+fmtD(row.action_date))}}catch(e){console.warn(e)}
+      else if(row.action_date&&was.date&&row.action_date>was.date&&row.status!=='Completed'){t3Defer(id,'Moved from '+fmtD(was.date)+' to '+fmtD(row.action_date));try{await _p('daily_actions',id,{postpone_count:(+row.postpone_count||0)+1})}catch(e){warn('postpone count',e)}}}}catch(e){warn('postpone watch',e)}
     return row};
   saveRow=function(key,d,id,opts){return watch(_s,key,id,arguments)};
   patchRow=function(key,id,patch,opts){return watch(_p,key,id,arguments)}})();
@@ -22017,6 +22027,32 @@ const t3Defer=(id,why)=>{if(S.t3.bulk){S.t3.bulk.push(id);return}const x=byId('d
         const n=new Date(),cur=n.getHours()*60+n.getMinutes(),late=x.action_date<t||(x.end_time?mins(tm(x.end_time))<cur:cur>workSlots().e);
         if(late)t3Defer(id,x.action_date<t?'Not finished on '+fmtD(x.action_date):'Its planned time has passed')}}}catch(e){console.warn(e)}
     return r}})();
+
+/* ---------- a meeting or event takes the time of an action: move it after the event ends ---------- */
+const T3_BLOCKS=(day)=>{const out=[];
+  (D().meetings||[]).filter(m=>m.meeting_date===day&&m.status!=='Cancelled'&&/\d{1,2}:\d{2}/.test(String(m.start_time||''))).forEach(m=>{const s=mins(tm(m.start_time)),e=m.end_time&&mins(tm(m.end_time))>s?mins(tm(m.end_time)):s+60;out.push([s,e,m.title])});
+  if(typeof icsDayBlocks==='function')icsDayBlocks(day).filter(b=>b.busy!=='FREE').forEach(b=>out.push([b.s,b.e,b.title]));
+  return out.filter(b=>b[1]>b[0])};
+async function t3Reflow(day){
+  if(!t3Workday(day)||day<todayS())return 0;const blocks=T3_BLOCKS(day);if(!blocks.length)return 0;
+  let n=0;S.t3.silent=true;
+  try{const acts=(D().daily_actions||[]).filter(x=>x.action_date===day&&!isClosed(x)&&x.status!=='On Hold'&&x.status!=='In Progress'&&!t3Soft(x)&&x.start_time).sort((a,b)=>mins(tm(a.start_time))-mins(tm(b.start_time)));
+    for(const x of acts){
+      const dur=clamp(x.end_time&&mins(tm(x.end_time))>mins(tm(x.start_time))?mins(tm(x.end_time))-mins(tm(x.start_time)):(num(x.planned_min)||60),15,240),s=mins(tm(x.start_time)),e=s+dur;
+      const hit=blocks.filter(b=>s<b[1]&&e>b[0]).sort((a,b)=>b[1]-a[1])[0];if(!hit)continue;
+      const free=t3Free(day,x.id);let slot=null;
+      for(const f of free){const st=Math.max(f[0],hit[1]);if(f[1]-st>=dur){slot=[st,st+dur];break}}
+      const why='Moved by “'+trunc(hit[2],60)+'” ('+hhmm(hit[0])+'–'+hhmm(hit[1])+')';
+      if(slot){await patchRow('daily_actions',x.id,{start_time:hhmm(slot[0]),end_time:hhmm(slot[1]),planned_min:dur});await t3Note(x.id,why+': now '+hhmm(slot[0])+'–'+hhmm(slot[1]))}
+      else{const to=t3PostponeTo(x,day);await patchRow('daily_actions',x.id,{action_date:to,start_time:null,end_time:null,postpone_count:(+x.postpone_count||0)+1});await t3Note(x.id,why+': no free time left today, moved to '+fmtS(to))}
+      n++}
+  }catch(e){warn('move after event',e)}finally{S.t3.silent=false}
+  if(n)toast(n+' action'+(n>1?'s':'')+' moved after a meeting');
+  return n}
+(function(){const _s=saveRow;saveRow=async function(key,d,id,opts){const row=await _s.apply(this,arguments);
+  try{if(key==='meetings'&&row&&row.meeting_date>=todayS()&&row.meeting_date<=addD(todayS(),7)&&!S.t3.silent)setTimeout(()=>t3Reflow(row.meeting_date).then(()=>renderView()).catch(e=>warn('reflow',e)),400)}catch(e){warn('reflow hook',e)}
+  return row}})();
+AUTO_TASKS.push({id:'t3flow',need:'daily_actions',on:()=>t3On()&&!!S.profile,run:async()=>{let n=0;for(let i=0;i<=3;i++)n+=await t3Reflow(addD(todayS(),i));return n},txt:n=>n+' action(s) moved after a meeting'});
 /* ---------- the strip on One day ---------- */
 const t3Planned=day=>(D().daily_actions||[]).filter(x=>x.action_date===day&&x.status!=='Cancelled'&&!t3Soft(x)).length;
 function t3Strip(day){
@@ -22041,7 +22077,7 @@ ACT.t3replan=async()=>{
   try{const r=await t3Pick(t,true);toast(r.n?r.n+' action'+(r.n>1?'s':'')+' added to today\'s Top 3':'Nothing to add: the day already has 10 actions and 3 Top picks, or no open action is waiting.');renderView()}catch(e){toast('Not planned: '+((e&&e.message)||e),1)}};
 CHG.t3auto=async el=>{try{await setPrefs({top3auto:!!el.checked});toast(el.checked?'Top 3 will be picked automatically on working days':'Automatic Top 3 is off');renderView()}catch(e){toast('Not saved: '+((e&&e.message)||e),1)}};
 if(typeof putFaq==='function'){
-  putFaq('How are my Top 3 picked, and when are they not?','On every working day (Monday to Friday, not a public holiday, a joint leave or a day off you booked) the first time you open Polaris One it plans up to 10 open actions: Critical first, then High, Medium and Low, and the one that has waited longest first. The first 3 become your Top 3 and are starred. All are moved to today and placed one after another in the time that is not blocked by a meeting, an Outlook event, a prayer, lunch, a break or another timed action. It happens once a day: when you finish them early, new ones do not appear the same day. The rest wait their turn for the next working day. Switch it off, or plan again by hand, in the “Top 3 planner” strip on One day.');
+  putFaq('How are my Top 3 picked, and when are they not?','On every working day (Monday to Friday, not a public holiday, a joint leave or a day off you booked) the first time you open Polaris One it plans up to 10 open actions: Critical, starred and Urgent actions first, then everything else in the order it was created (first in, first out). The first 3 become your Top 3 and are starred. All are moved to today and placed one after another in the time that is not blocked by a meeting, an Outlook event, a prayer, lunch, a break or another timed action. It happens once a day: when you finish them early, new ones do not appear the same day. The rest wait their turn for the next working day. Switch it off, or plan again by hand, in the “Top 3 planner” strip on One day.');
   putFaq('Why does a window ask me for a reason?','When an action is postponed (moved to a later date, put on hold or cancelled), or you close a Top 3 that is late and not finished, Polaris One asks for the reason and writes it in the Time log with 0 hours. It is asked once a day for an action. The reasons build a picture of what really holds you up.')}
 
 /* several actions moved at once (“Move all to today”): one window for the whole group */
@@ -22728,6 +22764,12 @@ MOD.meetings.fields.push(
   F('mt_next_action','Next action (Notion AI)','textarea','',{ro:1,rows:4,sql:'text',wide:1}),
   F('mt_recommendation','Recommendation action (Notion AI)','textarea','',{ro:1,rows:4,sql:'text',wide:1}));
 COL_NEWER.meetings=(COL_NEWER.meetings||[]).concat(['mt_summary','mt_next_action','mt_recommendation']);
+/* r62: the postponing story lives on the action itself */
+MOD.daily_actions.fields.push(
+  F('_pp','Postponing','heading','Written by Polaris One when this action is moved: who or what took its time, and how many times it was postponed.'),
+  F('postpone_count','Postponed (times)','number','',{ro:1,sql:'integer'}),
+  F('postpone_reason','Reasons for postponing','textarea','',{ro:1,rows:4,sql:'text',wide:1}));
+COL_NEWER.daily_actions=(COL_NEWER.daily_actions||[]).concat(['postpone_count','postpone_reason']);
 Object.assign(NHINT,{email_to:/(email.?to|kepada|recipient|penerima)/i,ai_email_subject:/(email.?subject|subjek)/i,ai_email_body:/(email.?draft|draft.?email|email.?body)/i});
 NFIELDS.daily_actions.push(['email_to','Email to','text','out'],['ai_email_subject','Notion AI email subject','ai','in'],['ai_email_body','Notion AI email draft','ai','in']);
 (function(){const o=fieldHtml;fieldHtml=function(f,val,vals){
@@ -23824,6 +23866,67 @@ async function startApp(){
   clearInterval(S.syncTimer);setTimeout(()=>{runAutoSync('open');runAutomations();S.syncTimer=setInterval(()=>{runAutoSync('tick');runAutomations();if(typeof refreshAccessInfo==='function')refreshAccessInfo()},300000)},1500);
   if(S.profile._missing)toast('Profile row not found — run the SQL schema in Supabase.',1);
 }
+/* ===== r63 · a prayer ticked in Daily Action is ticked in Habits, and the other way round; reminder popup before each prayer ===== */
+S.pr=S.pr||{busy:false,shown:{}};
+const prHabit=k=>(D().habits||[]).find(h=>h.active!==false&&prayerOf(h.name)===k);
+const prLogOf=(h,d)=>(D().habit_logs||[]).find(l=>l.habit_id===h.id&&prayDay(l.log_date)===d&&l.done!==false);
+const prActs=(k,d)=>(D().daily_actions||[]).filter(x=>prayDay(x.action_date)===d&&prayerOf(x.title)===k&&x.status!=='Cancelled');
+async function prHabitFollow(row,done){
+  const k=prayerOf(row.title);if(!k||S.pr.busy)return;const d=prayDay(row.action_date),h=prHabit(k);if(!h)return;
+  S.pr.busy=true;
+  try{const ex=prLogOf(h,d);
+    if(done&&!ex)await saveRow('habit_logs',{habit_id:h.id,log_date:d,done:true});
+    else if(!done&&ex&&!prActs(k,d).some(x=>x.status==='Completed'))await removeRow('habit_logs',ex.id)}
+  catch(e){warn('prayer habit follow',e)}finally{S.pr.busy=false}}
+async function prActionFollow(habit,date,done){
+  const k=prayerOf(habit.name);if(!k||S.pr.busy)return;const d=prayDay(date);
+  S.pr.busy=true;
+  try{for(const x of prActs(k,d)){
+    if(done&&x.status!=='Completed')await patchRow('daily_actions',x.id,{status:'Completed',progress:100});
+    else if(!done&&x.status==='Completed')await patchRow('daily_actions',x.id,{status:'Not Started',progress:0})}}
+  catch(e){warn('prayer action follow',e)}finally{S.pr.busy=false}}
+(function(){
+  const _s=saveRow,_p=patchRow,_r=removeRow;
+  const act=async(call,key,id,args)=>{
+    const old=key==='daily_actions'&&id?byId('daily_actions',id):null,was=old?old.status==='Completed':false;
+    const row=await call.apply(null,args);
+    try{if(row&&key==='daily_actions'){const now=row.status==='Completed';if(now!==was)await prHabitFollow(row,now)}
+      else if(row&&key==='habit_logs'&&!S.pr.busy){const h=byId('habits',row.habit_id);if(h&&row.done!==false)await prActionFollow(h,row.log_date,true)}}catch(e){warn('prayer sync',e)}
+    return row};
+  saveRow=function(key,d,id,opts){return act(_s,key,id,arguments)};
+  patchRow=function(key,id,patch,opts){return act(_p,key,id,arguments)};
+  removeRow=async function(key,id,opts){
+    const old=key==='habit_logs'?byId('habit_logs',id):null;
+    const r=await _r.apply(this,arguments);
+    try{if(old&&!S.pr.busy){const h=byId('habits',old.habit_id);if(h)await prActionFollow(h,old.log_date,false)}}catch(e){warn('prayer unsync',e)}
+    return r}})();
+AUTO_TASKS.push({id:'prsync',need:'habit_logs',on:()=>!!S.profile,run:async()=>{let n=0;const d=todayS();
+  for(const [k] of PRAYER_NAMES){const h=prHabit(k),a=prActs(k,d);if(!h||!a.length)continue;const doneA=a.some(x=>x.status==='Completed'),doneH=!!prLogOf(h,d);
+    if(doneA&&!doneH){await prHabitFollow(a.find(x=>x.status==='Completed'),true);n++}else if(doneH&&!doneA){await prActionFollow(h,d,true);n++}}
+  return n},txt:n=>n+' prayer(s) synced between Daily Action and Habits'});
+/* reminder popup */
+const prRem=()=>Object.assign({on:true,lead:10},prefs().prayRemind||{});
+function prRemShow(k,name,time,left){
+  let el=$('#prayRemind');if(el)el.remove();
+  el=document.createElement('div');el.id='prayRemind';el.setAttribute('role','alertdialog');el.setAttribute('aria-live','assertive');el.setAttribute('aria-label','Prayer time reminder');
+  el.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:260;width:min(420px,92vw);background:#fff;border:2px solid #1F9D55;border-radius:16px;box-shadow:0 24px 60px rgba(15,27,45,.35);padding:16px 18px;display:flex;flex-direction:column;gap:10px';
+  el.innerHTML=`<div style="display:flex;gap:12px;align-items:center"><div style="font-size:32px" aria-hidden="true">🕌</div><div><div style="font-weight:700;font-size:17px">Time for ${esc(name)} at ${esc(time)}</div><div class="sm mut">${left>0?`In ${left} min. Get ready: wudhu and stop what you are doing.`:'It is time now.'}</div></div></div><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-act="prsnooze" data-k="${k}">Remind me in 3 min</button><button class="btn p" data-act="prok">Got it</button></div>`;
+  document.body.appendChild(el);try{if(window.Notification&&Notification.permission==='granted')new Notification('Time for '+name+' at '+time,{body:left>0?'In '+left+' min':'Now',tag:'pray-'+k})}catch(e){}}
+ACT.prok=()=>{const e=$('#prayRemind');if(e)e.remove()};
+ACT.prsnooze=el=>{const e=$('#prayRemind');if(e)e.remove();S.pr.snooze={k:el.dataset.k,at:Date.now()+180000}};
+function prRemTick(){
+  try{if(!S.profile||!prRem().on)return;const d=todayS(),p=prayerFor(d);if(!p)return;const n=new Date(),cur=n.getHours()*60+n.getMinutes();
+    if(S.pr.snooze&&Date.now()>=S.pr.snooze.at){const k=S.pr.snooze.k;S.pr.snooze=null;const m=mins(p[k]),nm=prayName(k,d);if(m!=null&&cur<=m+5)return prRemShow(k,nm,p[k],Math.max(0,m-cur))}
+    for(const [k] of PRAYER_NAMES){const m=mins(p[k]);if(m==null)continue;const left=m-cur,key=d+'|'+k;
+      if(left>=0&&left<=prRem().lead&&!S.pr.shown[key]){
+        S.pr.shown[key]=1;let st={};try{st=JSON.parse(localStorage.getItem('prayRemShown')||'{}')}catch(e){}
+        if(st[key])continue;st[key]=1;Object.keys(st).forEach(x=>{if(x.slice(0,10)!==d)delete st[x]});try{localStorage.setItem('prayRemShown',JSON.stringify(st))}catch(e){}
+        const h=prHabit(k);if((h&&prLogOf(h,d))||prActs(k,d).some(x=>x.status==='Completed'))continue;
+        prRemShow(k,prayName(k,d),p[k],left);break}}}catch(e){warn('prayer reminder',e)}}
+if(!window._prTimer)window._prTimer=setInterval(prRemTick,20000);
+(function(){const _g=geoCardHtml;geoCardHtml=function(){const r=prRem();return '<div>'+_g()+`<div class="card" style="margin-top:12px"><div class="ch"><h3>Prayer reminder popup</h3>${r.on?'<span class="badge b-green">On</span>':'<span class="badge b-slate">Off</span>'}</div><p class="sm ink2" style="margin-bottom:10px">A box appears before each of the five prayers while Polaris One is open. It does not appear when that prayer is already ticked.</p><label class="chk"><input type="checkbox" data-change="prremon" ${r.on?'checked':''}> Remind me before prayer time</label><div class="row" style="margin-top:8px"><label class="sm" for="prlead">Minutes before</label><select class="in" id="prlead" style="width:auto" data-change="prremlead">${[5,10,15,20,30].map(n=>`<option value="${n}" ${r.lead===n?'selected':''}>${n} min</option>`).join('')}</select></div></div></div>`}})();
+CHG.prremon=async el=>{await setPrefs({prayRemind:Object.assign({},prRem(),{on:el.checked})});toast(el.checked?'Prayer reminder on':'Prayer reminder off');renderView()};
+CHG.prremlead=async el=>{await setPrefs({prayRemind:Object.assign({},prRem(),{lead:+el.value})});toast('Saved');renderView()};
 (async function boot(){
   try{await DB.init()}catch(e){console.error(e)}
   try{S.signupMode=await DB.publicSignupMode()}catch(e){S.signupMode='open'}
