@@ -20387,8 +20387,10 @@ function syShareSync(){
   const area=syAreaOf(key,{portfolio_id:val('portfolio_id'),activity_id:val('activity_id'),time_cat:val('time_cat')});
   const fld=el.closest('.fld'),okA=syAllowed(area),help=fld&&fld.querySelector('.help');
   if(fld)fld.classList.toggle('hide',!(syLinked()||el.checked));
-  el.disabled=!okA;if(!okA)el.checked=false;
-  if(help){if(!el.dataset.h)el.dataset.h=help.textContent;help.textContent=okA?el.dataset.h:'Not available: choose a Life Area first (every Life Area can be shared with Altair Project Management).'}}
+  /* r64: an item that is ALREADY shared (for example one Altair Project Management created) keeps its switch: opening and saving the form must never turn sharing off by itself, because that sends a delete to Altair Project Management */
+  const was=!!(S.form.id&&(byId(MOD[key].t,S.form.id)||{}).share_with_altair);
+  el.disabled=!okA&&!was;if(!okA&&!was)el.checked=false;
+  if(help){if(!el.dataset.h)el.dataset.h=help.textContent;help.textContent=okA?el.dataset.h:(was?'Choose a Life Area to keep this item shared. Switching this off sends a delete to Altair Project Management.':'Not available: choose a Life Area first (every Life Area can be shared with Altair Project Management).')}}
 (function(){const o=openForm;openForm=function(){const r=o.apply(this,arguments);syShareSync();return r}})();
 document.addEventListener('change',e=>{if(e.target&&e.target.closest&&e.target.closest('#form'))syShareSync()});
 
