@@ -23097,6 +23097,7 @@ function ngReadX(t,m,v,ctx){const ty=v.type,f=m.f,k=f.k,rev=ctx.rev,ttl=ctx.titl
     if(!hit&&k==='status'&&rev)rev.push('“'+ttl+'”: the Notion status “'+nm+'” has no Polaris One counterpart, so the status is left as it is');return hit}
   return NOX}
 /* ---- value → Notion property (null = do not write this property) ---- */
+const ngHM=v=>{const x=String(v==null?'':v).trim(),h=x.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);return h?h[1].padStart(2,'0')+':'+h[2]:x};
 function ngWrite(t,m,row,why){const c=ngCfg(t),ty=m.ty,name=m.p;let v=row[m.f.k];
   if(m.f.t==='area')return ngAreaOut(t,m,row,why);
   if(NGX_T.includes(t)){
@@ -23190,8 +23191,9 @@ async function ngPlan(ts){const N=S.ng;N.busy='plan';N.err='';N.res='';N.plan=nu
             if(X&&t==='activities'&&m.f.k==='status'&&nv==='Completed'&&pv!=='Completed'){pl.review.push('“'+ctx.title+'”: Notion says “'+(ngStatMap(t).Completed||'Done')+'”. Polaris One does not close an item from Notion by itself (evidence and sub-items must be checked): set Completed here if it is really done');return}
             if(m.f.t==='number'||m.f.t==='range'){if(!(nv==null&&(pv==null||pv===''))&&+nv!==+pv)diff.push({m,to:nv,from:pv})}
             else if(m.f.t==='select'||m.f.t==='nsel'){const o=(typeof opts_of==='function'?null:null);if(!ngEqual(nv,pv)&&!(nv&&pv&&ngN(nv)===ngN(pv)))diff.push({m,to:nv,from:pv})}
+            else if(m.f.t==='time'){const a=ngHM(nv),b=ngHM(pv);if(a!==b)diff.push({m,to:nv,from:pv})}
             else if(!ngEqual(nv,pv))diff.push({m,to:nv,from:pv})});
-          if(diff.length&&changedHere&&mp.some(m=>m.dir==='both'&&!m.der&&diff.some(d=>d.m===m))){pl.conflicts.push({t,r,d:diff.find(d=>d.m.dir==='both'&&!d.m.der)});continue}
+          if(diff.length&&changedHere&&mp.some(m=>m.dir==='both'&&!m.der&&diff.some(d=>d.m===m))){const dd=diff.filter(d=>d.m.dir==='both'&&!d.m.der);pl.conflicts.push({t,r,d:dd[0],diffs:dd,page:pg.id,props});continue}
           if(diff.length){pl.pull.push({t,r,diff,page:pg.id});}
           if(changedHere){pl.push.push({t,r,op:'update',page:r.notion_page_id,props,why})}
           continue}
@@ -23259,6 +23261,12 @@ function ngValuesBody(t){const c=ngCfg(t),sc=c.schema,mp=c.maps||{};
   return area+pairs('Status','Pair each Polaris One status with a Notion status. A status left empty is not synced (Cancelled has no identical option). Done is only pushed when the item is Completed here; Polaris One never invents evidence.',['Not Started','In Progress','On Hold','Completed','Cancelled'],sp,'statusMap',ngStatMap(t))
    +pairs('Priority','',['Low','Medium','High','Critical'],pp,'prioMap',ngPrioMap(t))
    +`<div class="cd-box"><b>Never touched</b><p class="sm ink2" style="margin:4px 0">Sync Status, Source Updated From, Last Sync, Sync Notes, Standard Activity ID, Progress (%), Hours Worked, Actual Start/End, Date Plan, Last Activity Date and every formula or rollup are never written. Relations are not synced for these two databases.</p></div>`}
+ACT.ngconf=async el=>{const N=S.ng,pl=N.plan;if(!pl||N.busy)return;const x=(pl.conflicts||[]).find(c=>c.r.id===el.dataset.id&&c.t===el.dataset.t);if(!x)return;
+  try{N.busy='run';cdRefresh();
+    if(el.dataset.v==='mine'){await ngCall('PATCH','/v1/pages/'+x.page,{properties:x.props});const row=await DB.update(x.t,x.r.id,{notion_synced_at:ngStamp()});replaceRow(x.t,row);toast('Notion now has the Polaris One values')}
+    else{const patch={};(x.diffs||[x.d]).forEach(d=>{const v=ngCoerce(d.m,d.to);if(v!==undefined)patch[d.m.f.k]=v});patch.notion_synced_at=ngStamp();const row=await DB.update(x.t,x.r.id,patch);replaceRow(x.t,row);toast('Polaris One now has the Notion values')}
+  }catch(e){N.err=e.message||String(e);warn('conflict choice',e)}
+  N.busy='';await ngPlan(pl.scope!=='all'?[pl.scope]:null)};
 ACT.nglinkdec=async el=>{const N=S.ng;N.decisions=Object.assign({},N.decisions||{},{[el.dataset.id]:el.dataset.v});await ngPlan(N.plan&&N.plan.scope!=='all'?[N.plan.scope]:null)};
 function ngExtraPlan(pl){
   const nm=x=>esc(ngTitleOf(x.t,x.r));
@@ -23312,7 +23320,7 @@ function ngSyncBody(T){const N=S.ng,a=ngAuto(),pl=N.plan&&(!T||N.plan.scope===T)
    ${ngExtraPlan(pl)}
    <h5>To send to Notion (${pl.push.length})</h5>${list(pl.push,x=>`<div style="border-top:1px solid var(--line);padding:3px 0">${badge(x.op==='create'?'new':'update',x.op==='create'?'green':'blue')} ${nm(x)} <span class="mut">${esc(MOD[x.t].many)}</span>${x.why.map(w=>`<div class="xs mut">${esc(w)}</div>`).join('')}</div>`)||'<p class="sm mut">Nothing.</p>'}
    <h5>To bring back from Notion (${pl.pull.length})</h5>${list(pl.pull,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> <span class="mut">${esc(MOD[x.t].many)}</span><br>${x.diff.map(d=>`<span class="xs">${esc(d.m.f.l||d.m.f.k)}: ${esc(d.from==null?'∅':d.from)} → <b>${esc(d.to==null?'∅':d.to)}</b></span>`).join(' · ')}</div>`)||'<p class="sm mut">Nothing.</p>'}
-   ${pl.conflicts.length?`<h5>Conflicts (${pl.conflicts.length})</h5><p class="sm mut">Changed here and in Notion since the last sync. Left alone.</p>${list(pl.conflicts,x=>`<div style="border-top:1px solid var(--line);padding:3px 0"><b>${nm(x)}</b> · ${esc(x.d.m.f.l||x.d.m.f.k)}</div>`)}`:''}`:''}
+   ${pl.conflicts.length?`<h5>Conflicts (${pl.conflicts.length})</h5><p class="sm mut">Changed here and in Notion since the last sync. Left alone until you choose; nothing is lost either way.</p>${list(pl.conflicts,x=>`<div style="border-top:1px solid var(--line);padding:6px 0"><b>${nm(x)}</b>${(x.diffs||[x.d]).map(d=>`<div class="xs" style="margin:2px 0">${esc(d.m.f.l||d.m.f.k)}: here <b>${esc(String(d.from==null||d.from===''?'(empty)':d.from).slice(0,60))}</b> · Notion <b>${esc(String(d.to==null||d.to===''?'(empty)':d.to).slice(0,60))}</b></div>`).join('')}<button class="btn s p" data-act="ngconf" data-t="${x.t}" data-id="${x.r.id}" data-v="mine">Keep Polaris One</button> <button class="btn s" data-act="ngconf" data-t="${x.t}" data-id="${x.r.id}" data-v="theirs">Use Notion</button></div>`)}`:''}`:''}
   ${N.res?`<p class="sm" role="status">${esc(N.res)}</p>`:''}${N.err?`<p class="sm" style="color:var(--red)" role="alert">${esc(N.err)}</p>`:''}</div>`}
 ngEnableX(true);
 connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.',state:()=>NG_T.some(ngReady)?'on':'off',types:NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:'Connect, mapping, sync',beta:true,title:'Notion '+MOD[t].many,lead:'Own database, own mapping',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row. Uses the same Notion token as the Activity Log.',
