@@ -22720,6 +22720,13 @@ MOD.daily_actions.fields.push(
   F('ai_email_subject','Email subject (Notion AI)','text','',{ro:1,sql:'text',wide:1}),
   F('ai_email_body','Email draft (Notion AI)','textarea','',{ro:1,rows:8,sql:'text',wide:1}));
 COL_NEWER.daily_actions=(COL_NEWER.daily_actions||[]).concat(['email_to','ai_email_subject','ai_email_body']);
+/* r59: the Notion AI columns of Meeting Notes come back into the meeting, read only (Summary, Next Action, Recommendation Action) */
+MOD.meetings.fields.push(
+  F('_mt','Written by Notion AI','heading','These three texts are written in Notion by Notion AI after the meeting. They appear here after the next sync and cannot be edited here.'),
+  F('mt_summary','Summary (Notion AI)','textarea','',{ro:1,rows:5,sql:'text',wide:1}),
+  F('mt_next_action','Next action (Notion AI)','textarea','',{ro:1,rows:4,sql:'text',wide:1}),
+  F('mt_recommendation','Recommendation action (Notion AI)','textarea','',{ro:1,rows:4,sql:'text',wide:1}));
+COL_NEWER.meetings=(COL_NEWER.meetings||[]).concat(['mt_summary','mt_next_action','mt_recommendation']);
 Object.assign(NHINT,{email_to:/(email.?to|kepada|recipient|penerima)/i,ai_email_subject:/(email.?subject|subjek)/i,ai_email_body:/(email.?draft|draft.?email|email.?body)/i});
 NFIELDS.daily_actions.push(['email_to','Email to','text','out'],['ai_email_subject','Notion AI email subject','ai','in'],['ai_email_body','Notion AI email draft','ai','in']);
 (function(){const o=fieldHtml;fieldHtml=function(f,val,vals){
