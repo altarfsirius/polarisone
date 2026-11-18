@@ -23273,12 +23273,13 @@ async function ngRun(limit){const N=S.ng,pl=N.plan;if(!pl||N.busy)return;N.busy=
   try{if(!limit)for(const x of (pl.link||[]).filter(y=>y.approved)){try{const row=await DB.update(x.t,x.r.id,{notion_page_id:x.cands[0],notion_synced_at:ngStamp()});replaceRow(x.t,row);linkedN++}catch(e){fail.push(`${MOD[x.t].many} “${ngTitleOf(x.t,x.r)}”: ${e.message||e}`)}}
     for(const x of items){try{const c=ngCfg(x.t);let page=x.page;ngParentRel(x.t,byId(x.t,x.r.id)||x.r,x.props);
         if(x.op==='create'&&!page){const r=await ngCall('POST','/v1/pages',{parent:{type:'data_source_id',data_source_id:nId(c.ds)},properties:x.props});page=r.id}
-        else await ngCall('PATCH','/v1/pages/'+page,{properties:x.props});
+        else{try{await ngCall('PATCH','/v1/pages/'+page,{properties:x.props})}catch(e){if(!/archiv|trash|deleted/i.test(e.message||''))throw e;await ngArchive(page,false);await ngCall('PATCH','/v1/pages/'+page,{properties:x.props})}}   /* shared again: the page comes back out of the trash, no second page */
         const row=await DB.update(x.t,x.r.id,{notion_page_id:page,notion_synced_at:ngStamp()});replaceRow(x.t,row);sent++;if(!S.ng.fake&&NGX_T.includes(x.t))await nSleep(350)}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
     if(!limit)for(const x of pl.pull){try{const patch={};x.diff.forEach(d=>{const v=ngCoerce(d.m,d.to);if(v!==undefined)patch[d.m.f.k]=v});
         if(Object.keys(patch).length){patch.notion_synced_at=ngStamp();const row=await DB.update(x.t,x.r.id,patch);replaceRow(x.t,row);got++}}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
+    if(!limit){const pend=prefs().notion_archive_pending||[];if(pend.length){const keep=[];for(const x of pend){try{await ngArchive(x.page,true);sent++}catch(e){keep.push(x)}}try{await setPrefs({notion_archive_pending:keep})}catch(e){}}}
     if(!limit)for(const t of (pl.tables||NG_T)){if(ngReady(t))await ngSave(t,{lastPull:new Date(Date.now()-120000).toISOString()})}
     if(!limit&&!fail.length&&ngParentKey()&&(pl.tables||NG_T).includes('activities')&&!ngCfg('activities').parentSeeded)await ngSave('activities',{parentSeeded:true});
     N.res=`${sent} sent to Notion, ${got} brought back${linkedN?`, ${linkedN} linked`:''}${fail.length?`, ${fail.length} failed: `+fail.slice(0,3).join(' · '):''}.`;N.plan=null}
@@ -24166,6 +24167,21 @@ function ngImportBody(t){const N=S.ng,pl=N.imp[t],last=((prefs().notion_import_l
   return h}
 ACT.nimpplan=el=>ngImportPlan(el.dataset.t);ACT.nimprun=el=>ngImportRun(el.dataset.t);
 ACT.nimpundo1=el=>{S.ng.undoAsk=el.dataset.t;cdRefresh()};ACT.nimpundo0=()=>{S.ng.undoAsk='';cdRefresh()};ACT.nimpundo2=el=>ngImportUndo(el.dataset.t);
+
+/* ===== r82 · stop sharing or delete in Polaris One = the Notion page is archived (Notion trash); share again = the same page comes back ===== */
+async function ngArchive(page,on){const b=on===false?false:true;try{return await ngCall('PATCH','/v1/pages/'+page,{in_trash:!b?false:true})}catch(e){return await ngCall('PATCH','/v1/pages/'+page,{archived:b})}}
+function ngArchiveLater(t,page,why){if(!page||!NG_T.includes(t)||!ngReady(t))return;
+  ngArchive(page,true).then(()=>toast('Notion page archived ('+why+'). Share it again and it comes back.')).catch(async e=>{try{warn('notion archive',e)}catch(x){}
+    try{const l=(prefs().notion_archive_pending||[]).concat([{t,page}]);await setPrefs({notion_archive_pending:l})}catch(x){}
+    toast('The Notion page could not be archived now. It stays on the list and Preview & sync will try again.')})}
+(function(){const _s=saveRow;saveRow=async function(key,d,id,opts){const t=MOD[key]&&MOD[key].t,old=id&&t?byId(t,id):null,wasOn=!!(old&&old.share_with_notion&&old.notion_page_id);
+    const row=await _s.apply(this,arguments);
+    try{if(wasOn&&row&&row.share_with_notion===false)ngArchiveLater(t,old.notion_page_id,'sharing stopped')}catch(e){}
+    return row};
+  const _r=removeRow;removeRow=async function(key,id,opts){const t=MOD[key]&&MOD[key].t,old=t?byId(t,id):null,pg=old&&old.share_with_notion&&old.notion_page_id;
+    const res=await _r.apply(this,arguments);
+    try{if(pg&&!byId(t,id))ngArchiveLater(t,pg,'deleted here')}catch(e){}
+    return res}})();
 (async function boot(){
   try{await DB.init()}catch(e){console.error(e)}
   try{S.signupMode=await DB.publicSignupMode()}catch(e){S.signupMode='open'}
