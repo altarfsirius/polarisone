@@ -9987,7 +9987,7 @@ Object.assign(PAGEHELP,{
  'integrations/database':'Which database this app uses, how it is found again after an update (config.json or a setup link), and the SQL schema.',
  'settings/location':'Your place for prayer times, and the status of the public holidays on your calendar.'});
 FAQ.push(['I replaced index.html with a new version. What do I have to do?','Open Connections → API & server → API status. It checks three things: the app itself, the database schema (schema.sql) and the server function (api-proxy), and tells you which one, if any, needs a new file. Your database address and links are found again by themselves if config.json sits next to index.html. Nothing has to be typed again.']);
-FAQ.push(['Where do I put a new API link or key?','Secret keys: Connections → API & server → Keys & server, one form for all of them. A public database link: add it to config.json (Connections → Database → Download config.json), or in Connections → API & server → Database imports for a single connection. You never have to edit the app.']);
+FAQ.push(['Where do I put a new API link or key?','Secret keys: Connections → API & server → Keys & server, one form for all of them. A public database link: add it to config.json (Connections → Database → Download config.json), or in Connections → Database → Database imports for a single connection. You never have to edit the app.']);
 
 /* ---- r14: 81_inbound.js ---- */
 /* =====================================================================
@@ -10117,7 +10117,7 @@ VIEWS['integrations/inbound']=adminOnly(()=>{
    <p class="sm mut">Paste this into the assistant or developer who builds the other app. It describes the connection, the figures to send and how to avoid double entries.</p>
    <pre tabindex="0" style="margin:8px 0 0;padding:10px 12px;background:var(--soft);border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.5;white-space:pre-wrap">${esc(inbPrompt())}</pre></div>
   ${inbBlock('JavaScript (supabase-js)',sn.js,'js')}${inbBlock('curl',sn.curl,'curl')}${inbBlock('Python',sn.py,'py')}
-  <div class="card mt"><div class="ch"><h3>Safety</h3></div><ul class="sm" style="margin:0;padding-left:18px;line-height:1.7"><li>Use the publishable key only. A secret or service-role key bypasses every protection; if one ever appeared in a screenshot or a file, rotate it in Supabase.</li><li>The app signs in as you, so it can write only your rows. Another user’s data stays out of reach.</li><li>Keep the app’s password in that app’s own browser or settings, not in a shared file.</li><li>Every row sent by an app is recorded in the audit history like a typed one, and an Admin can remove it from the table’s page.</li><li>To <i>pull</i> data from an app that has its own web API, use Connections → API & server → Database imports instead.</li></ul></div>`});
+  <div class="card mt"><div class="ch"><h3>Safety</h3></div><ul class="sm" style="margin:0;padding-left:18px;line-height:1.7"><li>Use the publishable key only. A secret or service-role key bypasses every protection; if one ever appeared in a screenshot or a file, rotate it in Supabase.</li><li>The app signs in as you, so it can write only your rows. Another user’s data stays out of reach.</li><li>Keep the app’s password in that app’s own browser or settings, not in a shared file.</li><li>Every row sent by an app is recorded in the audit history like a typed one, and an Admin can remove it from the table’s page.</li><li>To <i>pull</i> data from an app that has its own web API, use Connections → Database → Database imports instead.</li></ul></div>`});
 
 /* nav: after Automation */
 (function(){const it=navP('integrations');if(!it||it.subs.some(s=>s[0]==='inbound'))return;const i=it.subs.findIndex(s=>s[0]==='automation');it.subs.splice(i<0?it.subs.length:i+1,0,['inbound','Inbound links'])})();
@@ -10464,7 +10464,7 @@ const RELEASE_NOTES=[
    ['Analysis and Improvement are linked to an Activity','Problems, Risks, Processes and Improvements link to the Activity they affect (the lasting unit). From there, “Add action” raises a one-day step as a Daily Action and remembers where it came from.','improve','problems','Open Problems'],
    ['Add action has three options','New action · Repeat an earlier action (copied with its time of day, category and duration) · Link an existing action. Available from Daily Action, from Activities and from Analysis and Improvement.','execute','daily','Open Daily Action'],
    ['Altair Project Management without duplicates','Each Altair Project Management task is recognised by its ID, so a task is never created twice, however often it refreshes. Words like “doing” and “tinggi” from the source are translated into Polaris One’ own values.','integrations','automation','Open Automation',1],
-   ['Data health','Connections → API & server → Data health finds old records with foreign words or duplicates and fixes them in one press, keeping everything linked.','integrations','health','Open Data health',1]]},
+   ['Data health','Connections → Database → Data health finds old records with foreign words or duplicates and fixes them in one press, keeping everything linked.','integrations','health','Open Data health',1]]},
   {t:'Notes for brainstorming',items:[
    ['Text and pictures in one note','Execute → Notes: write, paste a picture (Ctrl+V) or drop one in, attach the note to an Activity or Daily Action, and turn the lines that matter into actions.','execute','notes','Open Notes']]},
   {t:'Money',items:[
@@ -10522,7 +10522,7 @@ function putFaq(q,a,before){if(FAQ.some(f=>f[0]===q)){setFaq(q,a);return}const i
 function setMod(start,row){const i=MODS25.findIndex(m=>m[0].startsWith(start));if(i>=0)MODS25[i]=row;else MODS25.push(row)}
 function putMod(row,after){const i=MODS25.findIndex(m=>m[0]===row[0]);if(i>=0){MODS25[i]=row;return}const j=after?MODS25.findIndex(m=>m[0].startsWith(after)):-1;if(j>=0)MODS25.splice(j+1,0,row);else MODS25.push(row)}
 
-setFaq('Can I connect another database or system?','Yes, if your admin allowed API settings for you. Open Connections → API & server → Database imports, add a connection (REST/JSON, Supabase/PostgREST or CSV), map its fields to a Polaris One module and import. MySQL, SQL Server or Oracle need a small API in front of them; Connections → API & server → Setup guide lists easy options.');
+setFaq('Can I connect another database or system?','Yes, if your admin allowed API settings for you. Open Connections → Database → Database imports, add a connection (REST/JSON, Supabase/PostgREST or CSV), map its fields to a Polaris One module and import. MySQL, SQL Server or Oracle need a small API in front of them; Connections → Database → Setup guide lists easy options.');
 setFaq('What gets created automatically?','Holidays (Calendar Indonesia) and prayer times (Aladhan) become Daily Actions, parent items from Altair Project Management become Activities and its sub items become Daily Actions, rows from Altair Auto become Activities, and each Market Analysis run becomes a Daily Action and an entry in Market Desk → Analysis journal. Everything is tagged, recognised by its ID so it is never created twice, and can be removed on Connections → Automation.');
 setFaq('How do I connect my Outlook calendar?','Settings → My Outlook → Connect Outlook, and sign in with your own Microsoft account. Your calendar then appears on the Calendar and the Daily Action timeline and can become Meetings; your inbox appears under Execute → Mail. If your organisation does not allow the sign-in, paste your private calendar link instead (Outlook on the web → Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link). That shows the calendar only, not mail. The link works like a password: keep it out of shared places. The first time, an admin has to register the connection once (Connections → API & server → Keys & server shows the steps).');
 setFaq('Why can I not see some menus or buttons?','Admins decide what each person may do. If something is missing (for example Connections or the Delete button), your admin has not allowed it for your account. Under Settings → Profile, “Your access” lists what you can do. A button marked “needs approval” sends your request to an admin first.');
@@ -10535,7 +10535,7 @@ putFaq('How do I add an action I have done before?','Press “Add action” (Dai
 putFaq('What are Notes for?','Thinking before doing. Execute → Notes is a free page for ideas, lists and pictures (paste with Ctrl+V or drop a file). Attach a note to an Activity or Daily Action, then turn the lines that matter into actions. Notes are private: never shared.','Who can see my Outlook calendar and mail?');
 putFaq('What is the Finance review?','A monthly money check-up under Personal Finance → Finance review. Type your numbers (or press “Fill from ledger”), tick the habits you kept, and Polaris One calculates a health score and next steps. Turn the next steps into Daily Actions. It is private to you and is not financial advice.','Who can see my Outlook calendar and mail?');
 putFaq('Where do my Market Analysis results go?','Each analysis you run in Market Desk → Market Analysis lands in Market Desk → Analysis journal by itself and becomes a Daily Action for today. Write your decision and the reason, then use “Record the trade in Ledger” so the result flows back to the analysis. Nothing needs to be installed: the analysis tool is part of Polaris One.','Who can see my Outlook calendar and mail?');
-putFaq('I see words like “doing” or “tinggi” in my data. What now?','They came from another system in its own words. New imports are translated automatically. For older records open Connections → API & server → Data health and press Fix: the values become Polaris One’ own (In progress, High …) and duplicates are merged without breaking any link.','Who can see my Outlook calendar and mail?');
+putFaq('I see words like “doing” or “tinggi” in my data. What now?','They came from another system in its own words. New imports are translated automatically. For older records open Connections → Database → Data health and press Fix: the values become Polaris One’ own (In progress, High …) and duplicates are merged without breaking any link.','Who can see my Outlook calendar and mail?');
 putFaq('The app icon did not change on my iPhone.','An iPhone keeps the icon from the day the shortcut was made. Remove the old Polaris One shortcut from the Home Screen, open the app in Safari and use Share → Add to Home Screen again.','Who can see my Outlook calendar and mail?');
 putFaq('Which version am I using, and what changed?','The top of every screen shows the version and revision. Press it, or open Guide → What’s new, to read what changed in this revision.');
 
@@ -21123,20 +21123,23 @@ setInterval(pwaBox,2000);
   const hasView=sub=>typeof VIEWS['integrations/'+sub]==='function';
 
   connAdd({id:'database',group:'sys',name:'Database',mono:'Db',tint:CONN_TINT.t,tool:true,by:'Built into Polaris One',kw:'supabase schema sql config.json project url anon key',
-    desc:'Which database this app uses, how it is found again after an update, and the SQL to run once.',page:['integrations','database'],
+    desc:'Which database this app uses and the SQL to run once. Also database imports, data health, the import log and the setup guide.',page:['integrations','database'],
     state:()=>DB.mode==='supabase'?'on':'off',
     types:[pgType('database','db','Database & schema')]});
 
   connAdd({id:'automation',group:'sys',name:'Automation',mono:'Ax',tint:CONN_TINT.k,tool:true,by:'Built into Polaris One',kw:'holidays prayer times breaks outlook market analysis clean up',
-    desc:'What Polaris One creates for you by itself: holidays, prayer times, imports, meetings and breaks.',page:['integrations','automation'],
+    desc:'Daily breaks, the market-analysis log and clean-up. Holidays, prayer times and Outlook meetings are set in their own cards.',page:['integrations','automation'],
     types:[pgType('automation','auto','Automation')]});
 
-  const API_SUBS=['hub','keys','inbound','gwmap','connections','health','log','setup'];
+  const API_SUBS=['hub','keys','inbound'];   /* r77: mapping went to Altair Project Management; imports, data health, log and guide went to Database */
+  const DB_SUBS=['connections','health','log','setup'];
   const apis={id:'apis',group:'sys',name:'API & server',mono:'API',tint:CONN_TINT.e,tool:true,by:'Built into Polaris One',kw:'api status keys server edge function secrets inbound links mapping imports data health log setup guide',
-    desc:'Status of every API, secret keys and the server function, inbound links, mapping, imports, data health and the setup guide.'};
+    desc:'Status of every API, the secret keys and the server function, and the inbound links of other apps.'};
   Object.defineProperty(apis,'types',{enumerable:true,get(){
     return API_SUBS.filter(k=>hasView(k)&&allowed(k)).map(k=>pgType(k,k,subLabel(k)))}});
   connAdd(apis);
+  const dbc=connApp('database');if(dbc)Object.defineProperty(dbc,'types',{enumerable:true,configurable:true,get(){return [pgType('database','db','Database & schema')].concat(DB_SUBS.filter(k=>hasView(k)&&allowed(k)).map(k=>pgType(k,k,subLabel(k))))}});
+  const ordo0=connApp('ordo');if(ordo0&&hasView('gwmap')&&!ordo0.types.some(x=>x.id==='map'))ordo0.types.push(pgType('gwmap','map','Field mapping'));
 
   /* the full link screen of Altair Project Management (status, queue, failed events, conflicts) sits next to its other types */
   const ordo=connApp('ordo');
@@ -21144,7 +21147,7 @@ setInterval(pwaBox,2000);
 
   /* old addresses: open the gallery, then the pop-up that now holds that screen */
   const MAP={database:['database','db'],automation:['automation','auto'],altair:['ordo','status']};
-  API_SUBS.forEach(k=>MAP[k]=['apis',k]);
+  API_SUBS.forEach(k=>MAP[k]=['apis',k]);DB_SUBS.forEach(k=>MAP[k]=['database',k]);MAP.gwmap=['ordo','map'];
   /* going to any other screen closes a pop-up that is still open (a screen of the old API Hub is no longer a page) */
   const og=go;
   go=function(p,s){if(p!=='integrations'&&cdEl())closeModal(true);return og.apply(this,arguments)};
@@ -21192,7 +21195,7 @@ RELEASE_NOTES.unshift({rev:29,date:'2026-10-26',groups:[
 const SCH_NAME='Altair Project Management';
 const schConn=(n)=>connFor(n||SCH_NAME);
 function schBody(n){
-  const c=schConn(n);if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → API &amp; server.</p>';
+  const c=schConn(n);if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → Database → Database imports.</p>';
   const st=connState(c);
   return `<div class="cd-box"><div class="row" style="gap:8px;align-items:center">${badge(st[0],st[1])}</div>
    <div class="sm" style="margin:8px 0">${c.pg_table?`Table: <b>${esc(c.pg_table)}</b>`:'No table chosen yet.'}${c.target_table&&Object.keys(c.field_map||{}).length?` · mapped ${Object.keys(c.field_map).length} fields`:''}${c.last_run_at?` · last run ${ago(Date.parse(c.last_run_at))}`:''}</div>
@@ -22490,7 +22493,7 @@ async function pdfOcr(file,password,onProgress){
   const tbl=(h,rows)=>`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="Table"><table class="tbl" style="width:100%"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   function importMap(cn){
     const c=connFor(cn),app=gwApp(c||{name:cn});
-    if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → API &amp; server.</p>';
+    if(!c)return '<p class="sm mut">The built-in connection was removed. Add it again under Connections → Database → Database imports.</p>';
     const cfg=c.hier&&c.hier.on?c.hier:(app&&GW_APPS[app]?GW_APPS[app].cfg:null);
     let h=`<p class="sm ink2" style="margin-bottom:8px">Each Polaris One field and the ${esc(cn)} field it is read from. Press <b>Edit field map</b> to choose them yourself.</p>`;
     if(cfg){
@@ -23676,6 +23679,7 @@ const exBar=p=>{p=clamp(Math.round(num(p)),0,100);return `<span class="exbar"><i
 const exName=(v,code)=>{try{return typeof idStrip==='function'?idStrip(v,[code]):String(v==null?'':v)}catch(e){return String(v==null?'':v)}};
 const exTxt=v=>esc(String(v==null?'':v).trim()).replace(/\n+/g,'<br>');
 function exSrcChips(src){return src.map(k=>`<span class="exsrc exsrc-${k}" title="${esc(EX_SRC[k])}">${esc(EX_SHORT[k])}</span>`).join(' ')}
+const exL=(k,id,h)=>`<a href="#" class="exlnk" data-act="open" data-k="${k}" data-id="${esc(id)}">${h}</a>`;
 function exActivity(r,d){
   const s=d.s,a=r.a,C=s.col,meta=[];
   if(C.dates&&(a.planned_start||a.planned_finish))meta.push(`Planned ${a.planned_start?fmtD(a.planned_start):'—'} – ${a.planned_finish?fmtD(a.planned_finish):'—'}`);
@@ -23683,20 +23687,20 @@ function exActivity(r,d){
   if(C.hours){const h=[];if(r.hrs)h.push(exH(r.hrs)+' logged in this period');if(num(a.est_hours)||num(a.actual_hours))h.push(`estimated ${fmtN(num(a.est_hours),1)} h · actual ${fmtN(num(a.actual_hours),1)} h`);if(h.length)meta.push(h.join(' · '))}
   if(C.priority&&a.priority)meta.push('Priority '+esc(a.priority));
   const par=a.parent_id&&r.depth===0?byId('activities',a.parent_id):null;
-  let h=`<section class="exa" style="margin-left:${Math.min(r.depth,4)*14}px" data-exa="${esc(a.id)}"><div class="exah"><div class="exat">${C.code&&a.code?`<span class="excode">${esc(a.code)}</span> `:''}<b>${esc(exName(a.name,a.code))}</b>${par?` <span class="exmut">· under ${esc(trunc(exName(par.name,par.code),50))}</span>`:''}</div><div class="exab">${C.source?exSrcChips(r.src)+' ':''}${badge(a.status)}${r.late>0?` <span class="badge b-red">${r.late} day${r.late>1?'s':''} late</span>`:''}</div></div>
+  let h=`<section class="exa" style="margin-left:${Math.min(r.depth,4)*14}px" data-exa="${esc(a.id)}"><div class="exah"><div class="exat">${C.code&&a.code?`<span class="excode">${esc(a.code)}</span> `:''}<b>${exL('activities',a.id,esc(exName(a.name,a.code)))}</b>${par?` <span class="exmut">· under ${esc(trunc(exName(par.name,par.code),50))}</span>`:''}</div><div class="exab">${C.source?exSrcChips(r.src)+' ':''}${badge(a.status)}${r.late>0?` <span class="badge b-red">${r.late} day${r.late>1?'s':''} late</span>`:''}</div></div>
    <div class="exam"><span class="exprog">${exBar(a.progress)}</span>${meta.length?' · '+meta.join(' · '):''}</div>`;
   if(s.sec.notes){const n=[['Deliverable',a.deliverable],['Result',a.result],['Remarks',a.remarks]].filter(x=>String(x[1]||'').trim());if(n.length)h+=`<div class="exnote">${n.map(x=>`<div><b>${x[0]}:</b> ${exTxt(x[1])}</div>`).join('')}</div>`}
   let any=false;
   if(s.sec.actions&&r.actions.length){any=true;
-    h+=`<div class="exsh">Actions · ${r.done} of ${r.actions.length} done</div><table class="ext"><thead><tr><th style="width:62px">Date</th>${C.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:44px">%</th><th style="width:78px">Time</th>${C.result?'<th>Result</th>':''}${C.blocker?'<th>Blocker</th>':''}</tr></thead><tbody>${r.actions.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${C.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${esc(exName(x.title,x.code))}</td><td>${esc(x.status||'')}</td><td>${Math.round(num(x.progress))}</td><td class="exnw">${exMin(dMin(x))}</td>${C.result?`<td>${exTxt(x.result)}</td>`:''}${C.blocker?`<td>${exTxt(x.blocker)}</td>`:''}</tr>`).join('')}</tbody></table>`}
+    h+=`<div class="exsh">Actions · ${r.done} of ${r.actions.length} done</div><table class="ext"><thead><tr><th style="width:62px">Date</th>${C.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:44px">%</th><th style="width:78px">Time</th>${C.result?'<th>Result</th>':''}${C.blocker?'<th>Blocker</th>':''}</tr></thead><tbody>${r.actions.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${C.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${exL('daily_actions',x.id,esc(exName(x.title,x.code)))}</td><td>${esc(x.status||'')}</td><td>${Math.round(num(x.progress))}</td><td class="exnw">${exMin(dMin(x))}</td>${C.result?`<td>${exTxt(x.result)}</td>`:''}${C.blocker?`<td>${exTxt(x.blocker)}</td>`:''}</tr>`).join('')}</tbody></table>`}
   if(s.sec.time&&r.logs.length){any=true;
     /* entries with 0 hours (postponed, skipped) are folded away unless the reader opens them */
     const nz=r.logs.filter(l=>!num(l.hours)).length,showZ=!!(C.zero||s.zopen[a.id]),logs=showZ?r.logs:r.logs.filter(l=>num(l.hours));
     const fold=nz&&!C.zero?`<div class="exmut exnone" data-exzero>${showZ?'':`${nz} entr${nz>1?'ies':'y'} with 0 hours not shown. `}<button class="btn s noprint" data-act="exzero" data-id="${esc(a.id)}" aria-expanded="${showZ?'true':'false'}">${showZ?'Hide':'Open'} ${nz} entr${nz>1?'ies':'y'} with 0 hours</button></div>`:'';
-    h+=`<div class="exsh">Time log · ${exH(r.hrs)} in ${logs.length} entr${logs.length===1?'y':'ies'}</div>${logs.length?`<table class="ext"><thead><tr><th style="width:62px">Date</th><th style="width:54px">Hours</th><th style="width:92px">Source</th><th>Action</th>${C.tlnote?'<th>What was done</th>':''}</tr></thead><tbody>${logs.map(l=>{const x=l.daily_action_id?d.daBy.get(l.daily_action_id):null;return `<tr><td>${fmtS(l.log_date)}</td><td>${fmtN(num(l.hours),2)}</td><td>${esc(l.source||'')}</td><td>${x?esc(exName(x.title,x.code)):'<span class="exmut">—</span>'}</td>${C.tlnote?`<td>${exTxt(exName(l.note,x&&x.code))}</td>`:''}</tr>`}).join('')}</tbody></table>`:''}${fold}`}
+    h+=`<div class="exsh">Time log · ${exH(r.hrs)} in ${logs.length} entr${logs.length===1?'y':'ies'}</div>${logs.length?`<table class="ext"><thead><tr><th style="width:62px">Date</th><th style="width:54px">Hours</th><th style="width:92px">Source</th><th>Action</th>${C.tlnote?'<th>What was done</th>':''}</tr></thead><tbody>${logs.map(l=>{const x=l.daily_action_id?d.daBy.get(l.daily_action_id):null;return `<tr><td>${fmtS(l.log_date)}</td><td>${fmtN(num(l.hours),2)}</td><td>${esc(l.source||'')}</td><td>${x?exL('daily_actions',x.id,esc(exName(x.title,x.code))):'<span class="exmut">—</span>'}</td>${C.tlnote?`<td>${exTxt(exName(l.note,x&&x.code))}</td>`:''}</tr>`}).join('')}</tbody></table>`:''}${fold}`}
   if(s.sec.evidence&&(r.ev.length||a.link)){any=true;
     const lk=u=>/^https?:\/\//i.test(String(u||''))?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(trunc(u,70))}</a>`:esc(trunc(u||'',70));
-    const rowsE=r.ev.map(e=>`<tr><td>${e.evidence_date?fmtS(e.evidence_date):'—'}</td><td>${esc(e.title)}</td><td>${esc(e.type||'')}</td>${C.url?`<td class="exurl">${e.url?lk(e.url):e.file_path?'File: '+esc(String(e.file_path).split('/').pop()):'<span class="exmut">—</span>'}</td>`:''}</tr>`).join('')+(a.link?`<tr><td>—</td><td>Document link of the Activity</td><td>Link</td>${C.url?`<td class="exurl">${lk(a.link)}</td>`:''}</tr>`:'');
+    const rowsE=r.ev.map(e=>`<tr><td>${e.evidence_date?fmtS(e.evidence_date):'—'}</td><td>${exL('evidence',e.id,esc(e.title))}</td><td>${esc(e.type||'')}</td>${C.url?`<td class="exurl">${e.url?lk(e.url):e.file_path?'File: '+esc(String(e.file_path).split('/').pop()):'<span class="exmut">—</span>'}</td>`:''}</tr>`).join('')+(a.link?`<tr><td>—</td><td>Document link of the Activity</td><td>Link</td>${C.url?`<td class="exurl">${lk(a.link)}</td>`:''}</tr>`:'');
     h+=`<div class="exsh">Evidence · ${r.ev.length+(a.link?1:0)} item${r.ev.length+(a.link?1:0)>1?'s':''}${s.evid==='all'?' to date':''}</div><table class="ext"><thead><tr><th style="width:62px">Date</th><th>Title</th><th style="width:120px">Type</th>${C.url?'<th>Link or file</th>':''}</tr></thead><tbody>${rowsE}</tbody></table>`}
   if(!any&&(s.sec.actions||s.sec.time||s.sec.evidence))h+=`<div class="exmut exnone">No ${[s.sec.actions&&'actions',s.sec.time&&'time',s.sec.evidence&&'evidence'].filter(Boolean).join(', ')} recorded in this period.</div>`;
   return h+'</section>'}
@@ -23774,7 +23778,7 @@ function exReport(d){
   if(s.sec.meet)h+=exMeet(d);
   h+=`<h3 class="exh3">Activities${d.rows.length?` (${d.rows.length})`:''}</h3>`;
   h+=d.rows.length?d.groups.map(g=>(g.name?`<h4 class="exh4">${esc(g.name)} <span class="exmut">· ${g.list.length} ${g.list.length>1?'Activities':'Activity'}${g.list.length?' · average progress '+Math.round(sum(g.list.map(r=>r.a.progress))/g.list.length)+'%':''}</span></h4>`:'')+g.list.map(r=>exActivity(r,d)).join('')).join(''):`<div class="exmut exnone">No Activity matches the choices above.</div>`;
-  if(s.sec.loose&&d.loose.length)h+=`<h3 class="exh3">Actions without an Activity (${d.loose.length})</h3><table class="ext"><thead><tr><th style="width:62px">Date</th>${s.col.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:64px">Time</th>${s.col.result?'<th>Result</th>':''}</tr></thead><tbody>${d.loose.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${s.col.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${esc(exName(x.title,x.code))}</td><td>${esc(x.status||'')}</td><td>${exMin(dMin(x))}</td>${s.col.result?`<td>${exTxt(x.result)}</td>`:''}</tr>`).join('')}</tbody></table>`;
+  if(s.sec.loose&&d.loose.length)h+=`<h3 class="exh3">Actions without an Activity (${d.loose.length})</h3><table class="ext"><thead><tr><th style="width:62px">Date</th>${s.col.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:64px">Time</th>${s.col.result?'<th>Result</th>':''}</tr></thead><tbody>${d.loose.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${s.col.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${exL('daily_actions',x.id,esc(exName(x.title,x.code)))}</td><td>${esc(x.status||'')}</td><td>${exMin(dMin(x))}</td>${s.col.result?`<td>${exTxt(x.result)}</td>`:''}</tr>`).join('')}</tbody></table>`;
   h+=`<footer class="exfoot">Read from Polaris One on ${fmtDT(new Date())}. Items of linked apps are shown as last synchronised${links.length?' ('+links.map(esc).join('; ')+')':''}. Status, progress and dates are those kept in Polaris One.</footer></div>`;
   return h}
 function exStyle(){if(document.getElementById('exsty'))return;const st=document.createElement('style');st.id='exsty';st.textContent=`
@@ -24038,6 +24042,19 @@ ACT.mfitem=el=>{try{closeModal()}catch(e){}openDetail('meeting_items',el.dataset
   /* put it right after the first row of number tiles */
   let d=0,k=i;const re=/<div\b|<\/div>/g;re.lastIndex=i;let x;while((x=re.exec(h))){d+=x[0]==='</div>'?-1:1;if(d===0){k=re.lastIndex;break}}
   return h.slice(0,k)+c+h.slice(k)}})();
+
+/* r77: the settings of Automation sit in the card of the service they belong to */
+(function(){
+  const pick=re=>()=>{try{const d=document.createElement('div');d.innerHTML=VIEWS['integrations/automation']();const cs=[...d.querySelectorAll('.card')].filter(c=>re.test(((c.querySelector('h3')||{}).textContent||'')));
+    return cs.length?`<div class="g g2">${cs.map(c=>c.outerHTML).join('')}</div>`:'<p class="sm mut">Nothing to set here.</p>'}catch(e){return `<div class="callout warn">${ic('alert')}<div>${esc(e.message)}</div></div>`}};
+  const add=(id,t)=>{const a=connApp(id);if(a&&Array.isArray(a.types)&&!a.types.some(x=>x.id===t.id))a.types.push(t)};
+  const T=(id,name,title,re)=>({id,name,sub:'Create Daily Actions by itself',title,lead:'',text:'',bare:true,body:pick(re),after:()=>{const f=AFTER['integrations/automation'];if(f)f()}});
+  add('holidays',T('auto','Daily Actions','Holidays → Daily Actions',/^Holidays/));
+  add('prayer',T('auto','Daily Actions','Prayer times → Daily Actions',/^Prayer times/));
+  add('ocal',T('auto','Meetings','Outlook → Meetings',/^Outlook → Meetings/));
+  if(typeof putFaq==='function')putFaq('Where are the automatic holidays, prayer times and Outlook meetings now?','In the card of the service they belong to (Settings → Connections): Indonesian holidays, Prayer times and Outlook Calendar each have a “Daily Actions” or “Meetings” part with the switch. Daily breaks, the market-analysis log and clean-up stay in the card “Automation”. Database imports, data health, the import log and the setup guide are in the card “Database”; the mapping of Altair Project Management is in its own card; “API & server” keeps API status, keys and inbound links.');
+  const au=connApp('automation');if(au&&au.types&&au.types[0])au.types[0].body=pick(/^(Market Analysis|Clean up|Daily breaks)/);
+})();
 (async function boot(){
   try{await DB.init()}catch(e){console.error(e)}
   try{S.signupMode=await DB.publicSignupMode()}catch(e){S.signupMode='open'}
