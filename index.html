@@ -23529,6 +23529,130 @@ document.addEventListener('input',e=>{const t=e.target;if(!t||!t.dataset||!t.dat
 PAGEHELP['market/sizing']='How many units fit the risk you choose: account size, risk %, entry and stop. Pure arithmetic, not advice.';
 (function(){const n=NAV.find(x=>x.id==='market');if(n&&!n.subs.some(s=>s[0]==='sizing')){const i=n.subs.findIndex(s=>s[0]==='summary');n.subs.splice(i+1,0,['sizing','Position size'])}})();
 
+/* ---- r83: Market Desk · Decision playbook (Buy / Hold / Sell checklist, ratios, macro bias, thesis, glossary) ---- */
+const PB_Q=[
+ ['b1','Business','g','I can explain how the company makes money'],
+ ['b2','Business','g','The business is easy to understand'],
+ ['b3','Business','g','It has a moat: brand, low cost, switching cost or pricing power'],
+ ['b4','Business','g','The industry is growing and its end market is attractive'],
+ ['m1','Management','g','Management has a record of creating shareholder value'],
+ ['m2','Management','g','Management or the promoter owns a large share (skin in the game)'],
+ ['m3','Management','b','Shares are pledged, or insiders are selling'],
+ ['m4','Management','b','Stock-based pay keeps rising and the share count is growing'],
+ ['f1','Financials','g','Revenue grew more than 5% a year'],
+ ['f2','Financials','g','Earnings grew more than 7% a year'],
+ ['f3','Financials','g','Return on equity is above 15%'],
+ ['f4','Financials','g','Margins are stable and above 15%'],
+ ['f5','Financials','g','Debt-to-equity is below 1 and interest is covered'],
+ ['f6','Financials','g','Profit turns into free cash flow'],
+ ['r1','Red flags','b','Cash is smaller than total debt'],
+ ['r2','Red flags','b','Receivables grow faster than revenue'],
+ ['r3','Red flags','b','Inventory grows faster than profit'],
+ ['r4','Red flags','b','Goodwill and intangibles are above 50% of total assets'],
+ ['r5','Red flags','b','Retained earnings are negative'],
+ ['r6','Red flags','b','Current ratio is below 1'],
+ ['k1','Risk and outlook','b','A major disruption, regulation or "black swan" risk is unresolved'],
+ ['k2','Risk and outlook','g','Revenue and earnings can keep growing in the next years'],
+ ['k3','Risk and outlook','g','I wrote down what would prove me wrong (see Thesis)'],
+ ['v1','Valuation','g','P/E is not above the industry, or the growth justifies it'],
+ ['v2','Valuation','g','PEG is below 2'],
+ ['v3','Valuation','g','EV/EBITDA is fair for the industry'],
+ ['v4','Valuation','g','Good news is not already priced in: a positive surprise could still lift the price']
+].map(x=>({id:x[0],g:x[1]==='Valuation'?'v':x[1],k:x[2],t:x[3]}));
+const PB_MAC=[
+ ['g','Growth','GDP, PMI, consumption and jobs: is activity speeding up or slowing?'],
+ ['i','Inflation','CPI, PCE, wages and prices: is the economy overheating or cooling?'],
+ ['c','Central bank','Rate path, liquidity and the tone of the Fed, ECB, BOJ, PBoC and Bank Indonesia'],
+ ['f','Fiscal and policy','Stimulus, subsidies and government spending: do they help growth and sentiment?'],
+ ['k','Capital flow','Is global money moving toward this country, sector or asset, or away from it?'],
+ ['r','Relative value','Not "good or bad" but "stronger or weaker than the alternatives"']];
+const PB_GLOS=[['Stock / share','A small ownership stake in a company.'],['Market capitalisation','Share price × shares outstanding.'],['IPO','The first public sale of a company’s shares.'],['Bull market','Prices are generally rising.'],['Bear market','Prices are generally falling.'],['52-week high / low','The highest and lowest price in the last year.'],['Volume','How many shares were traded in a period.'],['Volatility','How sharply the price moves up and down.'],['Liquidity','How easily you can buy or sell without moving the price.'],['Dividend','Part of the profit paid to shareholders.'],['Dividend yield','Dividend ÷ price: income relative to the price.'],['CAGR','Annual growth rate over several years.'],['Capital gain','Profit from selling above the purchase price.'],['ROE','Net profit ÷ shareholders’ equity: how well equity is used.'],['EPS','Profit per outstanding share.'],['P/E ratio','Price ÷ EPS: price compared with earnings.'],['Book value','Net worth of the company (assets − liabilities).'],['P/B ratio','Price ÷ book value per share.'],['Debt-to-equity','Total debt ÷ shareholders’ equity.'],['Current ratio','Current assets ÷ current liabilities: can it pay what is due within a year?']];
+const pbUi=()=>S.ui.pb=S.ui.pb||{tab:'check',own:false,name:'',a:{},th:{base:'',conf:'',inv:'',alt:'',hor:'Months'},mac:{},rt:{exp:'',act:'',hi:'1'},ra:{}};
+const pbN=v=>{const x=parseFloat(String(v==null?'':v).replace(/,/g,''));return isFinite(x)?x:null};
+function pbScore(u){let q=0,qa=0,v=0,va=0,red=0,ans=0;
+ PB_Q.forEach(c=>{const a=u.a[c.id];if(!a)return;ans++;const ok=(c.k==='g')===(a==='y');if(c.g==='v'){va++;if(ok)v++}else{qa++;if(ok)q++}if(c.k==='b'&&a==='y')red++});
+ const Q=qa?Math.round(q/qa*100):null,V=va?Math.round(v/va*100):null,own=u.own;let t,tone='',why;
+ if(ans<10||qa<7)return{ans,Q,V,red,t:'Keep answering',tone:'',why:'Answer at least 10 questions, 7 of them about the business, to get a reading. “Not sure” is a fine answer: leave it empty and find out.'};
+ if(red>=3||Q<50){t=own?'Sell or reduce':'Pass';tone='red';why=red>=3?red+' red flags are present. Do not let a cheap price talk you out of that.':'Quality is below 50%: the business does not pass the basic checks.'}
+ else if(Q>=75&&red===0&&V!=null&&V>=60){t=own?'Hold (add on dips)':'Buy (start small)';tone='green';why='Strong business, no red flag and a fair price. Size the position in Position size, and write the invalidation first.'}
+ else if(Q>=75&&(V==null||V<60||red>0)){t=own?'Hold (do not add)':'Watchlist';tone='';why=red>0?'Good business, but a red flag is open. Resolve it first.':V==null?'Good business. Answer the valuation questions before you buy.':'Good business at a price that already expects a lot. Wait for a better price or a reason.'}
+ else{t=own?'Hold and review':'Watchlist';tone='';why='Mixed picture: quality '+Q+'%. Study the weak answers; decide again when they change.'}
+ return{ans,Q,V,red,t,tone,why}}
+const pbSeg=(act,id,cur,opts)=>opts.map(o=>`<button class="btn s ${cur===o[0]?'p':''}" data-act="${act}" data-id="${id}" data-v="${o[0]}" aria-pressed="${cur===o[0]}">${o[1]}</button>`).join('');
+function pbCheck(u){
+ const r=pbScore(u),groups=[...new Set(PB_Q.map(c=>c.g))],sv=prefs().pb_saved||[];
+ const gh=g=>g==='v'?'Valuation (is the price fair?)':g;
+ const rows=groups.map(g=>`<div class="card mt"><div class="ch"><h3>${esc(gh(g))}</h3></div>${PB_Q.filter(c=>c.g===g).map(c=>{const a=u.a[c.id],flag=c.k==='b'&&a==='y';return `<div class="row" style="gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--line,#e5e7eb)"><div class="sm" style="flex:1 1 220px;min-width:0${flag?';color:#B3261E;font-weight:600':''}">${esc(c.t)}</div><div class="row" style="gap:4px">${pbSeg('pbans',c.id,a,[['y','Yes'],['n','No']])}</div></div>`}).join('')}</div>`).join('');
+ const tl=[['base','Base case','What do I expect to happen?'],['conf','Confirmation','Which data would strengthen the idea?'],['inv','Invalidation','What change would make the idea no longer valid?'],['alt','Alternative scenario','What happens if my main assumption is wrong?']];
+ return `<div class="g g2"><div class="card"><div class="ch"><h3>Stock or asset</h3></div>
+  <label class="sm" for="pb_name"><b>Name or code</b></label><input class="in" id="pb_name" data-pb="name" value="${esc(u.name)}" placeholder="e.g. BBCA, AAPL, XAUUSD" style="width:100%">
+  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${pbSeg('pbown','own',u.own?'1':'0',[['0','I do not own it'],['1','I own it']])}</div>
+  <p class="xs mut" style="margin-top:10px">Answer from the company’s reports, not from the price chart. Leave a question empty when you do not know: that is information too.</p></div>
+  <div class="card"><div class="ch"><h3>Reading</h3></div>
+  <div class="g g2" style="margin-bottom:10px">${stat('Decision aid',esc(r.t),r.ans+' answered',r.tone)}${stat('Quality',r.Q==null?'–':r.Q+'%','business, people, financials, risk')}${stat('Valuation',r.V==null?'–':r.V+'%','price against value')}${stat('Red flags',String(r.red),'answers marked Yes on a warning',r.red?'red':'')}</div>
+  <div class="sm">${esc(r.why)}</div>
+  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn s p" data-act="pbsave">${ic('plus',14)} Save this evaluation</button><button class="btn s" data-act="pbclear">Clear</button><button class="btn s" data-act="pbgo" data-s="sizing">Position size</button></div>
+  <p class="xs mut" style="margin-top:10px">A learning aid built from your own answers. It does not know the market, the news or your situation. It is not advice.</p></div></div>
+  ${rows}
+  <div class="card mt"><div class="ch"><h3>Thesis: it must be able to be wrong</h3></div><div class="g g2">${tl.map(x=>`<div><label class="sm" for="pb_${x[0]}"><b>${x[1]}</b></label><textarea class="in" id="pb_${x[0]}" data-pb="th.${x[0]}" rows="2" placeholder="${x[2]}" style="width:100%">${esc(u.th[x[0]])}</textarea></div>`).join('')}
+  <div><label class="sm" for="pb_hor"><b>Time horizon</b></label><select class="in" id="pb_hor" data-pb="th.hor" style="width:100%">${['Short term (weeks)','Months','Long term (years)'].map(o=>`<option ${u.th.hor===o?'selected':''}>${o}</option>`).join('')}</select><div class="xs mut">The same fact can read bearish in the short term and bullish in the long term.</div></div></div></div>
+  ${sv.length?`<div class="card mt"><div class="ch"><h3>Saved evaluations</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Date</th><th>Name</th><th>Decision aid</th><th>Quality</th><th>Valuation</th><th></th></tr></thead><tbody>${sv.map((x,i)=>`<tr><td>${esc(x.d)}</td><td>${esc(x.n||'–')}${x.own?' <span class="xs mut">(owned)</span>':''}</td><td>${esc(x.t)}</td><td>${x.q==null?'–':x.q+'%'}</td><td>${x.v==null?'–':x.v+'%'}</td><td style="white-space:nowrap"><button class="btn s" data-act="pbload" data-id="${i}">Open</button> <button class="btn s" data-act="pbdel" data-id="${i}" aria-label="Delete saved evaluation">${ic('trash',14)}</button></td></tr>`).join('')}</tbody></table></div></div>`:''}`}
+function pbRatios(u){
+ const a=u.ra,n=k=>pbN(a[k]),f=(k,l,h)=>`<div><label class="sm" for="pr_${k}"><b>${l}</b></label><input class="in" id="pr_${k}" data-pb="ra.${k}" data-re="1" inputmode="decimal" value="${esc(a[k]||'')}" style="width:100%">${h?`<div class="xs mut">${h}</div>`:''}</div>`;
+ const d=(x,y)=>x!=null&&y!=null&&y!==0?x/y:null,fx=(v,p)=>v==null?'–':fmtN(v,p==null?2:p);
+ const cr=d(n('ca'),n('cl')),wc=n('ca')!=null&&n('cl')!=null?n('ca')-n('cl'):null,de=d(n('debt'),n('eq')),er=d(n('eq'),n('ta')),roe=d(n('ni'),n('eq')),
+  pe=d(n('price'),n('eps')),dy=d(n('div'),n('price')),mc=n('price')!=null&&n('sh')!=null?n('price')*n('sh'):null,bv=d(n('eq'),n('sh')),pb=d(n('price'),bv);
+ const cm=n('pu')!=null&&n('vu')!=null?n('pu')-n('vu'):null,be=cm>0&&n('fx')!=null?n('fx')/cm:null;
+ const tn=(v,okf)=>v==null?'':okf(v)?'green':'red';
+ return `<div class="g g2"><div class="card"><div class="ch"><h3>Balance sheet and market numbers</h3></div><div style="display:grid;gap:10px">
+  ${f('ca','Current assets','Cash, receivables, inventory: due within a year')}${f('cl','Current liabilities')}${f('debt','Total debt')}${f('eq','Shareholders’ equity')}${f('ta','Total assets')}${f('ni','Net profit (a year)')}${f('price','Share price')}${f('eps','EPS (profit per share)')}${f('div','Dividend per share (a year)')}${f('sh','Shares outstanding')}</div></div>
+  <div class="card"><div class="ch"><h3>Result</h3></div><div class="g g2">
+  ${stat('Current ratio',fx(cr),'above 1.5 is comfortable, below 1 is a warning',tn(cr,v=>v>=1.5))}${stat('Working capital',fx(wc,0),'current assets − current liabilities',tn(wc,v=>v>0))}
+  ${stat('Debt-to-equity',fx(de),'below 1 is conservative; rising debt is a risk',tn(de,v=>v<1))}${stat('Equity ratio',fx(er),'equity ÷ total assets; higher means less borrowed',tn(er,v=>v>=0.4))}
+  ${stat('ROE',roe==null?'–':fx(roe*100,1)+'%','above 15% is strong',tn(roe,v=>v>=.15))}${stat('P/E',fx(pe,1),'compare with the industry, not with zero')}
+  ${stat('Dividend yield',dy==null?'–':fx(dy*100,2)+'%','income relative to the price')}${stat('P/B',fx(pb),'price ÷ book value per share')}
+  ${stat('Market cap',fx(mc,0),'price × shares')}${stat('Book value / share',fx(bv),'equity ÷ shares')}</div>
+  <p class="xs mut" style="margin-top:10px">Use ratios with context: the industry, the trend over several years and the quality of the business. One ratio never decides.</p></div></div>
+ <div class="card mt"><div class="ch"><h3>Fixed and variable costs: break-even</h3></div><div class="g g2"><div style="display:grid;gap:10px">${f('pu','Selling price per unit')}${f('vu','Variable cost per unit','Material, packaging, commission, shipping')}${f('fx','Fixed cost per month','Rent, salaries, insurance, subscriptions')}</div>
+  <div><div class="g g2">${stat('Contribution margin',fx(cm,0),'price − variable cost',tn(cm,v=>v>0))}${stat('Break-even units',be==null?'–':fx(Math.ceil(be),0),'fixed cost ÷ contribution margin')}</div><p class="xs mut" style="margin-top:10px">Above break-even, each extra unit adds its contribution margin to profit. Check whether a cost is truly fixed or only fixed up to a capacity limit (step-fixed).</p></div></div></div>`}
+function pbMacro(u){
+ const bias=PB_MAC.reduce((s,m)=>s+(u.mac[m[0]]|0),0),ans=Object.keys(u.mac).length;
+ const read=ans<4?['Keep answering','Rate at least 4 of the 6 drivers.','']:bias>=3?['Risk-on tilt','Most drivers support risk assets. Look for entries on pullbacks, not for chasing.','green']:bias<=-3?['Risk-off tilt','Most drivers work against risk assets. Smaller size, more cash, tighter invalidation.','red']:['Neutral, be selective','Mixed drivers. Choose by relative value: what is stronger than the alternatives.',''];
+ const ex=pbN(u.rt.exp),ac=pbN(u.rt.act),hi=u.rt.hi==='1';let rx='';
+ if(ex!=null&&ac!=null&&ex!==0){const sp=(ac-ex)/Math.abs(ex)*100,beat=Math.abs(sp)<2?0:((ac>ex)===hi?1:-1);rx=beat===0?'In line with expectations: the price usually moves little.':beat>0?'Better than expected ('+fmtN(sp,1)+'% against the forecast): the price can rise, unless the market had already priced even more.':'Worse than expected ('+fmtN(sp,1)+'% against the forecast): the price can fall even when the number looks good in absolute terms.'}
+ const asset=[['Equity','Growth → Earnings → Margin → Valuation → Cost of capital'],['Bonds','Inflation → Policy expectations → Interest rates → Yield'],['FX','Relative growth → Relative rates → Capital flow → Currency demand'],['Commodity','Supply → Demand → Inventory → Production → Global activity']];
+ return `<div class="g g2"><div class="card"><div class="ch"><h3>Macro bias for risk assets</h3></div>${PB_MAC.map(m=>{const c=u.mac[m[0]];return `<div style="padding:7px 0;border-top:1px solid var(--line,#e5e7eb)"><div class="sm"><b>${m[1]}</b> <span class="xs mut">${m[2]}</span></div><div class="row" style="gap:4px;margin-top:5px;flex-wrap:wrap">${pbSeg('pbmac',m[0],c===undefined?'':String(c),[['1','Supports'],['0','Neutral'],['-1','Against']])}</div></div>`}).join('')}</div>
+  <div><div class="card"><div class="ch"><h3>Reading</h3></div>${stat('Bias',read[0],'score '+bias+' of ±'+PB_MAC.length,read[2])}<p class="sm" style="margin-top:10px">${read[1]}</p><p class="xs mut">Thinking order: macro data → policy → pricing and positioning → scenario → execution.</p></div>
+  <div class="card mt"><div class="ch"><h3>Good data is not always bullish</h3></div><div class="g g2"><div><label class="sm" for="rt_exp"><b>Expected</b></label><input class="in" id="rt_exp" data-pb="rt.exp" data-re="1" inputmode="decimal" value="${esc(u.rt.exp)}" style="width:100%"></div><div><label class="sm" for="rt_act"><b>Actual</b></label><input class="in" id="rt_act" data-pb="rt.act" data-re="1" inputmode="decimal" value="${esc(u.rt.act)}" style="width:100%"></div></div>
+  <div class="row" style="gap:6px;margin:8px 0;flex-wrap:wrap">${pbSeg('pbhi','hi',u.rt.hi,[['1','Higher is good for the price (profit)'],['0','Lower is good for the price (inflation)']])}</div><div class="sm">${rx||'Type the forecast and the result. The reaction depends on the gap, not on the number.'}</div></div></div></div>
+ <div class="card mt"><div class="ch"><h3>What drives each asset</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Asset</th><th>Driver chain</th></tr></thead><tbody>${asset.map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td></tr>`).join('')}</tbody></table></div></div>
+ <div class="card mt"><div class="ch"><h3>Time horizon changes the reading</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Horizon</th><th>What matters</th><th>Often reads as</th></tr></thead><tbody><tr><td>Weeks</td><td>High rates announced, weak sentiment, valuations pressed</td><td>Bearish</td></tr><tr><td>Months</td><td>Inflation easing, market pricing a rate cut, sensitive sectors recovering</td><td>Neutral to bullish</td></tr><tr><td>Years</td><td>Stable inflation, lower rates, healthier growth</td><td>Bullish</td></tr></tbody></table></div></div>
+ <div class="card mt"><div class="ch"><h3>Start from the driver, not the headline</h3></div><p class="sm">Ask first: which main driver of this asset is changing, and by how much compared with what the market expected? Then turn it into a workflow: <b>question → driver → evidence → expectation → scenario and exposure</b>. Price decides whether a good fundamental is still attractive: when expectations are too high, even good news has little room; when they are too low, a small improvement can reprice a lot.</p></div>`}
+function pbGlos(){const hw=['Understand the business','Check sales and profit','Study debt levels','Look at valuation','Decide with discipline'];
+ return `<div class="card"><div class="ch"><h3>How to read a stock</h3></div><ol class="sm ink2" style="margin:0;padding-left:20px">${hw.map(x=>`<li style="margin:3px 0">${x}</li>`).join('')}</ol><p class="sm" style="margin-top:8px"><b>Three golden rules.</b> Learn the business before you buy the stock. Compare ratios with industry peers. Never invest only because the price is rising.</p><p class="xs mut">Example: EPS 20 and price 300 gives P/E 15. Dividend 6 and price 120 gives a yield of 5%. Market cap = shares outstanding × share price.</p></div>
+ <div class="card mt"><div class="ch"><h3>20 terms every investor must know</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Term</th><th>Meaning</th></tr></thead><tbody>${PB_GLOS.map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td></tr>`).join('')}</tbody></table></div></div>`}
+VIEWS['market/playbook']=()=>{const u=pbUi(),tabs=[['check','Buy / Hold / Sell'],['ratios','Ratios'],['macro','Macro'],['terms','Terms']];
+ return `<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs.map(t=>`<button class="btn s ${u.tab===t[0]?'p':''}" data-act="pbtab" data-id="${t[0]}" aria-pressed="${u.tab===t[0]}">${t[1]}</button>`).join('')}</div>`+
+  (u.tab==='ratios'?pbRatios(u):u.tab==='macro'?pbMacro(u):u.tab==='terms'?pbGlos():pbCheck(u))+`<p class="xs mut" style="margin-top:12px">For learning, built from the reference sheets you gave. Ratios need context, quality and risk. Not advice.</p>`};
+ACT.pbtab=el=>{pbUi().tab=el.dataset.id;renderView()};
+ACT.pbown=el=>{pbUi().own=el.dataset.v==='1';renderView()};
+ACT.pbans=el=>{const u=pbUi(),id=el.dataset.id;if(u.a[id]===el.dataset.v)delete u.a[id];else u.a[id]=el.dataset.v;renderView()};
+ACT.pbmac=el=>{const u=pbUi(),id=el.dataset.id,v=+el.dataset.v;if(u.mac[id]===v)delete u.mac[id];else u.mac[id]=v;renderView()};
+ACT.pbhi=el=>{pbUi().rt.hi=el.dataset.v;renderView()};
+ACT.pbclear=()=>{const u=pbUi();u.a={};u.name='';u.th={base:'',conf:'',inv:'',alt:'',hor:'Months'};renderView()};
+ACT.pbgo=el=>go('market',el.dataset.s);
+ACT.pbsave=async()=>{const u=pbUi(),r=pbScore(u);if(!u.name.trim()){toast('Type the name or code first.');return}
+ const sv=(prefs().pb_saved||[]).filter(x=>!(x.n===u.name.trim()&&x.d===todayS()));sv.unshift({n:u.name.trim(),d:todayS(),own:u.own,q:r.Q,v:r.V,red:r.red,t:r.t,a:Object.assign({},u.a),th:Object.assign({},u.th)});
+ await setPrefs({pb_saved:sv.slice(0,30)});toast('Evaluation saved.');renderView()};
+ACT.pbload=el=>{const x=(prefs().pb_saved||[])[+el.dataset.id];if(!x)return;const u=pbUi();u.name=x.n;u.own=!!x.own;u.a=Object.assign({},x.a);u.th=Object.assign({base:'',conf:'',inv:'',alt:'',hor:'Months'},x.th);u.tab='check';renderView()};
+ACT.pbdel=async el=>{const sv=(prefs().pb_saved||[]).slice();sv.splice(+el.dataset.id,1);await setPrefs({pb_saved:sv});renderView()};
+document.addEventListener('input',e=>{const t=e.target;if(!t||!t.dataset||!t.dataset.pb)return;const u=pbUi(),p=t.dataset.pb.split('.');
+ if(p.length===1)u[p[0]]=t.value;else u[p[0]][p[1]]=t.value;
+ if(t.dataset.re){const keep=t.id,pos=t.selectionStart;renderView();const n=document.getElementById(keep);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}}});
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.pb==='th.hor')pbUi().th.hor=t.value});
+PAGEHELP['market/playbook']='A decision aid for Buy, Hold or Sell: a checklist of the business, people, financials, red flags, valuation and risk, ratio calculators, a macro bias and a thesis that can be proven wrong. It is built from your answers, not from live prices. Not advice.';
+(function(){const n=NAV.find(x=>x.id==='market');if(n&&!n.subs.some(s=>s[0]==='playbook')){const i=n.subs.findIndex(s=>s[0]==='sizing');n.subs.splice(i+1,0,['playbook','Decision playbook'])}})();
+
 /* ---- r14: 99_zzzzzzzzzzzzzzzzzzzzzzzz_dupes.js ---- */
 /* Rev 30 · Projects: (1) copies of the same project are marked "duplikat" in the list (display only, nothing is renamed, deleted or synced);
    (2) a project that arrived without a Life Area says "choose area": Polaris One is the only place that decides the Life Area. */
