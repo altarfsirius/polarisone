@@ -23595,11 +23595,11 @@ function dupProjects(){
 const EX_KEY='po_exec_v1';
 const EX_SRC={po:'Polaris One',apm:'Altair Project Management',aero:'Altair Aero Engineering',auto:'Altair Auto',imp:'Imported (API gateway)'};
 const EX_SHORT={po:'Polaris One',apm:'APM',aero:'Aero',auto:'Auto',imp:'Import'};
-const EX_SEC=[['summary','Summary figures'],['sources','Totals by app'],['review','Weekly review'],['actions','Actions'],['time','Time log'],['evidence','Evidence'],['notes','Deliverable, result, remarks'],['loose','Actions without an Activity']];
+const EX_SEC=[['summary','Summary figures'],['sources','Totals by app'],['review','Weekly review'],['actions','Actions'],['time','Time log'],['evidence','Evidence'],['notes','Deliverable, result, remarks'],['loose','Actions without an Activity'],['meet','Meetings & decisions'],['charts','Charts']];
 const EX_COL=[['code','IDs'],['source','App'],['dates','Planned dates'],['hours','Hours'],['priority','Priority'],['result','Action result'],['blocker','Blocker'],['tlnote','Time log notes'],['zero','Time entries with 0 hours'],['url','Evidence links']];
 const EX_WEEKS=[[1,'1 week'],[2,'2 weeks'],[4,'4 weeks'],[13,'13 weeks (quarter)']];
 function exDef(){return {weeks:1,src:{po:1,apm:1,aero:1,auto:1,imp:1},scope:'open',status:'',group:'project',evid:'period',areaOff:{},projOff:{},
-  sec:{summary:1,sources:1,review:1,actions:1,time:1,evidence:1,notes:0,loose:0},col:{code:1,source:1,dates:1,hours:1,priority:0,result:1,blocker:0,tlnote:1,zero:0,url:1},off:{}}}
+  sec:{summary:1,sources:1,review:1,actions:1,time:1,evidence:1,notes:0,loose:0,meet:1,charts:1},col:{code:1,source:1,dates:1,hours:1,priority:0,result:1,blocker:0,tlnote:1,zero:0,url:1},off:{}}}
 function exS(){
   if(S.ex)return S.ex;
   const d=exDef();let o={};try{o=JSON.parse(localStorage.getItem(EX_KEY)||'{}')||{}}catch(e){o={}}
@@ -23697,6 +23697,60 @@ function exActivity(r,d){
     h+=`<div class="exsh">Evidence · ${r.ev.length+(a.link?1:0)} item${r.ev.length+(a.link?1:0)>1?'s':''}${s.evid==='all'?' to date':''}</div><table class="ext"><thead><tr><th style="width:62px">Date</th><th>Title</th><th style="width:120px">Type</th>${C.url?'<th>Link or file</th>':''}</tr></thead><tbody>${rowsE}</tbody></table>`}
   if(!any&&(s.sec.actions||s.sec.time||s.sec.evidence))h+=`<div class="exmut exnone">No ${[s.sec.actions&&'actions',s.sec.time&&'time',s.sec.evidence&&'evidence'].filter(Boolean).join(', ')} recorded in this period.</div>`;
   return h+'</section>'}
+
+/* r72: meeting results, discussion items and the state of their actions, grouped by project */
+function exMeet(d){
+  const s=d.s,ws=d.ws,we=d.we,t=todayS(),dd=x=>x?String(x).slice(0,10):'';
+  const ms=(D().meetings||[]).filter(m=>m.status!=='Cancelled'&&dd(m.meeting_date)>=ws&&dd(m.meeting_date)<=we).sort((a,b)=>dd(a.meeting_date).localeCompare(dd(b.meeting_date)));
+  const inM=new Set(ms.map(m=>m.id)),pk=i=>i.project_id&&byId('projects',i.project_id)?i.project_id:'none';
+  const items=(D().meeting_items||[]).filter(i=>!s.projOff[pk(i)]&&(inM.has(i.meeting_id)||(miLive(i)&&byId('meetings',i.meeting_id)&&dd(byId('meetings',i.meeting_id).meeting_date)<ws)));
+  const MA=D().meeting_actions||[],byItem=new Map(),push=(k,v)=>{if(!byItem.has(k))byItem.set(k,[]);byItem.get(k).push(v)};
+  MA.forEach(a=>{if(a.item_id)push(a.item_id,a)});
+  const late=a=>a.status!=='Done'&&a.status!=='Cancelled'&&a.due_date&&dd(a.due_date)<t;
+  const acts=items.flatMap(i=>byItem.get(i.id)||[]),aDone=acts.filter(a=>a.status==='Done').length,aLate=acts.filter(late).length;
+  const loose=MA.filter(a=>!a.item_id&&inM.has(a.meeting_id));
+  if(!ms.length&&!items.length&&!loose.length)return `<h3 class="exh3">Meetings &amp; decisions</h3><div class="exmut exnone">No meetings in this period.</div>`;
+  const stCls=st=>st==='Done'||st==='Decided'?'ok':st==='Open'||st==='Follow-up needed'?'warn':'';
+  let h=`<h3 class="exh3">Meetings &amp; decisions</h3><div class="exmut" style="margin-bottom:6px">${ms.length} meeting${ms.length===1?'':'s'} in this period · ${items.length} discussion item${items.length===1?'':'s'} (${items.filter(miLive).length} still open) · ${acts.length} follow-up action${acts.length===1?'':'s'}, ${aDone} done${aLate?', <b>'+aLate+' overdue</b>':''}</div>`;
+  if(ms.length)h+=`<table class="ext"><thead><tr><th style="width:62px">Date</th><th>Meeting</th><th>Result</th></tr></thead><tbody>${ms.map(m=>`<tr><td>${fmtS(m.meeting_date)}</td><td><b>${esc(m.title||'')}</b></td><td>${exTxt(trunc(m.mt_summary||m.mt_next_action||'',400))||'<span class="exmut">—</span>'}</td></tr>`).join('')}</tbody></table>`;
+  const gm=new Map();items.forEach(i=>{const k=pk(i);if(!gm.has(k))gm.set(k,[]);gm.get(k).push(i)});
+  [...gm.entries()].sort((x,y)=>((x[0]==='none')-(y[0]==='none'))||String(refLabel('projects',x[0])).localeCompare(String(refLabel('projects',y[0])),undefined,{numeric:true})).forEach(([k,list])=>{
+    const la=list.flatMap(i=>byItem.get(i.id)||[]);
+    h+=`<h4 class="exh4">${k==='none'?'No project':esc(refLabel('projects',k))} <span class="exmut">· ${list.length} item${list.length>1?'s':''} · ${list.filter(miLive).length} open · ${la.filter(a=>a.status==='Done').length} of ${la.length} actions done${la.filter(late).length?' · '+la.filter(late).length+' overdue':''}</span></h4>
+    <table class="ext"><thead><tr><th style="width:62px">Meeting</th><th>Discussion item and decision</th><th style="width:96px">Status</th><th style="width:130px">Owner · due</th></tr></thead><tbody>${list.map(i=>{const m=byId('meetings',i.meeting_id),as=byItem.get(i.id)||[];
+      return `<tr><td>${m?fmtS(m.meeting_date):'—'}</td><td><b>${esc(i.topic||'')}</b>${i.decision?`<div><span class="exmut">Decision:</span> ${exTxt(trunc(i.decision,300))}</div>`:''}${as.length?`<div style="margin-top:3px">${as.map(a=>`<div>${a.status==='Done'?'✓':'○'} ${esc(trunc(a.action||'',140))} <span class="exmut">· ${esc(a.status||'Open')}${a.pic?' · '+esc(a.pic):''}${a.due_date?' · due '+fmtS(a.due_date):''}</span>${late(a)?' <b>overdue</b>':''}</div>`).join('')}</div>`:''}</td><td>${esc(i.status||'Open')}</td><td>${esc(i.pic||'—')}${i.due_date?'<br>'+fmtS(i.due_date):''}</td></tr>`}).join('')}</tbody></table>`});
+  if(loose.length)h+=`<h4 class="exh4">Other action items from these meetings <span class="exmut">· ${loose.length}</span></h4><table class="ext"><thead><tr><th>Action</th><th style="width:96px">Status</th><th style="width:130px">Owner · due</th></tr></thead><tbody>${loose.map(a=>`<tr><td>${esc(a.action||'')}${late(a)?' <b>overdue</b>':''}</td><td>${esc(a.status||'Open')}</td><td>${esc(a.pic||'—')}${a.due_date?'<br>'+fmtS(a.due_date):''}</td></tr>`).join('')}</tbody></table>`;
+  return h}
+
+/* r73: charts for the Executive Progress Report (inline SVG, readable on screen and in print) */
+const EX_CLR={'Completed':'#2E7D32','In Progress':'#1E6FD9','Not Started':'#94A3B8','On Hold':'#D98E04','Cancelled':'#B0B7C3','Late':'#C62828','Open':'#D98E04','Decided':'#2E7D32','Follow-up needed':'#7B3FC4','Done':'#2E7D32','Deferred':'#94A3B8','Overdue':'#C62828'};
+function exDonut(parts,total,label){
+  const R=42,C=2*Math.PI*R;let off=0;const tt=parts.reduce((a,p)=>a+p.n,0);
+  if(!tt)return '<div class="exmut">No data</div>';
+  const segs=parts.filter(p=>p.n).map(p=>{const len=C*p.n/tt,o=`<circle r="${R}" cx="55" cy="55" fill="none" stroke="${p.c}" stroke-width="16" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 55 55)"/>`;off+=len;return o}).join('');
+  return `<div class="exdn"><svg viewBox="0 0 110 110" width="110" height="110" role="img" aria-label="${esc(label)}"><circle r="${R}" cx="55" cy="55" fill="none" stroke="#EEF2F6" stroke-width="16"/>${segs}<text x="55" y="53" text-anchor="middle" font-size="20" font-weight="700" fill="#16202E">${total}</text><text x="55" y="68" text-anchor="middle" font-size="9" fill="#64748B">${esc(label)}</text></svg>
+  <ul class="exlg">${parts.filter(p=>p.n).map(p=>`<li><i style="background:${p.c}"></i>${esc(p.l)} <b>${p.n}</b> <span class="exmut">${Math.round(100*p.n/tt)}%</span></li>`).join('')}</ul></div>`}
+function exBars(rows){
+  if(!rows.length)return '<div class="exmut">No data</div>';
+  return `<div class="exbc">${rows.map(r=>`<div class="exbr"><div class="exbl" title="${esc(r.l)}">${esc(trunc(r.l,34))}</div><div class="exbt"><i style="width:${clamp(Math.round(r.v),0,100)}%;background:${r.c||'#1E6FD9'}"></i></div><div class="exbv">${Math.round(r.v)}%${r.x?` <span class="exmut">${esc(r.x)}</span>`:''}</div></div>`).join('')}</div>`}
+function exCharts(d){
+  const s=d.s,rows=d.rows,t=todayS();
+  const st=['Completed','In Progress','Not Started','On Hold','Cancelled'],cnt=k=>rows.filter(r=>(r.a.status||'Not Started')===k).length;
+  const parts=st.map(k=>({l:k,n:cnt(k),c:EX_CLR[k]})).concat([{l:'Late',n:rows.filter(r=>r.late>0).length,c:EX_CLR.Late}]);
+  /* "Late" overlaps a status, so the ring shows the statuses and Late is listed beside it */
+  const ring=exDonut(parts.slice(0,5),rows.length,'Activities');
+  const late=parts[5].n;
+  const gp=d.groups.filter(g=>g.name).map(g=>({l:g.name,v:g.list.length?sum(g.list.map(r=>num(r.a.progress)))/g.list.length:0,x:g.list.length+' act.'})).sort((a,b)=>b.v-a.v).slice(0,10);
+  const ab=exBars(gp.length?gp:rows.slice(0,0));
+  const aDone=sum(rows.map(r=>r.done)),aAll=sum(rows.map(r=>r.actions.length)),aOver=sum(rows.map(r=>r.actions.filter(x=>x.status!=='Completed'&&x.status!=='Cancelled'&&x.action_date&&x.action_date<t).length));
+  const ra=exDonut([{l:'Completed',n:aDone,c:EX_CLR.Completed},{l:'Not done, overdue',n:aOver,c:EX_CLR.Late},{l:'Not done yet',n:Math.max(0,aAll-aDone-aOver),c:'#94A3B8'}],aAll,'Actions');
+  let mt='';
+  if(s.sec.meet){const dd=x=>x?String(x).slice(0,10):'',ms=new Set((D().meetings||[]).filter(m=>dd(m.meeting_date)>=d.ws&&dd(m.meeting_date)<=d.we).map(m=>m.id));
+    const it=(D().meeting_items||[]).filter(i=>ms.has(i.meeting_id)&&!s.projOff[i.project_id&&byId('projects',i.project_id)?i.project_id:'none']);
+    if(it.length)mt=`<div class="exch"><h4>Discussion items</h4>${exDonut(['Open','Follow-up needed','Decided','Done','Deferred'].map(k=>({l:k,n:it.filter(i=>(i.status||'Open')===k).length,c:EX_CLR[k]})),it.length,'Items')}</div>`}
+  return `<div class="exchs"><div class="exch"><h4>Activities by status</h4>${ring}${late?`<div class="exmut" style="margin-top:4px"><i class="exdot" style="background:${EX_CLR.Late}"></i>${late} past planned finish</div>`:''}</div>
+  <div class="exch"><h4>Actions in this period</h4>${ra}</div>${mt}
+  <div class="exch exwide"><h4>Average progress by ${s.group==='area'?'life area':s.group==='source'?'app':'project'}</h4>${s.group==='none'?'<div class="exmut">Group by project, life area or app to see this chart.</div>':ab}</div></div>`}
 function exReport(d){
   const s=d.s,T=d.tot,who=(S.profile&&S.profile.full_name)||'',links=exLinks();
   const f=[],nmA=k=>k==='none'?'No life area':String(refLabel('portfolios',k)).trim(),nmP=k=>k==='none'?'No project':refLabel('projects',k);
@@ -23710,16 +23764,18 @@ function exReport(d){
    <div class="exfilt">${f.map(esc).join(' · ')}</div>`;
   if(s.sec.summary){const k=(l,v,x)=>`<div class="exk"><div class="exkl">${l}</div><div class="exkv">${v}</div><div class="exks">${x||''}</div></div>`;
     h+=`<div class="exks4">${k('Activities',T.n,`${T.completed} completed in this period`)}${k('Average progress',T.prog==null?'—':Math.round(T.prog)+'%',`${T.inprog} in progress`)}${k('Late',T.late,'past the planned finish')}${k('Actions done',`${T.nDone} / ${T.nAct}`,T.nAct?Math.round(T.nDone/T.nAct*100)+'% of the actions in this period':'no actions in this period')}${k('Time logged',exH(T.hrs),'from the time log')}${k('Evidence',T.ev,s.evid==='all'?'items to date':'items dated in this period')}</div>`}
+  if(s.sec.charts)h+=exCharts(d);
   if(s.sec.sources&&d.bySrc.length)h+=`<h3 class="exh3">By app</h3><table class="ext exsum"><thead><tr><th>App</th><th>Activities</th><th>Completed</th><th>Late</th><th>Average progress</th><th>Actions done</th><th>Time logged</th></tr></thead><tbody>${d.bySrc.map(x=>`<tr><td><b>${esc(EX_SRC[x.k])}</b></td><td>${x.n}</td><td>${x.done}</td><td>${x.late}</td><td>${x.prog==null?'—':exBar(x.prog)}</td><td>${x.actDone} / ${x.act}</td><td>${exH(x.hrs)}</td></tr>`).join('')}</tbody></table>${d.bySrc.length>1?'<div class="exmut exfoot1">An Activity shared with more than one app is counted under each of them.</div>':''}`;
   if(s.sec.review){h+=`<h3 class="exh3">Weekly review</h3>`;
     h+=d.reviews.length?d.reviews.map(r=>`<div class="exrev"><div class="exrevh"><b>${fmtD(r.period_start)} – ${fmtD(r.period_end||r.period_start)}</b>${r.score!=null&&r.score!==''?` <span class="exscore">Outcome score ${Math.round(num(r.score))}%</span>`:''}</div><div class="exrevg">${[['Wins',r.wins],['Gaps',r.gaps],['Insights',r.insights],['Next actions',r.next_actions]].filter(x=>String(x[1]||'').trim()).map(x=>`<div><div class="exrevl">${x[0]}</div><div>${exTxt(x[1])}</div></div>`).join('')||'<div class="exmut">The review has no notes.</div>'}</div></div>`).join(''):`<div class="exmut exnone">No weekly review was written for this period.</div>`}
+  if(s.sec.meet)h+=exMeet(d);
   h+=`<h3 class="exh3">Activities${d.rows.length?` (${d.rows.length})`:''}</h3>`;
   h+=d.rows.length?d.groups.map(g=>(g.name?`<h4 class="exh4">${esc(g.name)} <span class="exmut">· ${g.list.length} ${g.list.length>1?'Activities':'Activity'}${g.list.length?' · average progress '+Math.round(sum(g.list.map(r=>r.a.progress))/g.list.length)+'%':''}</span></h4>`:'')+g.list.map(r=>exActivity(r,d)).join('')).join(''):`<div class="exmut exnone">No Activity matches the choices above.</div>`;
   if(s.sec.loose&&d.loose.length)h+=`<h3 class="exh3">Actions without an Activity (${d.loose.length})</h3><table class="ext"><thead><tr><th style="width:62px">Date</th>${s.col.code?'<th style="width:104px">ID</th>':''}<th>Action</th><th style="width:82px">Status</th><th style="width:64px">Time</th>${s.col.result?'<th>Result</th>':''}</tr></thead><tbody>${d.loose.map(x=>`<tr><td>${fmtS(x.action_date)}</td>${s.col.code?`<td class="excode">${esc(x.code||'')}</td>`:''}<td>${esc(exName(x.title,x.code))}</td><td>${esc(x.status||'')}</td><td>${exMin(dMin(x))}</td>${s.col.result?`<td>${exTxt(x.result)}</td>`:''}</tr>`).join('')}</tbody></table>`;
   h+=`<footer class="exfoot">Read from Polaris One on ${fmtDT(new Date())}. Items of linked apps are shown as last synchronised${links.length?' ('+links.map(esc).join('; ')+')':''}. Status, progress and dates are those kept in Polaris One.</footer></div>`;
   return h}
 function exStyle(){if(document.getElementById('exsty'))return;const st=document.createElement('style');st.id='exsty';st.textContent=`
-.exrep{background:#fff;color:#16202E;border:1px solid var(--line,#E2E8F0);border-radius:12px;padding:22px 24px;font-size:13px;line-height:1.45}
+.exchs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:14px 0}.exch{border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;break-inside:avoid}.exch h4{margin:0 0 8px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#64748B}.exwide{grid-column:1/-1}.exdn{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.exlg{list-style:none;margin:0;padding:0;font-size:12px}.exlg li{display:flex;align-items:center;gap:6px;margin:2px 0}.exlg i,.exdot{display:inline-block;width:10px;height:10px;border-radius:2px;flex:none}.exbc{display:grid;gap:5px}.exbr{display:grid;grid-template-columns:minmax(90px,200px) 1fr 90px;gap:8px;align-items:center;font-size:12px}.exbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exbt{background:#EEF2F6;border-radius:4px;height:10px;overflow:hidden}.exbt i{display:block;height:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}.exbv{font-weight:600}.exdn svg circle{-webkit-print-color-adjust:exact;print-color-adjust:exact}.exrep{background:#fff;color:#16202E;border:1px solid var(--line,#E2E8F0);border-radius:12px;padding:22px 24px;font-size:13px;line-height:1.45}
 .exhead{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:2px solid #16202E;padding-bottom:10px}
 .exhead h2{font:700 24px var(--serif,Georgia,serif);letter-spacing:-.02em;margin:2px 0}.exkick{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#5B6878}
 .exwho{text-align:right;font-size:12px;color:#3D4A5C}.exfilt{font-size:11.5px;color:#5B6878;margin:8px 0 14px}
@@ -23950,6 +24006,33 @@ ACT.ovstat=el=>{const t=todayS(),A=FD('activities'),all=A.filter(a=>a.status!=='
   const body=list.length?`<p class="sm mut" style="margin-bottom:8px">${list.length} activit${list.length===1?'y':'ies'}, earliest planned finish first. Tap one to open it.</p><div class="list">${list.map(a=>`<div class="item" style="gap:10px" data-act="ovopen" data-id="${a.id}"><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;overflow-wrap:anywhere">${esc(a.name)}</div><div class="sm mut">${esc(a.status||'')}${a.planned_finish?' · due '+fmtD(a.planned_finish):' · no planned finish'}${a.progress!=null?' · '+(+a.progress||0)+'%':''}</div></div>${late(a)?'<span class="badge b-red">Overdue</span>':''}</div>`).join('')}</div>`:'<div class="empty"><b>Nothing here</b>No activity is counted in this tile.</div>';
   openModal(title+' ('+list.length+')',body)};
 ACT.ovopen=el=>{try{closeModal()}catch(e){}openDetail('activities',el.dataset.id)};
+/* ===== r71 · Home: "Meeting follow-ups" dashboard card (Discussion items that are still open) ===== */
+function mfData(){const t=todayS(),all=(D().meeting_items||[]),live=all.filter(miLive),due=i=>i.due_date?String(i.due_date).slice(0,10):'';
+  const d7=addD(t,7),mine=s=>String(s||'').trim().toLowerCase();
+  const sets={open:live,over:live.filter(i=>due(i)&&due(i)<t),today:live.filter(i=>due(i)===t),soon:live.filter(i=>due(i)>t&&due(i)<=d7),nodue:live.filter(i=>!due(i)),nopic:live.filter(i=>!String(i.pic||'').trim()),done:all.filter(i=>!miLive(i))};
+  const prj=new Map();live.forEach(i=>{const k=i.project_id||'';const e=prj.get(k)||{k,n:0,over:0};e.n++;if(due(i)&&due(i)<t)e.over++;prj.set(k,e)});
+  const pic=new Map();live.forEach(i=>{const k=String(i.pic||'').trim()||'(no one yet)';const e=pic.get(k)||{k,n:0,over:0};e.n++;if(due(i)&&due(i)<t)e.over++;pic.set(k,e)});
+  return {t,all,live,sets,prj:[...prj.values()].sort((a,b)=>b.over-a.over||b.n-a.n),pic:[...pic.values()].sort((a,b)=>b.over-a.over||b.n-a.n),due}}
+function mfCard(){
+  if(!(D().meeting_items||[]).length)return '';
+  const v=mfData(),S_=v.sets,tile=(k,l,n,s,tone)=>`<div data-act="mfopen" data-k="${k}" role="button" tabindex="0" style="cursor:pointer" onkeydown="if(event.key==='Enter')this.click()" class="stat ${tone||''}"><div class="l">${l}</div><div class="v">${n}</div><div class="s">${s}</div></div>`;
+  const tiles=`<div class="g g6">${tile('open','Open items',S_.open.length,'still to follow up','blue')}${tile('over','Overdue',S_.over.length,'past follow-up date',S_.over.length?'red':'')}${tile('today','Due today',S_.today.length,'follow up today',S_.today.length?'amber':'')}${tile('soon','Next 7 days',S_.soon.length,'coming up')}${tile('nopic','No owner',S_.nopic.length,'nobody responsible',S_.nopic.length?'amber':'')}${tile('nodue','No date',S_.nodue.length,'no follow-up date')}</div>`;
+  const rows=(a,lab)=>a.length?a.slice(0,6).map(e=>{const w=Math.max(4,Math.round(e.n/(a[0].n||1)*100));return `<div data-act="mfopen" data-k="grp" data-g="${esc(lab==='p'?'p:'+e.k:'o:'+e.k)}" style="cursor:pointer;margin:7px 0" role="button" tabindex="0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lab==='p'?(e.k?trunc(refLabel('projects',e.k),44):'No project'):e.k)}</span><b>${e.n}${e.over?` <span class="badge b-red">${e.over} overdue</span>`:''}</b></div><div style="height:6px;border-radius:4px;background:var(--line,#e5e7eb);margin-top:3px"><div style="height:6px;border-radius:4px;width:${w}%;background:${e.over?'#B42318':'var(--brand)'}"></div></div></div>`}).join(''):'<div class="sm mut">Nothing open.</div>';
+  const next=S_.open.filter(i=>v.due(i)).sort((a,b)=>v.due(a).localeCompare(v.due(b))).slice(0,5);
+  const nx=next.length?next.map(i=>`<div class="item" data-act="open" data-k="meeting_items" data-id="${i.id}" style="gap:10px"><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;overflow-wrap:anywhere">${esc(i.topic)}</div><div class="sm mut">${esc(i.pic||'No owner')} · due ${esc(fmtS(i.due_date))}${i.project_id?' · '+esc(trunc(refLabel('projects',i.project_id),30)):''}</div></div>${v.due(i)<v.t?'<span class="badge b-red">Overdue</span>':v.due(i)===v.t?'<span class="badge b-amber">Today</span>':''}</div>`).join(''):'<div class="sm mut">No open item has a follow-up date.</div>';
+  return `<div class="card mt"><div class="ch"><h3>Meeting follow-ups</h3><span class="sp"></span><span class="sm mut">${S_.done.length} closed of ${v.all.length}</span><button class="btn s" data-act="go" data-p="meetings" data-s="items">All items</button></div>${tiles}<div class="g g3 g1m mt"><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">By project</div>${rows(v.prj,'p')}</div><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">By person responsible</div>${rows(v.pic,'o')}</div><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">Next due</div><div class="list">${nx}</div></div></div></div>`}
+ACT.mfopen=el=>{const v=mfData(),k=el.dataset.k;let title,rows;
+  if(k==='grp'){const g=el.dataset.g,isP=g.startsWith('p:'),key=g.slice(2);rows=v.live.filter(i=>isP?(i.project_id||'')===key:(String(i.pic||'').trim()||'(no one yet)')===key);title=(isP?(key?refLabel('projects',key):'No project'):key)+' · open items'}
+  else{const names={open:'Open items',over:'Overdue items',today:'Due today',soon:'Due in the next 7 days',nopic:'Items with no owner',nodue:'Items with no follow-up date'};rows=v.sets[k]||v.live;title=names[k]||'Items'}
+  rows=rows.slice().sort((a,b)=>(v.due(a)||'9999').localeCompare(v.due(b)||'9999')||String(a.topic).localeCompare(String(b.topic)));
+  const body=rows.length?`<p class="sm mut" style="margin-bottom:8px">${rows.length} item${rows.length===1?'':'s'}, earliest follow-up first. Tap one to open it.</p><div class="list">${rows.map(i=>`<div class="item" style="gap:10px" data-act="mfitem" data-id="${i.id}"><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;overflow-wrap:anywhere">${esc(i.topic)}</div>${i.decision?`<div class="sm ink2">Decision: ${esc(trunc(i.decision,120))}</div>`:''}<div class="sm mut">${esc(i.pic||'No owner')}${i.due_date?' · due '+esc(fmtS(i.due_date)):' · no date'}${i.project_id?' · '+esc(trunc(refLabel('projects',i.project_id),36)):''}</div></div>${miBadge(i.status)}</div>`).join('')}</div>`:'<div class="empty"><b>Nothing here</b>No item matches.</div>';
+  openModal(title+' ('+rows.length+')',body)};
+ACT.mfitem=el=>{try{closeModal()}catch(e){}openDetail('meeting_items',el.dataset.id)};
+(function(){const o=VIEWS['dashboard/overview'];VIEWS['dashboard/overview']=function(){const h=o.apply(this,arguments);let c='';try{if(!(typeof isKid==='function'&&isKid()))c=mfCard()}catch(e){warn('meeting follow-ups card',e)}
+  if(!c)return h;const m='<div class="g g6 mt">',i=h.indexOf(m);if(i<0)return h+c;
+  /* put it right after the first row of number tiles */
+  let d=0,k=i;const re=/<div\b|<\/div>/g;re.lastIndex=i;let x;while((x=re.exec(h))){d+=x[0]==='</div>'?-1:1;if(d===0){k=re.lastIndex;break}}
+  return h.slice(0,k)+c+h.slice(k)}})();
 (async function boot(){
   try{await DB.init()}catch(e){console.error(e)}
   try{S.signupMode=await DB.publicSignupMode()}catch(e){S.signupMode='open'}
