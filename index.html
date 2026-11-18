@@ -23027,7 +23027,7 @@ const NG_SKIP=new Set(['heading','secret','file','dynref','hidden']);
 const NG_OK={text:['title','rich_text'],textarea:['rich_text','title'],time:['rich_text'],color:['rich_text'],number:['number'],range:['number'],select:['select','status','multi_select','rich_text'],nsel:['select','status','multi_select','rich_text'],date:['date'],check:['checkbox'],url:['url','rich_text'],ref:['relation']};
 const ngN=x=>String(x||'').toLowerCase().replace(/[\s_\-()]/g,'');
 const ngCfgAll=()=>(S.profile&&prefs().notion_all)||{};
-const NGX_T=['activities','daily_actions'];const ngxOn=t=>NGX_T.includes(t)&&NG_T.includes(t);
+const NGX_T=['activities','daily_actions'];const NIMP_T=['activities','daily_actions','meetings'];const ngxOn=t=>NGX_T.includes(t)&&NG_T.includes(t);
 const ngCfg=t=>{const s=(ngCfgAll().t||{})[t];return s&&Object.keys(s).length?s:(ngxOn(t)?ngLegacyCfg(t):{})};
 async function ngSave(t,patch){const a=ngCfgAll(),tt=Object.assign({},a.t||{});if(t)tt[t]=Object.assign({},ngCfg(t),patch);await setPrefs({notion_all:Object.assign({},a,{t:tt})})}
 async function ngSaveTop(patch){await setPrefs({notion_all:Object.assign({},ngCfgAll(),patch)})}
@@ -23386,8 +23386,8 @@ NGX_T.forEach(t=>{if(!MOD[t])return;const have=k=>MOD[t].fields.some(f=>f.k===k)
   if(!have('notion_page_id'))MOD[t].fields.push(F('notion_page_id','Notion page','hidden','',{sql:'text'}));
   if(!have('notion_synced_at'))MOD[t].fields.push(F('notion_synced_at','Notion synced at','hidden','',{sql:'text'}))});
 connAdd({id:'notion-all',group:'notes',name:'Notion',mono:'N',tint:CONN_TINT.n,beta:true,desc:'Activities, Daily Actions, Goals, Plans, KPIs, Ledger, Meetings and the rest ⇄ the databases you made in Notion. Preview first.',state:()=>NG_T.some(ngReady)?'on':'off',types:NG_T.map(t=>({id:'db-'+t,name:MOD[t].many,sub:'Connect, mapping, sync',beta:true,title:'Notion '+MOD[t].many,lead:'Own database, own mapping',text:'One Notion database for '+MOD[t].many+'. Mapped by name; you can change any row. Uses the same Notion token as the Activity Log.',
-  body:()=>{S.ng.sub=S.ng.sub||{};const k='db-'+t,subs=[['c','Connect & check'],['m','Mapping']].concat(NGX_T.includes(t)?[['v','Life area, status, priority']]:[]).concat([['s','Preview & sync']]),cur=S.ng.sub[k]||'c';
-    return `<div class="cd-row" role="tablist" aria-label="${esc(MOD[t].many)}" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${subs.map(([id,l])=>`<button class="btn ${id===cur?'p':''}" role="tab" aria-selected="${id===cur}" data-act="ngsub" data-g="${k}" data-s="${id}">${l}</button>`).join('')}</div>`+(cur==='m'?(NGX_T.includes(t)?ngMapBodyX(t):ngTableBody(t,'m')):cur==='v'?ngValuesBody(t):cur==='s'?ngSyncBody(t):ngTableBody(t,'c'))},
+  body:()=>{S.ng.sub=S.ng.sub||{};const k='db-'+t,subs=[['c','Connect & check'],['m','Mapping']].concat(NGX_T.includes(t)?[['v','Life area, status, priority']]:[]).concat([['s','Preview & sync']]).concat(NIMP_T.includes(t)?[['i','Import from Notion']]:[]),cur=S.ng.sub[k]||'c';
+    return `<div class="cd-row" role="tablist" aria-label="${esc(MOD[t].many)}" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${subs.map(([id,l])=>`<button class="btn ${id===cur?'p':''}" role="tab" aria-selected="${id===cur}" data-act="ngsub" data-g="${k}" data-s="${id}">${l}</button>`).join('')}</div>`+(cur==='m'?(NGX_T.includes(t)?ngMapBodyX(t):ngTableBody(t,'m')):cur==='v'?ngValuesBody(t):cur==='s'?ngSyncBody(t):cur==='i'?ngImportBody(t):ngTableBody(t,'c'))},
   state:()=>ngReady(t)?'on':'off'}))});
 ACT.ngsub=el=>{S.ng.sub=S.ng.sub||{};S.ng.sub[el.dataset.g]=el.dataset.s;cdRefresh()};
 /* =====================================================================
@@ -24062,6 +24062,104 @@ ACT.mfitem=el=>{try{closeModal()}catch(e){}openDetail('meeting_items',el.dataset
   add('ordo',K('gw','Server account','Read-only account'));
   const au=connApp('automation');if(au&&au.types&&au.types[0])au.types[0].body=pick(/^(Market Analysis|Clean up|Daily breaks)/);
 })();
+
+/* ===== r80 · bring the pages that exist only in Notion into Polaris One =====
+   For the first load of a year of Meetings, Activities and Actions kept in Notion.
+   Read-only on Notion. Preview first, then staged inserts, numbered by Polaris One, undoable. A page already linked, or with the same title as an unlinked
+   Polaris One record, is never imported twice. */
+const nidn=x=>String(x||'').replace(/-/g,'').toLowerCase();
+S.ng.imp=S.ng.imp||{};
+const nimpNorm=x=>ngN(String(x||'').replace(/^(?:(?:PRJ|PRB|ACT)-\d{4}-\d+|ACN-\d{6}-\d+)\s·\s/,''));
+async function ngImportPlan(t){const N=S.ng,c=ngCfg(t);if(N.busy)return;N.busy='imp:'+t;N.err='';cdRefresh();
+  try{const mp=ngMap(t);if(!mp||!ngReady(t))throw new Error('Connect and check this database first.');
+    const main=mp.find(m=>m.f.k===MOD[t].main);if(!main)throw new Error('Map the title first.');
+    /* every page, 100 at a time */
+    const pages=[];let cur,more=false;for(let i=0;i<100;i++){const b={page_size:100};if(cur)b.start_cursor=cur;const r=await ngCall('POST','/v1/data_sources/'+nId(c.ds)+'/query',b);(r.results||[]).forEach(x=>pages.push(x));more=!!r.has_more;if(!more)break;cur=r.next_cursor;if(!S.ng.fake)await nSleep(120)}
+    const truncated=more;
+    /* the relation columns: an Action points to its Activity, an Activity may point to its parent */
+    let rel='',relName='';
+    try{const ds=await ngCall('GET','/v1/data_sources/'+nId(c.ds)),pr=ds.properties||{};
+      const tgt=k=>{const r=(pr[k]||{}).relation||{};return nidn(r.data_source_id||r.database_id||'')},rels=Object.keys(pr).filter(k=>pr[k].type==='relation');
+      if(t==='daily_actions'){const ad=nidn((ngCfg('activities')||{}).ds),h=rels.filter(k=>tgt(k)===ad&&ad);rel=h.find(k=>/activ|aktiv/i.test(k))||h[0]||''}
+      if(t==='activities'){const h=rels.filter(k=>tgt(k)===nidn(c.ds));rel=h.find(k=>/parent|induk/i.test(k))||''}
+      relName=rel}catch(e){}
+    const known=new Set((D()[t]||[]).map(r=>r.notion_page_id).filter(Boolean).map(nidn)),ids=new Set((D()[t]||[]).map(r=>String(r.id).toLowerCase())),ip=ngIdProp(t,c.schema);
+    const twin=new Map();(D()[t]||[]).filter(r=>!r.notion_page_id).forEach(r=>twin.set(nimpNorm(ngTitleOf(t,r))+'|'+(t==='daily_actions'?String(r.action_date||'').slice(0,10):''),r));
+    const items=[],skip={known:0,twin:0,noTitle:0,twins:[]},bad={},notes={noArea:0,noDate:0,noActivity:0};
+    for(const pg of pages){
+      if(known.has(nidn(pg.id))){skip.known++;continue}
+      if(ip){const v=(pg.properties||{})[ip],idv=ngTxt(v&&v.rich_text).trim().toLowerCase();if(idv&&ids.has(idv)){skip.known++;continue}}
+      const row={},rev=[],ctx={t,row,title:'',rev};
+      const tv=(pg.properties||{})[main.p];ctx.title=ngTxt(tv&&tv.title).trim();if(!ctx.title){skip.noTitle++;continue}
+      mp.filter(m=>m.dir!=='out'||(m.f.t==='area'&&t==='activities')).forEach(m=>{const nv=ngRead(pg.properties,m,ctx);if(nv===undefined)return;const v=ngCoerce(m,nv);
+        if(v===undefined){if(nv)(bad[m.f.k+': '+nv]=bad[m.f.k+': '+nv]||0,bad[m.f.k+': '+nv]++);return}
+        if(m.f.k==='progress'&&v!=null&&(v<0||v>100))return;row[m.f.k]=v});
+      row[MOD[t].main]=ctx.title;
+      if(t==='meetings'){const dp=mp.find(m=>m.f.k==='meeting_date'),dv=dp&&(pg.properties||{})[dp.p],ds=dv&&dv.date;
+        if(ds&&ds.start&&String(ds.start).length>10){const hm=x=>{const d=new Date(x);return isNaN(d)?null:String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};row.start_time=hm(ds.start);if(ds.end)row.end_time=hm(ds.end)}}
+      if(t==='daily_actions'&&!row.action_date){row.action_date=String(pg.created_time||'').slice(0,10)||todayS();notes.noDate++}
+      if(t==='meetings'&&!row.meeting_date){row.meeting_date=String(pg.created_time||'').slice(0,10)||todayS();notes.noDate++}
+      MOD[t].fields.forEach(f=>{if(f.def!==undefined&&row[f.k]===undefined&&!/^share_|^notion_/.test(f.k))row[f.k]=f.def});
+      if(t==='activities'){if(!row.status)row.status='Not Started';if(row.progress==null)row.progress=0;if(!row.portfolio_id)notes.noArea++}
+      const rv=rel?(pg.properties||{})[rel]:null,rid=rv&&rv.relation&&rv.relation[0]?rv.relation[0].id:'';
+      const tk=nimpNorm(ctx.title)+'|'+(t==='daily_actions'?String(row.action_date||'').slice(0,10):'');
+      if(twin.has(tk)){skip.twin++;if(skip.twins.length<5)skip.twins.push(ctx.title);continue}
+      row.share_with_notion=true;row.notion_page_id=pg.id;row.notion_synced_at=pg.last_edited_time||pg.created_time||null;   /* = Notion's own last edit: nothing is pulled, and the first sync writes the Polaris One number back */
+      if(pg.created_time)row.created_at=pg.created_time;
+      items.push({row,pg:pg.id,rel:rid,title:ctx.title})}
+    if(t==='daily_actions'){const have=new Set((D().activities||[]).map(a=>nidn(a.notion_page_id)).filter(Boolean));items.forEach(x=>{if(!x.rel||!have.has(nidn(x.rel)))notes.noActivity++})}
+    N.imp[t]={items,skip,bad,notes,pages:pages.length,truncated,rel:relName,at:new Date().toISOString()}}
+  catch(e){N.err=nFriendly?nFriendly(e,'the database'):(e.message||String(e))}
+  N.busy='';cdRefresh()}
+async function ngImportRun(t){const N=S.ng,pl=N.imp[t];if(!pl||!pl.items.length||N.busy)return;N.busy='imp:'+t;N.err='';N.msg='';cdRefresh();
+  try{const byPg=new Map();(D().activities||[]).forEach(a=>{if(a.notion_page_id)byPg.set(nidn(a.notion_page_id),a.id)});
+    let items=pl.items.slice().sort((a,b)=>String(a.row.created_at||'').localeCompare(String(b.row.created_at||'')));
+    items.forEach(x=>{x.row.id=uid()});
+    if(t==='activities')items.forEach(x=>byPg.set(nidn(x.pg),x.row.id));
+    if(t==='activities'){items.forEach(x=>{const pid=x.rel?byPg.get(nidn(x.rel)):null;x.row.parent_id=pid&&pid!==x.row.id?pid:null});
+      /* parents before children, so a chunk never points to a row that is not saved yet */
+      const depth=new Map(),by=new Map(items.map(x=>[x.row.id,x]));const dp=x=>{if(depth.has(x.row.id))return depth.get(x.row.id);depth.set(x.row.id,0);const p=x.row.parent_id&&by.get(x.row.parent_id);const d=p?dp(p)+1:0;depth.set(x.row.id,d);return d};
+      items.forEach(dp);items.sort((a,b)=>depth.get(a.row.id)-depth.get(b.row.id)||String(a.row.created_at||'').localeCompare(String(b.row.created_at||'')))}
+    if(t==='daily_actions')items.forEach(x=>{const id=x.rel?byPg.get(nidn(x.rel)):null;if(id)x.row.activity_id=id});
+    const rows=items.map(x=>x.row);idAssign(t,rows);
+    const done=[];let n=0;
+    for(let i=0;i<rows.length;i+=200){const part=rows.slice(i,i+200),ins=await DB.insertMany(t,part);D()[t]=(D()[t]||[]).concat(ins);ins.forEach(r=>done.push(r.id));n+=ins.length;N.msg='Imported '+n+' of '+rows.length+'…';cdRefresh();await nSleep(0)}
+    const last=Object.assign({},(prefs().notion_import_last)||{});last[t]={at:new Date().toISOString(),ids:done};try{await setPrefs({notion_import_last:last})}catch(e){}
+    N.res=`${n} ${MOD[t].many.toLowerCase()} imported from Notion. Each has its own Polaris One number; the next “Preview & sync” writes it back to Notion.`;N.msg='';N.imp[t]=null;toast(N.res);try{renderView()}catch(e){}}
+  catch(e){N.err='Stopped: '+(e.message||e)+'. What was already imported stays; press “Read Notion” again to continue with the rest.';D()[t]=D()[t]||[]}
+  N.busy='';cdRefresh()}
+async function ngImportUndo(t){const N=S.ng,l=((prefs().notion_import_last)||{})[t];if(!l||!l.ids||!l.ids.length||N.busy)return;N.busy='imp:'+t;N.err='';cdRefresh();
+  try{const ids=l.ids.slice();for(let i=0;i<ids.length;i+=200){const ch=ids.slice(i,i+200);
+      if(DB.mode==='supabase'){const {error}=await DB.sb.from(t).delete().in('id',ch);if(error)throw error}else for(const id of ch){try{await DB.remove(t,id)}catch(e){}}}
+    const set=new Set(ids);D()[t]=(D()[t]||[]).filter(r=>!set.has(r.id));const last=Object.assign({},prefs().notion_import_last||{});delete last[t];await setPrefs({notion_import_last:last});
+    N.res=`${ids.length} imported ${MOD[t].many.toLowerCase()} removed again. Notion was not touched.`;N.undoAsk='';try{renderView()}catch(e){}}
+  catch(e){N.err='Could not remove all: '+(e.message||e)}
+  N.busy='';cdRefresh()}
+function ngImportBody(t){const N=S.ng,pl=N.imp[t],last=((prefs().notion_import_last)||{})[t],busy=!!N.busy,many=MOD[t].many;
+  if(!ngReady(t))return `<div class="cd-box"><b>Import from Notion</b><p class="sm mut" style="margin-top:6px">Connect and check the Notion database first (tab “Connect & check”), and match its columns (tab “Mapping”).</p></div>`;
+  const li=(a,b)=>`<div class="row" style="justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:4px 0"><span>${a}</span><b>${b}</b></div>`;
+  const hint=t==='daily_actions'?'Import the <b>Activities</b> first, so each Action can be linked to its Activity.':t==='activities'?'Import <b>Activities</b> before Daily Actions.':'';
+  let h=`<div class="cd-box"><b>Import ${esc(many)} from Notion</b>
+   <p class="sm ink2" style="margin:6px 0">Pages that exist only in Notion become records in Polaris One. <b>Nothing is changed in Notion by this step.</b> Polaris One gives every record its own number. Read first, check the preview, then import. A page that is already linked, or has the same title as a record not yet linked, is never imported twice.${hint?` ${hint}`:''}</p>
+   <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn p" data-act="nimpplan" data-t="${t}" ${busy?'disabled':''}>${ic('refresh',15)} Read Notion (preview)</button>${busy&&N.busy==='imp:'+t?`<span class="sm mut" role="status">${esc(N.msg||'Working…')}</span>`:''}</div>
+   ${N.err?`<p class="sm" style="color:var(--red);margin-top:6px" role="alert">${esc(N.err)}</p>`:''}</div>`;
+  if(pl){const n=pl.items.length,nt=pl.notes,bk=Object.entries(pl.bad).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    h+=`<div class="cd-box" style="margin-top:10px"><b>Preview</b><span class="mut sm"> · ${pl.pages} pages read${pl.truncated?' (stopped at 10,000; run again after importing)':''}</span>
+     <div class="sm" style="margin-top:6px">${li('New, will be imported',n)}${li('Already linked to a record',pl.skip.known)}${li('Same title already in Polaris One (not imported; link them in “Preview & sync”)',pl.skip.twin)}${li('No title (skipped)',pl.skip.noTitle)}</div>
+     ${pl.rel?`<p class="sm mut" style="margin-top:6px">${t==='daily_actions'?'Activity':'Parent'} is read from the Notion column “${esc(pl.rel)}”.</p>`:t==='daily_actions'?'<p class="sm" style="margin-top:6px;color:var(--amber,#8A5A00)">! No relation column to the Activities database was found, so Actions are imported without an Activity.</p>':''}
+     ${t==='activities'&&nt.noArea?`<p class="sm" style="margin-top:6px;color:var(--amber,#8A5A00)">! ${nt.noArea} Activit${nt.noArea>1?'ies have':'y has'} no Life Area (the Domain is empty or not paired in “Life area, status, priority”). They are imported without one; give them a Life Area before they are sent back to Notion.</p>`:''}
+     ${t==='daily_actions'&&nt.noActivity?`<p class="sm" style="margin-top:6px;color:var(--amber,#8A5A00)">! ${nt.noActivity} Action${nt.noActivity>1?'s have':' has'} no Activity in Polaris One yet. They are imported without one.</p>`:''}
+     ${nt.noDate?`<p class="sm mut" style="margin-top:6px">${nt.noDate} without a date: the day the page was created is used.</p>`:''}
+     ${bk.length?`<details style="margin-top:6px"><summary class="b" style="cursor:pointer">Values Polaris One does not have (left empty)</summary><div class="sm" style="margin-top:4px">${bk.map(([k,v])=>`<div>${esc(k)} <b>× ${v}</b></div>`).join('')}</div></details>`:''}
+     ${pl.skip.twins.length?`<details style="margin-top:6px"><summary class="b" style="cursor:pointer">Examples of the same title</summary><div class="sm" style="margin-top:4px">${pl.skip.twins.map(x=>`<div>${esc(x)}</div>`).join('')}</div></details>`:''}
+     ${n?`<details style="margin-top:6px"><summary class="b" style="cursor:pointer">First ${Math.min(8,n)} to be imported</summary><div class="sm" style="margin-top:4px">${pl.items.slice(0,8).map(x=>`<div>${esc(trunc(x.title,90))}</div>`).join('')}</div></details>`:''}
+     <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn p" data-act="nimprun" data-t="${t}" ${busy||!n?'disabled':''}>${ic('down',15)} Import ${n} ${esc(many.toLowerCase())}</button><span class="sm mut">Saved in groups of 200. You can stop and read again; nothing is imported twice.</span></div></div>`}
+  if(last&&last.ids&&last.ids.length){h+=`<div class="cd-box" style="margin-top:10px"><b>Last import</b><span class="mut sm"> · ${last.ids.length} ${esc(many.toLowerCase())} on ${esc(fmtD(String(last.at).slice(0,10)))}</span>
+     ${N.undoAsk===t?`<p class="sm" style="margin-top:6px">Remove these ${last.ids.length} records from Polaris One? Notion is not changed. Edits you made to them since are lost.</p><div class="row" style="gap:8px"><button class="btn p" data-act="nimpundo2" data-t="${t}" ${busy?'disabled':''}>Yes, remove them</button><button class="btn" data-act="nimpundo0">Keep them</button></div>`:`<div class="row" style="margin-top:6px"><button class="btn" data-act="nimpundo1" data-t="${t}" ${busy?'disabled':''}>Undo this import…</button></div>`}</div>`}
+  if(N.res&&!pl)h+=`<p class="sm" style="margin-top:8px" role="status">${esc(N.res)}</p>`;
+  return h}
+ACT.nimpplan=el=>ngImportPlan(el.dataset.t);ACT.nimprun=el=>ngImportRun(el.dataset.t);
+ACT.nimpundo1=el=>{S.ng.undoAsk=el.dataset.t;cdRefresh()};ACT.nimpundo0=()=>{S.ng.undoAsk='';cdRefresh()};ACT.nimpundo2=el=>ngImportUndo(el.dataset.t);
 (async function boot(){
   try{await DB.init()}catch(e){console.error(e)}
   try{S.signupMode=await DB.publicSignupMode()}catch(e){S.signupMode='open'}
