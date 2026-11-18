@@ -23605,12 +23605,13 @@ function exS(){
   const d=exDef();let o={};try{o=JSON.parse(localStorage.getItem(EX_KEY)||'{}')||{}}catch(e){o={}}
   ['weeks','scope','status','group','evid'].forEach(k=>{if(typeof o[k]==='string'||typeof o[k]==='number')d[k]=o[k]});
   ['src','sec','col','off','areaOff','projOff'].forEach(k=>{if(o[k]&&typeof o[k]==='object')Object.assign(d[k],o[k])});
+  d.hide=!!o.hide;
   d.weeks=EX_WEEKS.some(w=>w[0]===+d.weeks)?+d.weeks:1;
   if(!['moved','open','all'].includes(d.scope))d.scope='open';if(!['project','area','source','none'].includes(d.group))d.group='project';if(!['period','all'].includes(d.evid))d.evid='period';
   /* start on the week of the latest weekly review when it is recent, otherwise on this week */
   const t=todayS(),wr=(D().reviews||[]).filter(r=>r.review_type==='Weekly'&&r.period_start).map(r=>weekStart(r.period_start)).sort(),last=wr[wr.length-1];
   d.ws=last&&last>=addD(weekStart(t),-14)&&last<=weekStart(t)?last:weekStart(t);d.pick=false;d.zopen={};S.ex=d;return d}
-function exSave(){const s=S.ex;if(!s)return;try{localStorage.setItem(EX_KEY,JSON.stringify({weeks:s.weeks,src:s.src,scope:s.scope,status:s.status,group:s.group,evid:s.evid,sec:s.sec,col:s.col,off:s.off,areaOff:s.areaOff,projOff:s.projOff}))}catch(e){}}
+function exSave(){const s=S.ex;if(!s)return;try{localStorage.setItem(EX_KEY,JSON.stringify({weeks:s.weeks,src:s.src,scope:s.scope,status:s.status,group:s.group,evid:s.evid,hide:s.hide?1:0,sec:s.sec,col:s.col,off:s.off,areaOff:s.areaOff,projOff:s.projOff}))}catch(e){}}
 /* which linked app an item belongs to; an item can be in more than one */
 function exSrc(r,ent){
   const o=[],id=r.id,sy=S.sync||{},ph=(S.ph&&S.ph.states)||{};
@@ -23819,7 +23820,7 @@ VIEWS['performance/executive']=()=>{
   const bar=`<div class="card flat noprint exctl" data-exctl>
    <div class="exrow"><span class="exlab">Period</span><button class="btn s" data-act="exweek" data-n="-1" aria-label="Earlier">${ic('cl',14)}</button><b>${fmtS(d.ws)} – ${fmtD(d.we)}</b><button class="btn s" data-act="exweek" data-n="1" aria-label="Later" ${addD(d.ws,7)>t?'disabled':''}>${ic('cr',14)}</button>${cur?'<span class="badge b-blue">this week</span>':`<button class="btn s" data-act="exweek" data-n="0">This week</button>`}
     <select class="in" data-change="exset" data-k="weeks" aria-label="Length of the period">${EX_WEEKS.map(w=>opt(w[0],w[1],s.weeks)).join('')}</select>${revSel}${hasRev?`<span class="badge b-green">${d.reviews.length} weekly review${d.reviews.length>1?'s':''}</span>`:`<span class="badge b-amber">no weekly review yet</span><button class="btn s" data-act="exreview">${ic('edit',14)} Write it</button>`}
-    <span class="sp"></span><button class="btn p" data-act="exprint" ${d.rows.length?'':'disabled'}>${ic('print')} Save as PDF</button></div>
+    <span class="sp"></span><button class="btn s" data-act="exhide" aria-expanded="${s.hide?'false':'true'}">${ic(s.hide?'down':'up',14)} ${s.hide?'Show options':'Hide options'}</button><button class="btn p" data-act="exprint" ${d.rows.length?'':'disabled'}>${ic('print')} Save as PDF</button></div>
    <div class="exrow"><span class="exlab">Apps</span>${Object.keys(EX_SRC).filter(k=>k==='po'||d.srcCount[k]).map(k=>chk('src',k,EX_SRC[k],s.src[k],` <span class="mut">(${d.srcCount[k]})</span>`)).join('')}</div>
    <div class="exrow" data-exareas><span class="exlab">Life areas</span>${areas.length?areas.map(x=>inc('areaOff',x[0],x[1],x[2])).join('')+allNone('areaOff'):'<span class="sm mut">No Activities in this period.</span>'}</div>
    <div class="exrow" data-exprojs style="align-items:flex-start"><span class="exlab" style="padding-top:5px">Projects</span><div class="exwrap">${projs.length?projs.map(x=>inc('projOff',x[0],trunc(x[1],48),x[2])).join(''):'<span class="sm mut">Tick a life area first.</span>'}</div>${projs.length?allNone('projOff'):''}</div>
@@ -23832,7 +23833,9 @@ VIEWS['performance/executive']=()=>{
    <div class="exrow"><span class="exlab">Sections</span>${EX_SEC.map(x=>chk('sec',x[0],x[1],s.sec[x[0]])).join('')}</div>
    <div class="exrow"><span class="exlab">Details</span>${EX_COL.map(x=>chk('col',x[0],x[1],s.col[x[0]])).join('')}<select class="in" data-change="exset" data-k="evid" aria-label="Which evidence">${opt('period','Evidence dated in the period',s.evid)}${opt('all','All evidence to date',s.evid)}</select></div>
    <p class="xs mut">The report is built from the week of a weekly review: Actions and time entries dated in the period, grouped under their Activity. In the print dialog choose “Save as PDF”. Your choices stay on this device.</p></div>`;
-  return bar+exReport(d)};
+  const mark='\n   <div class="exrow"><span class="exlab">Apps</span>',cut=bar.indexOf(mark);
+  return (s.hide&&cut>0?bar.slice(0,cut)+'</div>':bar)+exReport(d)};
+ACT.exhide=()=>{const s=exS();s.hide=!s.hide;exSave();renderView()};
 CHG.exopt=el=>{const s=exS();s[el.dataset.g][el.dataset.k]=el.checked?1:0;exSave();renderView()};
 CHG.exinc=el=>{const s=exS(),g=el.dataset.g;if(g!=='areaOff'&&g!=='projOff')return;if(el.checked)delete s[g][el.dataset.k];else s[g][el.dataset.k]=1;exSave();renderView()};
 CHG.exoff=el=>{const s=exS();if(el.checked)delete s.off[el.dataset.id];else s.off[el.dataset.id]=1;exSave();renderView()};
