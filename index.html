@@ -23180,6 +23180,9 @@ function ngWrite(t,m,row,why){const c=ngCfg(t),ty=m.ty,name=m.p;let v=row[m.f.k]
     if(!tg||!tg.notion_page_id){why.push(`“${name}”: the linked record is not in Notion yet, so the link is sent after it is`);return null}
     return {relation:[{id:tg.notion_page_id}]}}
   return null}
+/* r81: the Parent item of an Activity follows Polaris One into Notion (the Sub-item column of the parent fills itself) */
+const ngParentKey=()=>{const sc=ngCfg('activities').schema||{};return Object.keys(sc).find(k=>sc[k]==='relation'&&/^parent/i.test(k))||''};
+function ngParentRel(t,row,out){if(t!=='activities'||!row.parent_id)return;const pk=ngParentKey(),par=byId('activities',row.parent_id);if(pk&&par&&par.notion_page_id)out[pk]={relation:[{id:par.notion_page_id}]}}
 function ngProps(t,row,why){const mp=ngMap(t),sc=ngCfg(t).schema,out={};
   mp.filter(m=>m.dir!=='in').forEach(m=>{const w=ngWrite(t,m,row,why);if(!w)return;
     if(w.date&&out[m.p]&&out[m.p].date){const a=out[m.p].date;out[m.p]={date:m.f.k==='planned_finish'?{start:a.start,end:w.date.start}:{start:w.date.start,end:a.end||a.start}}}else out[m.p]=w});
@@ -23191,6 +23194,7 @@ function ngProps(t,row,why){const mp=ngMap(t),sc=ngCfg(t).schema,out={};
     if(dp&&sc[dp]==='date'){const off=-new Date().getTimezoneOffset(),sg=off>=0?'+':'-',z=sg+String(Math.floor(Math.abs(off)/60)).padStart(2,'0')+':'+String(Math.abs(off)%60).padStart(2,'0');
       const at=h=>String(row.meeting_date).slice(0,10)+(h?'T'+String(h).slice(0,5)+':00'+z:'');
       out[dp]={date:{start:at(row.start_time),end:row.start_time&&row.end_time?at(row.end_time):null}}}}
+  ngParentRel(t,row,out);
   return out}
 /* ---- API ---- */
 const ngCall=(m,p,b)=>S.ng.fake?S.ng.fake(m,p,b):nCall(m,p,b);
@@ -23235,7 +23239,8 @@ async function ngPlan(ts){const N=S.ng;N.busy='plan';N.err='';N.res='';N.plan=nu
       for(const r of rows){const pg=byId[String(r.id).toLowerCase()]||(r.notion_page_id?byPg[String(r.notion_page_id).replace(/-/g,'')]:null),why=[];
         if(X){const ck=ngAreaCheck(t,r);if(!ck.ok){pl.skip.push({t,r,why:ck.why,code:ck.code});continue}}
         const props=ngProps(t,r,why);if(X)why.forEach(w=>pl.review.push(w));
-        const changedHere=!r.notion_synced_at||String(r.updated_at||'')>String(r.notion_synced_at);
+        const seedParent=t==='activities'&&!!r.parent_id&&!!ngParentKey()&&!ngCfg('activities').parentSeeded;   /* first run: send the existing parents once */
+        const changedHere=!r.notion_synced_at||String(r.updated_at||'')>String(r.notion_synced_at)||seedParent;
         if(!r.notion_page_id){
           let hit=pg;if(!hit&&ip){const f=await ngQuery(t,{property:ip,rich_text:{equals:String(r.id)}},1);hit=f[0]}
           if(!hit&&X&&tp){const nt=ngN(ngTitleOf(t,r)),cands=pages.filter(g=>!linked.has(String(g.id).replace(/-/g,''))&&ngN(ngTxt(((g.properties||{})[tp]||{}).title))===nt),dec=(N.decisions||{})[r.id];
@@ -23263,10 +23268,10 @@ function ngCoerce(m,to){const f=m.f;if(f.t==='area')return to;if(f.t==='number'|
   if(f.t==='select'||f.t==='nsel'){const o=(OPT[f.opts]||f.opts);const list=Array.isArray(o)?o:null;if(to==null)return null;if(list){const h=list.find(x=>ngN(x)===ngN(to));return h===undefined?undefined:h}return to}
   return to==null?null:to}
 async function ngRun(limit){const N=S.ng,pl=N.plan;if(!pl||N.busy)return;N.busy='run';N.err='';cdRefresh();
-  let sent=0,got=0,fail=[];const items=limit?pl.push.slice(0,limit):pl.push;
+  let sent=0,got=0,fail=[];const items=(limit?pl.push.slice(0,limit):pl.push.slice()).sort((a,b)=>(a.t==='activities'&&a.r.parent_id?1:0)-(b.t==='activities'&&b.r.parent_id?1:0));   /* parents first, so a child can point to a page that exists */
   let linkedN=0;
   try{if(!limit)for(const x of (pl.link||[]).filter(y=>y.approved)){try{const row=await DB.update(x.t,x.r.id,{notion_page_id:x.cands[0],notion_synced_at:ngStamp()});replaceRow(x.t,row);linkedN++}catch(e){fail.push(`${MOD[x.t].many} “${ngTitleOf(x.t,x.r)}”: ${e.message||e}`)}}
-    for(const x of items){try{const c=ngCfg(x.t);let page=x.page;
+    for(const x of items){try{const c=ngCfg(x.t);let page=x.page;ngParentRel(x.t,byId(x.t,x.r.id)||x.r,x.props);
         if(x.op==='create'&&!page){const r=await ngCall('POST','/v1/pages',{parent:{type:'data_source_id',data_source_id:nId(c.ds)},properties:x.props});page=r.id}
         else await ngCall('PATCH','/v1/pages/'+page,{properties:x.props});
         const row=await DB.update(x.t,x.r.id,{notion_page_id:page,notion_synced_at:ngStamp()});replaceRow(x.t,row);sent++;if(!S.ng.fake&&NGX_T.includes(x.t))await nSleep(350)}
@@ -23275,6 +23280,7 @@ async function ngRun(limit){const N=S.ng,pl=N.plan;if(!pl||N.busy)return;N.busy=
         if(Object.keys(patch).length){patch.notion_synced_at=ngStamp();const row=await DB.update(x.t,x.r.id,patch);replaceRow(x.t,row);got++}}
       catch(e){fail.push(`${MOD[x.t].many} “${x.r[MOD[x.t].main]||x.r.id}”: ${e.message||e}`)}}
     if(!limit)for(const t of (pl.tables||NG_T)){if(ngReady(t))await ngSave(t,{lastPull:new Date(Date.now()-120000).toISOString()})}
+    if(!limit&&!fail.length&&ngParentKey()&&(pl.tables||NG_T).includes('activities')&&!ngCfg('activities').parentSeeded)await ngSave('activities',{parentSeeded:true});
     N.res=`${sent} sent to Notion, ${got} brought back${linkedN?`, ${linkedN} linked`:''}${fail.length?`, ${fail.length} failed: `+fail.slice(0,3).join(' · '):''}.`;N.plan=null}
   catch(e){N.err=e.message||String(e)}
   N.busy='';cdRefresh()}
