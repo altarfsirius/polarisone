@@ -1,7 +1,7 @@
 const {chromium}=require('playwright');
 (async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:1280,height:900}});
 const errs=[];p.on('pageerror',e=>errs.push(e.message.slice(0,300)));
-await p.goto('file://'+require('path').resolve(__dirname,'index.html')+'');await p.waitForTimeout(2000);await p.getByText('Demo Admin').click();await p.waitForTimeout(4000);
+await p.goto('file://'+require('path').resolve(__dirname,'../index.html')+'');await p.waitForTimeout(2000);await p.getByText('Demo Admin').click();await p.waitForTimeout(4000);
 const r=await p.evaluate(async()=>{const o={},w=ms=>new Promise(r=>setTimeout(r,ms));
  const pf=async n=>await saveRow('portfolios',{name:n,icon:'📌',color:'#123456',sort_order:99});
  const names=['Work','Freelance','Personal Development','Automotive','Trading'];
@@ -12,20 +12,20 @@ const r=await p.evaluate(async()=>{const o={},w=ms=>new Promise(r=>setTimeout(r,
  const sub=await mk('T-sub',null,aPD.id),sub2={id:'t-sub2',name:'T-sub2',parent_id:sub.id,portfolio_id:null},orph={id:'t-orph',name:'T-orph',parent_id:'zzz',portfolio_id:null},none=await mk('T-none',null,null);
  const c1={id:'cy1',parent_id:'cy2',portfolio_id:null},c2={id:'cy2',parent_id:'cy1',portfolio_id:null};D().activities.push(sub2,orph,c1,c2);
  const opts=['Work','Freelance','Personal Development'].map(n=>({name:n}));
- const prop='Domain';const base0={schema:{Name:'title',Domain:'select'},maps:{name:{prop:'Name',dir:'both'},portfolio_id:{prop:'Domain',dir:'both'}},opts:{}};S.profile.prefs.notion_all={t:{activities:base0,daily_actions:Object.assign({},base0)}};
+ const prop=nDomainProp();
  const am={};am[A['Work'].id]={domain:'Work',approved:true};am[A['Personal Development'].id]={domain:'Personal Development',approved:true};am[A['Freelance'].id]={domain:'Freelance',approved:false};
- const OPTS={[prop]:opts};await ngSave('activities',{opts:OPTS,areaMap:am});await ngSave('daily_actions',{opts:OPTS,areaMap:am});
- const chk=(t,r)=>{const c=ngAreaCheck(t,r);return c.ok?'OK:'+c.area.name:c.code};
+ const OPTS=Object.assign({},nCfg().opts||{},{[prop]:opts});await nSave({opts:OPTS,areaMap:am});
+ const chk=(t,r)=>{const c=nAreaCheck(t,r);return c.ok?'OK:'+c.area.name:c.code};
  o.work=chk('activities',aW);o.pd=chk('activities',aPD);o.auto_unpaired=chk('activities',aAU);
  o.sub=chk('activities',sub);o.nested=chk('activities',sub2);o.orphan=chk('activities',orph);o.none=chk('activities',none);o.cycle=chk('activities',c1);
- o.domPD=ngAreaToDomain('activities',sub2);o.domAU=ngAreaToDomain('activities',aAU);
+ o.domPD=nAreaToDomain('activities',sub2);o.domAU=nAreaToDomain('activities',aAU);
  /* Domain option missing in Notion */
- am[A['Automotive'].id]={domain:'Automotive',approved:true};await ngSave('activities',{areaMap:am});o.auto_noopt=chk('activities',aAU);
+ am[A['Automotive'].id]={domain:'Automotive',approved:true};await nSave({areaMap:am});o.auto_noopt=chk('activities',aAU);
  /* a Life Area added later is eligible once paired */
  const nl=await pf('Zebra Area');const z=await mk('T-z',nl.id);o.new_unpaired=chk('activities',z);
- am[nl.id]={domain:'Zebra Area',approved:true};OPTS[prop].push({name:'Zebra Area'});await ngSave('activities',{opts:OPTS,areaMap:am});o.new_paired=chk('activities',z);
+ am[nl.id]={domain:'Zebra Area',approved:true};OPTS[prop].push({name:'Zebra Area'});await nSave({opts:OPTS,areaMap:am});o.new_paired=chk('activities',z);
  /* reverse: domain → area (non work/freelance) */
- o.rev=ngDomainToArea('activities','Personal Development',null);
+ o.rev=nDomainToArea('Personal Development',null);
  /* daily action */
  const da={activity_id:sub2.id};o.da=chk('daily_actions',da);o.da_standalone=chk('daily_actions',{activity_id:null});
  /* holidays */
