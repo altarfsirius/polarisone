@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='89',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='96',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -7746,6 +7746,21 @@ VIEWS['finance/journal']=()=>{
   <div class="g g2"><div class="card"><div class="ch"><h3>Waiting for a decision</h3>${und.length?badge(und.length,'amber'):''}</div>${und.length?`<div class="list">${und.slice(0,6).map(r=>`<div class="item" style="flex-wrap:wrap;gap:6px"><div style="flex:1;min-width:160px;cursor:pointer" data-act="open" data-k="matrixrade_runs" data-id="${r.id}"><div class="t">${esc(trunc(r.section,48))}${r.ticker?' · '+esc(r.ticker):''}</div><div class="xs mut">${esc(fmtS(r.run_date))}${r.run_time?' '+esc(tm(r.run_time)):''}${r.detail?' · '+esc(trunc(r.detail,60)):''}</div></div>${canE?`<div class="row" style="gap:4px;flex-wrap:wrap">${chips(r)}</div>`:''}</div>`).join('')}</div>${und.length>6?`<p class="xs mut" style="margin-top:6px">${und.length-6} more below. Filter by decision “Not decided”.</p>`:''}`:'<div class="empty-mini">Every analysis has a decision. Well done.</div>'}</div>
   <div class="card"><div class="ch"><h3>Analyses by section</h3></div>${hbars(keys.map((k,i)=>({label:k+(by[k].pnl?` (${by[k].pnl>=0?'+':'−'}${fmtN(Math.abs(by[k].pnl),0)})`:''),value:by[k].n,color:PALETTE[i%PALETTE.length]})),{suffix:'',max:Math.max(1,...keys.map(k=>by[k].n))})}</div></div><div style="height:14px"></div>`;
   return crud('matrixrade_runs',{head,addLabel:'Add an analysis',emptyMsg:'Analyses arrive here by themselves when Market Analysis capture is on.'})};
+/* ---- r90: does it work? results of the journal by section, decision and how many criteria agreed ---- */
+function maAgree(r){const m=/Konfirmasi kriteria[^(\n]*\((\d+)\/(\d+)\)/.exec(r.detail||'');if(!m||!(+m[2]>0))return null;const p=Math.round(+m[1]/+m[2]*100);return p>=80?'Criteria agree 80% or more':p>=50?'Criteria agree 50 to 79%':'Criteria agree under 50%'}
+function maGroup(rows,keyFn,order){const g={};rows.forEach(r=>{const k=keyFn(r);if(!k)return;const e=g[k]=g[k]||{k,rows:[]};e.rows.push(r)});
+  const out=Object.values(g).map(e=>{const cl=e.rows.filter(maClosed),w=cl.filter(r=>r.outcome==='Win').length,l=cl.filter(r=>r.outcome==='Loss').length,be=cl.length-w-l;
+    return {k:e.k,n:e.rows.length,taken:e.rows.filter(maTaken).length,closed:cl.length,w,l,be,wr:w+l?Math.round(w/(w+l)*100):null,pnl:e.rows.some(r=>hasN(r.pnl))?sum(e.rows.map(r=>r.pnl)):null}});
+  return order?out.sort((a,b)=>order.indexOf(a.k)-order.indexOf(b.k)):out.sort((a,b)=>b.n-a.n)}
+function maEdgeCard(){const rows=D().matrixrade_runs||[];if(!rows.length)return '';
+  const closed=rows.filter(maClosed).length;
+  const tbl=(title,g)=>g.length?`<div class="tw"><table class="tbl"><thead><tr><th>${title}</th><th>Analyses</th><th>Decided</th><th>Closed</th><th>Win rate</th><th>Net result</th></tr></thead><tbody>${g.map(x=>`<tr><td>${esc(x.k)}</td><td>${x.n}</td><td>${x.taken}</td><td>${x.closed}</td><td>${x.wr==null?'–':x.wr+'%'}${x.w+x.l>0&&x.w+x.l<5?' <span class="badge b-amber" title="Fewer than 5 closed results: a few trades say little">few</span>':''}</td><td>${x.pnl==null?'–':(x.pnl>=0?'+':'−')+fmtN(Math.abs(x.pnl),0)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="sm mut">No data yet.</p>';
+  const bySec=maGroup(rows,r=>r.section||'Analysis').slice(0,8),byDec=maGroup(rows,r=>r.decision||'Not decided',['Buy','Sell','Hold','Wait','Skip','Not decided']),byAg=maGroup(rows,maAgree,['Criteria agree 80% or more','Criteria agree 50 to 79%','Criteria agree under 50%']);
+  return `<details class="card" ${closed>=1?'open':''} style="margin-bottom:12px"><summary class="b" style="cursor:pointer;list-style:none"><h3 style="display:inline">Does it work? Results by section, decision and agreement</h3> <span class="sm mut">${closed} closed result${closed===1?'':'s'}</span></summary>
+  <p class="sm ink2" style="margin-top:8px">Win rate = wins ÷ (wins + losses) among closed results. Analyses you skipped or are still waiting on are not scored. <b>Fewer than 5 closed results in a row means: do not conclude yet.</b> “Criteria agree” is read from the result text of Technical analyses; others are left out of that table.</p>
+  <div class="g g2" style="margin-top:8px"><div>${tbl('Section',bySec)}</div><div>${tbl('Decision',byDec)}</div></div>
+  <div style="margin-top:10px">${tbl('Agreement of the criteria',byAg)}</div></details>`}
+{const j0=VIEWS['finance/journal'];VIEWS['finance/journal']=function(){let c='';try{c=maEdgeCard()}catch(e){console.warn(e)}return c+j0.apply(this,arguments)}}
 ACT.madecide=async el=>{
   try{await patchRow('matrixrade_runs',el.dataset.id,{decision:el.dataset.v,outcome:['Skip','Wait'].includes(el.dataset.v)?'Not taken':'Open'});toast('Decision saved: '+el.dataset.v);renderView()}catch(e){if(e&&e.pending){toast(e.message);return}toast(e.message||'Could not save',1)}};
 MOD.matrixrade_runs.before=function(d,old){if(d.decision&&['Skip','Wait'].includes(d.decision)&&(!d.outcome||d.outcome==='Open'))d.outcome='Not taken';if(hasN(d.pnl)&&(!d.outcome||d.outcome==='Open'))d.outcome=num(d.pnl)>0?'Win':num(d.pnl)<0?'Loss':'Break-even'};
@@ -15030,6 +15045,21 @@ AFTER['finance/market']=()=>{
 CHG.maon=async el=>{await setPrefs({ma:Object.assign({},prefs().ma||{},{on:el.checked})});toast(el.checked?'Logging is on':'Logging is paused');if(S.route.p==='integrations')renderView()};
 CHG.madata=async el=>{await setPrefs({ma:Object.assign({},prefs().ma||{},{data:el.checked})});toast(el.checked?'Data checks are logged too':'Data checks are not logged')};
 CHG.macat=async el=>{await setPrefs({ma:Object.assign({},prefs().ma||{},{cat:el.value})});toast('Saved')};
+
+/* ---- r90: Market Analysis · how fresh is the data (a strip above the tab) ---- */
+const MXF={},MXF_HOSTS={'api.alternative.me':'Fear & Greed','api.coingecko.com':'CoinGecko','api.eia.gov':'EIA','api.frankfurter.app':'Frankfurter FX','www.frankfurter.app':'Frankfurter FX','api.gdeltproject.org':'GDELT','api.stlouisfed.org':'FRED','api.twelvedata.com':'Twelve Data','api.worldbank.org':'World Bank','data.nasdaq.com':'Nasdaq Data Link','newsapi.org':'NewsAPI','pro-api.coinmarketcap.com':'CoinMarketCap','www.alphavantage.co':'Alpha Vantage'};
+(function(){if(window.__mxfWrapped||typeof window.fetch!=='function')return;window.__mxfWrapped=true;const f0=window.fetch;
+  window.fetch=function(u){const p=f0.apply(this,arguments);let n='';try{const h=new URL(typeof u==='string'?u:(u&&u.url)||'',location.href).hostname;n=MXF_HOSTS[h]||''}catch(e){}
+    if(n&&p&&p.then){const e=MXF[n]=MXF[n]||{ok:0,fail:0,last:'',why:''};p.then(r=>{if(r&&r.ok){e.ok=Date.now();e.last='ok'}else{e.fail=Date.now();e.last='fail';e.why='HTTP '+(r&&r.status)}},er=>{e.fail=Date.now();e.last='fail';e.why=(er&&er.name==='TimeoutError')?'timed out':'no answer'})}
+    return p}})();
+const mxfAge=t=>{const m=Math.max(0,Math.round((Date.now()-t)/60000));return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' d ago'};
+function mxFreshHtml(){const k=Object.keys(MXF).sort();if(!k.length)return '<b>Data freshness:</b> no live data has been requested yet in this session. Open a tab with live cards and it appears here.';
+  return '<b>Data freshness</b> (this session) · '+k.map(n=>{const e=MXF[n];if(e.last==='fail')return `<span class="badge b-red" title="${esc(e.why)}">${esc(n)} · failed ${mxfAge(e.fail)}${e.ok?' (last good '+mxfAge(e.ok)+')':''}</span>`;
+    const old=Date.now()-e.ok>6*3600e3;return `<span class="badge b-${old?'amber':'green'}">${esc(n)} · ${mxfAge(e.ok)}</span>`}).join(' ')+' <span class="xs mut">Only requests made from this page count. A card that never loaded shows nothing here.</span>'}
+function mxFreshPaint(){const el=document.getElementById('mxFresh');if(el)el.innerHTML=mxFreshHtml()}
+setInterval(mxFreshPaint,15000);
+{const v0=VIEWS['finance/market'];VIEWS['finance/market']=function(){return String(v0.apply(this,arguments)).replace('<div id="mxSlot"','<div id="mxFresh" class="sm ink2 noprint" style="margin:0 0 8px;line-height:1.9" aria-live="off"></div><div id="mxSlot"')};
+ const a0=AFTER['finance/market'];AFTER['finance/market']=function(){const r=a0&&a0.apply(this,arguments);mxFreshPaint();return r}}
 
 /* the old address of the tab still opens the new one */
 const _parseHash16=parseHash;
@@ -23885,6 +23915,505 @@ ACT.peershow=()=>{const g=peerState();g.show=!g.show;renderView()};
 /* r85 backup: settings travel too, but never anything that looks like a key, token, secret or password */
 const BK_SECRET=/key|token|secret|pass|auth|bearer|cookie/i;
 function bkPrefs(){const p=prefs(),o={};Object.keys(p).forEach(k=>{if(!BK_SECRET.test(k))o[k]=p[k]});return o}
+/* ---- r91: Starter plan (v3) and Altair performance reports ---- */
+/* The starter plan creates, only when missing and matched by name, KPIs for six life areas, the v3 activities
+   (all in Development) and the first week of daily actions. Nothing is changed or deleted. KPIs of the Development group count their own completed activities. */
+const V3_AREAS=[['Development','🛠️','#0E7C66','Building and improving Polaris One and related tools']];  /* never created by the plan: the life areas are yours; a missing one is reported */
+const V3_ALIAS={'Financial':['financial','finance'],'Ibadah':['ibadah','ibadah islam']};
+const V3_K=[
+ ['dev0','Development','v3 · Open tests from v2 closed','item','Higher is better','Counts completed Activities of stage 0. Target = number of activities.'],
+ ['dev1','Development','v3 · Engine, goals, time (stages 1 to 3)','item','Higher is better','Counts completed Activities of stages 1 to 3.'],
+ ['dev2','Development','v3 · Market v3 (stage 4)','item','Higher is better','Counts completed Activities of stage 4.'],
+ ['dev3','Development','v3 · Growth, service, insight, release (stages 5 to 9)','item','Higher is better','Counts completed Activities of stages 5 to 9.'],
+ ['pd1','Personal Development','Learning hours per week','jam','Higher is better',null,5],
+ ['pd2','Personal Development','Weekly reviews written','item','Higher is better',null,48],
+ ['tr1','Trading','Trades with a written plan before entry','%','Higher is better',null,100],
+ ['tr2','Trading','Analysis journal outcomes recorded','%','Higher is better',null,100],
+ ['in1','Investment','Portfolio reviews done','item','Higher is better',null,12],
+ ['in2','Investment','Regular top-ups made on time','item','Higher is better',null,12],
+ ['fi1','Financial','Monthly money reviews done','item','Higher is better',null,12],
+ ['fi2','Financial','Instalments paid on time','%','Higher is better',null,100],
+ ['ib1','Ibadah','Days with all five prayers on time','hari','Higher is better',null,300],
+ ['ib2','Ibadah','Quran reading days','hari','Higher is better',null,300]];
+const V3_A=[
+ ['0.1','dev0','Deploy api-proxy 2026.11.22 and test Draft with AI on one real meeting',1,2,'Draft with sources, judged right or wrong'],
+ ['0.2','dev0','Test Rev 86 and Rev 88 (carried meeting items, follow-up bar) on iPhone',2,1,'Screenshots'],
+ ['0.3','dev0','Test Rev 89 and Rev 90 (Analysis journal, reminders, Does it work, data freshness)',2,1.5,'Screenshots and notes'],
+ ['0.4','dev0','Test APM numbering (Rev 37) after a real renumber',3,1,'APM code shows on Activity and Action'],
+ ['0.5','dev0','Test Notion import with real data, including status after re-share',4,1.5,'Result list'],
+ ['0.6','dev0','APM owner confirms the clean-up of candidates 4, 5 and 9; then drop v2_cleanup tables',5,0.5,'Written confirmation'],
+ ['0.7','dev0','Test restoring from the backup tables on one example',6,1,'One row restored and matched'],
+ ['0.8','dev0','Decide clean-up candidates 6 to 8 and 10, one by one',7,1,'Your decision per candidate'],
+ ['1.1','dev1','Split the code into source modules; the build still gives one index.html',0,0,'Regression tests pass'],
+ ['1.2','dev1','Fixed test suite for every area, desktop and iPhone 13',0,0,'One command, written result'],
+ ['1.3','dev1','Data versioning and controlled migration as a standard pattern',0,0,'Reusable backup, dry-run, execute scripts'],
+ ['1.4','dev1','Method library: concepts as templates that can be switched on',0,0,'One example concept works'],
+ ['2.1','dev1','Goal model: 10-year vision, yearly goals, OKR linked to KPI, Activity, Action',0,0,'Every Action shows its goal or none'],
+ ['2.2','dev1','KPI cascade (personal, team, company) with green, amber, red thresholds',0,0,'Every KPI has owner, source and Action'],
+ ['2.3','dev1','One rule engine for reminders and KPI health',0,0,'Rules listed in one place, each can be switched off'],
+ ['3.1','dev1','Guided weekly planning and daily capacity',0,0,'Warning before a day is full'],
+ ['3.2','dev1','Estimate calibration from time logs',0,0,'Correction factor shown in Performance'],
+ ['3.3','dev1','Worship module: Hijri calendar, voluntary fasting, Quran, dhikr, charity, zakat calculator, Friday reminder',0,0,'Worship records appear as schedule blocks'],
+ ['4.1','dev2','Trade plan card and automatic position size',0,0,'Plan saved to the Analysis journal'],
+ ['4.2','dev2','Optional parameters: MACD, Bollinger, volume, PER/PBV band, seasonality, foreign flow',0,0,'Parameters read in the asset summary'],
+ ['4.3','dev2','Platform labels and combined allocation across the 10 apps',0,0,'Combined allocation matches your positions'],
+ ['4.4','dev2','Test access to extra data sources (BI, DJPPR, IDX, OJK, Antam, CoinGlass, DefiLlama)',0,0,'Only sources that pass the test are shown'],
+ ['5.1','dev3','Original Personality Plus style profile, wheel of life, IDP and feedback',0,0,'Profile and IDP filled, linked to Skills & Knowledge'],
+ ['6.1','dev3','Stakeholders, service commitments, interaction log, 1:1',0,0,'No promise past its date without showing'],
+ ['6.2','dev3','10-year retirement path and business pipeline with editable assumptions',0,0,'Gap to target visible monthly'],
+ ['7.1','dev3','Cross-module insight and AI with data preview',0,0,'One conclusion and one suggestion per week'],
+ ['8.1','dev3','Fine roles, comments, change trail (only if there are other users)',0,0,'Decision: needed or not'],
+ ['9.1','dev3','Speed, accessibility, retire the old engine, documentation, full iPhone test',0,0,'All areas on the new engine, written results']];
+const v3Area=n=>{const al=(V3_ALIAS[n]||[n]).map(x=>x.toLowerCase());return (D().portfolios||[]).find(p=>al.includes(String(p.name||'').trim().toLowerCase()))};
+const v3Year=()=>new Date().getFullYear();
+const v3AName=a=>'['+a[0]+'] '+a[2];
+/* the app may put the code in front of a name (ACT-… · name), so a name matches with or without it */
+const v3Is=(x,nm)=>x===nm||String(x||'').endsWith(' · '+nm);
+function v3Plan(){
+  const out={areas:[],kpis:[],acts:[],dacts:[]};
+  V3_AREAS.forEach(a=>{out.areas.push({a,have:!!v3Area(a[0])})});
+  V3_K.forEach(k=>{out.kpis.push({k,have:(D().kpis||[]).some(x=>v3Is(x.name,k[2])&&+x.year===v3Year())})});
+  V3_A.forEach(a=>{out.acts.push({a,have:(D().activities||[]).some(x=>v3Is(x.name,v3AName(a)))})});
+  const t=todayS();V3_A.filter(a=>a[3]>0).forEach(a=>{const dt=addD(t,a[3]),ti='Plan v3 '+a[0]+': '+a[2];out.dacts.push({a,dt,ti,have:(D().daily_actions||[]).some(x=>v3Is(x.title,ti))})});
+  return out}
+function v3Card(){
+  const p=v3Plan(),n=(l)=>l.filter(x=>!x.have).length;
+  const left=n(p.areas)+n(p.kpis)+n(p.acts);
+  return `<div class="card noprint" id="v3card" style="margin-bottom:14px"><div class="ch"><h3>Starter plan v3</h3><span class="sp"></span><button class="btn s" data-act="v3open">${left?'Preview and create':'Review'}</button><label class="btn s" for="ar_file" style="margin-left:6px">Import Altair report</label><input class="sr" id="ar_file" type="file" accept="application/pdf,image/*" data-change="arfile"></div>
+  <p class="sm ink2">${left?`Not created yet: ${n(p.kpis)} KPI(s), ${n(p.acts)} activity(ies). Everything is created only when missing, nothing is changed or deleted.`:'The starter plan is in place. The KPIs of Development count their own completed activities.'} A report from Altair Project Management, Altair Aero Engineering or Altair Auto (PDF in the Altair format) updates matching KPIs after you check a preview.</p></div>`}
+{const v0=VIEWS['performance/kpi'];VIEWS['performance/kpi']=function(){setTimeout(()=>v3Sync().then(c=>{if(c&&S.route&&S.route.p==='performance'&&S.route.s==='kpi')renderView()}),150);return v3Card()+v0.apply(this,arguments)}}
+ACT.v3open=()=>{
+  const p=v3Plan(),nw=l=>l.filter(x=>!x.have).length,list=(l,f)=>l.filter(x=>!x.have).map(f).join('');
+  const body=`<p class="sm ink2" style="margin-bottom:8px">Preview. Nothing is created until you press Create. Names that already exist are skipped, so you can press it again safely.</p>
+  <div class="g g4" style="margin-bottom:10px">${stat('Life areas missing',nw(p.areas),nw(p.areas)?'create first':'all present',nw(p.areas)?'red':'')}${stat('KPIs',nw(p.kpis),'new (year '+v3Year()+')')}${stat('Activities',nw(p.acts),'new, in Development')}${stat('Daily actions',p.dacts.filter(x=>!x.have).length,'for the coming week')}</div>
+  <div class="sm" style="max-height:44vh;overflow:auto"><b>Life areas missing:</b> ${esc(list(p.areas,x=>x.a[0]+'; ')||'none')}<br><b>KPIs:</b><ul>${list(p.kpis,x=>'<li>'+esc(x.k[1]+' · '+x.k[2])+'</li>')||'<li>none</li>'}</ul><b>Activities:</b><ul>${list(p.acts,x=>'<li>'+esc(v3AName(x.a))+'</li>')||'<li>none</li>'}</ul><b>Daily actions:</b><ul>${list(p.dacts,x=>'<li>'+esc(x.dt+' · '+x.ti)+'</li>')||'<li>none</li>'}</ul></div>
+  <p class="xs mut" style="margin-top:8px">Targets of the KPIs outside Development are suggestions: change them to your own. Until something is recorded, a new KPI shows 0%, which is true.</p>`;
+  openModal('Starter plan v3',body,`<button class="btn" data-act="closeModal">Close</button><button class="btn p" data-act="v3make">${ic('check')} Create what is missing</button>`,'wide')};
+ACT.v3make=async el=>{
+  if(el&&el.disabled)return;if(el)el.disabled=true;
+  try{
+    const areas={};let nk=0,nt=0,nd=0;
+    for(const a of V3_AREAS){const r=v3Area(a[0]);if(!r)throw new Error('The life area '+a[0]+' does not exist. Create it first; the plan does not create life areas.');areas[a[0]]=r}
+    const skipA=new Set();
+    const kp={};
+    for(const k of V3_K){const ar=v3Area(k[1])||areas[k[1]];if(!ar){skipA.add(k[1]);continue}
+      let r=(D().kpis||[]).find(x=>v3Is(x.name,k[2])&&+x.year===v3Year());
+      if(!r){const d={name:k[2],strategic_objective:k[1]==='Development'?'Build Polaris One v3':'Starter KPI for '+k[1],portfolio_id:ar.id,year:v3Year(),period:'Annual',unit:k[3],direction:k[4],target:k[6]||1,actual:k[5]?0:null,weight:1,data_source:k[5]?'Polaris One: completed Activities linked to this KPI':'Manual, or an Altair report',notes:(k[5]?'[v3-auto] '+k[5]:'Suggested target: change it to your own.')};
+        r=await saveRow('kpis',d);nk++}
+      kp[k[0]]=r}
+    const dev=v3Area('Development')||areas.Development;
+    for(const a of V3_A){const nm=v3AName(a);let r=(D().activities||[]).find(x=>v3Is(x.name,nm));
+      if(!r){const t=todayS();r=await saveRow('activities',{name:nm,portfolio_id:dev.id,kpi_id:kp[a[1]]&&kp[a[1]].id||null,type:'Project',priority:a[0].startsWith('0.')?'High':'Medium',status:'Not Started',progress:0,planned_start:a[3]?addD(t,a[3]):null,planned_finish:a[3]?addD(t,a[3]):null,est_hours:a[4]||null,deliverable:a[5],important:true,remarks:'From the v3 plan. Stage '+a[0].split('.')[0]+'.'});nt++}
+      if(a[3]>0){const ti='Plan v3 '+a[0]+': '+a[2];if(!(D().daily_actions||[]).some(x=>v3Is(x.title,ti))){await saveRow('daily_actions',{action_date:addD(todayS(),a[3]),title:ti,activity_id:r.id,time_cat:'Work',priority:'High',planned_min:Math.round((a[4]||0.5)*60),status:'Not Started',progress:0,next_action:a[5]});nd++}}}
+    await v3Sync();closeModal(true);renderView();
+    toast(`Created ${nk} KPI(s), ${nt} activity(ies), ${nd} daily action(s)`+(skipA.size?'. Skipped KPIs of missing life area(s): '+[...skipA].join(', '):''))
+  }catch(e){console.warn('v3make',e);toast('Stopped: '+(e&&e.message||e),true);renderView()}};
+/* a v3 KPI of the Development group counts its own completed activities */
+let _v3busy=false;
+async function v3Sync(onlyId){
+  if(_v3busy)return false;_v3busy=true;let ch=false;
+  try{for(const k of (D().kpis||[]).filter(x=>String(x.notes||'').startsWith('[v3-auto]')&&(!onlyId||x.id===onlyId))){
+    const ac=(D().activities||[]).filter(a=>a.kpi_id===k.id),done=ac.filter(a=>a.status==='Completed').length;
+    if(num(k.actual)!==done||num(k.target)!==ac.length&&ac.length){await patchRow('kpis',k.id,{actual:done,target:ac.length||k.target});ch=true}}}
+  catch(e){console.warn('v3sync',e)}finally{_v3busy=false}return ch}
+{const a0=MOD.activities.after;MOD.activities.after=async function(r,o){const x=a0&&await a0.apply(this,arguments);if(r&&(r.kpi_id||o&&o.kpi_id))setTimeout(()=>{v3Sync(r.kpi_id||o.kpi_id).then(()=>{if(typeof renderView==='function'&&S.route&&S.route.p==='performance'&&S.route.s==='kpi')renderView()})},60);return x}}
+/* ---- Altair Performance Report v1: read from the text of a PDF, or by OCR when it is only a picture ---- */
+const AR_ROW=/^([A-Z][A-Z0-9]*(?:\.[A-Z0-9]+){2,})\s+(.+?)\s+(-?\d+(?:\.\d+)?)\s+(-|-?\d+(?:\.\d+)?)\s+(\S+)\s+(HIGHER|LOWER)(?:\s+(.*))?$/;
+function arParse(lines){
+  const L=lines.map(s=>String(s).replace(/\s+/g,' ').trim()).filter(Boolean),h={},rows=[],err=[];
+  if(!L.some(s=>/ALTAIR\s+PERFORMANCE\s+REPORT\s+V1/i.test(s)))return {err:['This is not an Altair Performance Report v1: the title line was not found.']};
+  const g=re=>{for(const s of L){const m=s.match(re);if(m)return m[1].trim()}return ''};
+  h.src=g(/^Source app:\s*(\w+)/i).toUpperCase();h.id=g(/^Report ID:\s*(\S+)/i);h.period=g(/^Period:\s*(.+)$/i);h.area=g(/^Life area:\s*(.+)$/i);
+  const rn=g(/^Rows:\s*(\d+)/i),cs=g(/^Checksum:\s*(-?\d+(?:\.\d+)?)/i);
+  if(!['APM','AERO','AUTO'].includes(h.src))err.push('Source app must be APM, AERO or AUTO.');
+  if(!h.id)err.push('Report ID is missing.');
+  const m=h.period.match(/(\d{4}-\d\d-\d\d)\s+to\s+(\d{4}-\d\d-\d\d)/i);if(!m)err.push('Period must look like 2026-11-16 to 2026-11-22.');else{h.from=m[1];h.to=m[2]}
+  let on=false;L.forEach(s=>{if(/^METRICS$/i.test(s)){on=true;return}if(/^(Rows:|END OF REPORT)/i.test(s))on=false;if(!on||/^Code\s+Metric/i.test(s))return;
+    const r=s.match(AR_ROW);if(r)rows.push({code:r[1],name:r[2].trim(),v:+r[3],t:r[4]==='-'?null:+r[4],unit:r[5],dir:r[6],note:(r[7]||'').trim()});else err.push('A metric line could not be read: "'+s.slice(0,70)+'"')});
+  if(!rows.length)err.push('No metric lines were found.');
+  if(rn==='')err.push('The Rows line is missing.');else if(+rn!==rows.length)err.push('Rows says '+rn+' but '+rows.length+' lines were read.');
+  if(cs==='')err.push('The Checksum line is missing.');else{const s=rows.reduce((a,x)=>a+x.v,0);if(Math.abs(s-(+cs))>0.011)err.push('Checksum says '+cs+' but the values add up to '+s.toFixed(2)+'. A digit was probably misread: check the original.')}
+  return {h,rows,err}}
+CHG.arfile=async el=>{
+  const f=el.files&&el.files[0];el.value='';if(!f)return;
+  try{
+    toast('Reading the report…');
+    let doc=await pdfRead(f,'');
+    if(doc.chars<12){const od=await pdfOcr(f,'',()=>{});if(od&&od.chars>=12){doc=od;doc.ocr=true}}
+    if(doc.chars<12)return toast('No text could be read from this file.',true);
+    const lines=[];(doc.pages||[]).forEach(pg=>(pg.lines||[]).forEach(l=>{if(l.text)lines.push(l.text)}));
+    S.ar=arParse(lines);S.ar.ocr=!!doc.ocr;arShow()
+  }catch(e){console.warn('arfile',e);toast('The report could not be read: '+(e&&e.message||e),true)}};
+function arShow(){
+  const a=S.ar,done=(prefs().ar_done||[]);if(!a)return;
+  if(a.h&&a.h.id&&done.includes(a.h.id))a.err=(a.err||[]).concat('This Report ID was already imported.');
+  const kmap=r=>(D().kpis||[]).find(k=>String(k.data_source||'').startsWith('ALTAIR:'+r.code));
+  const rows=(a.rows||[]).map(r=>{const k=kmap(r);return {r,k,st:k?'update':(r.t==null?'skip':'new')}});
+  const bad=(a.err||[]).length>0;
+  const body=(a.ocr?'<p class="sm" style="color:var(--amber)">This file was read by OCR. The checksum below protects you, but still compare the values with the original.</p>':'')+
+   (bad?`<div class="card" style="border-left:3px solid var(--red);padding:8px 12px;margin-bottom:8px"><b>Cannot import</b><ul>${a.err.map(e=>'<li>'+esc(e)+'</li>').join('')}</ul></div>`:'')+
+   (a.h&&a.h.id?`<p class="sm ink2">${esc(a.h.src)} · ${esc(a.h.id)} · ${esc(a.h.period||'')}${a.h.area?' · Life area: '+esc(a.h.area):''}</p>`:'')+
+   (rows.length?`<div style="overflow:auto"><table class="tbl"><thead><tr><th>Code</th><th>Metric</th><th>Value</th><th>Target</th><th>Result</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.r.code)}</td><td>${esc(x.r.name)}</td><td>${x.r.v} ${esc(x.r.unit)}</td><td>${x.r.t==null?'-':x.r.t}</td><td>${x.st==='update'?'updates KPI “'+esc(x.k.name)+'”':x.st==='new'?'creates a new KPI':'skipped: no KPI yet and no target'}</td></tr>`).join('')}</tbody></table></div>`:'')+
+   '<p class="xs mut" style="margin-top:8px">A new KPI goes to the Life Area named in the report, or Development. Only “actual” is changed on an existing KPI; your target stays.</p>';
+  openModal('Altair report',body,`<button class="btn" data-act="closeModal">Close</button>${bad?'':`<button class="btn p" data-act="arapply">${ic('check')} Apply to Performance</button>`}`,'wide')}
+ACT.arapply=async el=>{
+  const a=S.ar;if(!a||(a.err||[]).length)return;if(el)el.disabled=true;
+  try{
+    const yr=+String(a.h.to).slice(0,4),ar=(D().portfolios||[]).find(p=>String(p.name).toLowerCase()===String(a.h.area||'').toLowerCase())||v3Area('Development');
+    let u=0,n=0,s=0;
+    for(const r of a.rows){const k=(D().kpis||[]).find(x=>String(x.data_source||'').startsWith('ALTAIR:'+r.code));
+      const line=`\n${a.h.src} ${a.h.id} (${a.h.from} to ${a.h.to}): ${r.v} ${r.unit}`;
+      if(k){await patchRow('kpis',k.id,{actual:r.v,notes:(String(k.notes||'')+line).slice(-900)});u++}
+      else if(r.t!=null){await saveRow('kpis',{name:r.name,strategic_objective:'From '+a.h.src+' report',portfolio_id:ar&&ar.id||null,year:yr,period:'Annual',unit:r.unit,direction:r.dir==='LOWER'?'Lower is better':'Higher is better',target:r.t,actual:r.v,weight:1,data_source:'ALTAIR:'+r.code+' ('+a.h.src+')',notes:line.trim()});n++}
+      else s++}
+    await setPrefs({ar_done:(prefs().ar_done||[]).concat(a.h.id).slice(-200)});
+    S.ar=null;closeModal(true);renderView();toast(`Updated ${u} KPI(s), created ${n}, skipped ${s}`)
+  }catch(e){console.warn('arapply',e);toast('Stopped: '+(e&&e.message||e),true)}};
+/* ---- r92: agents send Activities and Daily Actions (polaris-agent/1) ---- */
+/* An app or agent signs in as you with the publishable key (same as Inbound links) and calls the SQL function agent_post. The same JSON can be uploaded here.
+   Rules: nothing is deleted; a source may only touch the life areas you allowed for it; the same ref is the same item, so sending twice never adds a copy. */
+const AG_SRC=[['APM','Altair Project Management'],['AERO','Altair Aero Engineering'],['AUTO','Altair Auto'],['NOTION','Notion AI'],['POLARIS','Polaris One development (your own file)']];
+const AG_STATUS=['Not Started','In Progress','On Hold','Completed','Cancelled'];
+const AGENT_SQL=`
+-- =====================================================================
+-- AGENT LINK (Rev 92 · polaris-agent/1). Additive and safe to run again. Creates one rules table and one function. Nothing existing is changed.
+-- An agent signs in as the owner (publishable key) and calls:  select agent_post('APM','activity','TSK-0001','{...}'::jsonb, false)
+--   p_dry = true only checks and says what would happen, without writing.
+-- =====================================================================
+create table if not exists public.agent_rules(
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  source text not null check (source in ('APM','AERO','AUTO')),
+  area text not null,
+  created_at timestamptz not null default now());
+create unique index if not exists agent_rules_uq on public.agent_rules(owner,source,lower(area));
+alter table public.agent_rules enable row level security;
+drop policy if exists agent_rules_own on public.agent_rules;
+create policy agent_rules_own on public.agent_rules for all using (owner=auth.uid()) with check (owner=auth.uid());
+
+create or replace function public.agent_post(p_source text, p_entity text, p_ref text, p_data jsonb, p_dry boolean default false)
+returns jsonb language plpgsql security invoker set search_path=public as $$
+declare
+  v_src text:=upper(trim(coalesce(p_source,''))); v_mark text; v_area uuid; v_aname text; v_id uuid; v_act uuid; v_kpi uuid;
+  v_status text; v_prog int; v_today date:=(now() at time zone 'Asia/Jakarta')::date; v_new boolean:=false; v_text text; v_ex record;
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  if v_src not in ('APM','AERO','AUTO') then raise exception 'unknown source %', v_src; end if;
+  if p_entity not in ('activity','action') then raise exception 'entity must be activity or action'; end if;
+  if coalesce(trim(p_ref),'')='' or length(p_ref)>80 then raise exception 'ref is required (max 80 characters)'; end if;
+  if jsonb_typeof(coalesce(p_data,'{}'::jsonb))<>'object' then raise exception 'data must be a JSON object'; end if;
+  v_mark:='[agent:'||v_src||':'||p_ref||']';
+  v_status:=coalesce(nullif(p_data->>'status',''),'');
+  if v_status<>'' and v_status not in ('Not Started','In Progress','On Hold','Completed','Cancelled') then raise exception 'status must be Not Started, In Progress, On Hold, Completed or Cancelled'; end if;
+  v_prog:=case when v_status='Completed' then 100 else least(100,greatest(0,coalesce(nullif(p_data->>'progress','')::int,0))) end;
+  if p_entity='activity' then
+    select id into v_id from public.activities where owner=auth.uid() and remarks like '%'||v_mark||'%' limit 1;
+    if v_id is null then
+      v_new:=true; v_aname:=p_data->>'life_area';
+      select p.id into v_area from public.portfolios p join public.agent_rules r on r.owner=auth.uid() and r.source=v_src and lower(r.area)=lower(p.name)
+        where p.owner=auth.uid() and lower(p.name)=lower(coalesce(v_aname,'')) limit 1;
+      if v_area is null then raise exception 'life area "%" is not allowed for % (set it in Polaris One > Integrations > Inbound links)', coalesce(v_aname,''), v_src; end if;
+      if coalesce(trim(p_data->>'name'),'')='' then raise exception 'name is required for a new activity'; end if;
+      select id into v_kpi from public.kpis where owner=auth.uid() and name=p_data->>'kpi' order by year desc limit 1;
+    end if;
+    if p_dry then return jsonb_build_object('ok',true,'dry',true,'entity','activity','created',v_new); end if;
+    v_text:=trim(coalesce(p_data->>'remarks',''))||' '||v_mark;
+    if v_new then
+      insert into public.activities(owner,code,name,portfolio_id,kpi_id,type,priority,status,progress,planned_start,planned_finish,est_hours,deliverable,remarks,completed_on)
+      values(auth.uid(),'AGT-'||v_src||'-'||substr(md5(p_ref),1,6),p_data->>'name',v_area,v_kpi,'Project',coalesce(nullif(p_data->>'priority',''),'Medium'),coalesce(nullif(v_status,''),'Not Started'),v_prog,
+        nullif(p_data->>'planned_start','')::date,nullif(p_data->>'planned_finish','')::date,nullif(p_data->>'est_hours','')::numeric,p_data->>'deliverable',v_text,case when v_status='Completed' then v_today end)
+      returning id into v_id;
+    else
+      update public.activities set name=coalesce(nullif(p_data->>'name',''),name),status=coalesce(nullif(v_status,''),status),
+        progress=case when v_status='' and p_data->>'progress' is null then progress else v_prog end,
+        planned_finish=coalesce(nullif(p_data->>'planned_finish','')::date,planned_finish),actual_hours=coalesce(nullif(p_data->>'actual_hours','')::numeric,actual_hours),
+        completed_on=case when v_status='Completed' then coalesce(completed_on,v_today) when v_status<>'' then null else completed_on end,
+        remarks=case when p_data ? 'remarks' then v_text else remarks end
+      where id=v_id and owner=auth.uid();
+    end if;
+  else
+    select id into v_id from public.daily_actions where owner=auth.uid() and notes like '%'||v_mark||'%' limit 1;
+    v_new:=v_id is null;
+    if coalesce(trim(p_data->>'activity_ref'),'')<>'' then
+      select a.id into v_act from public.activities a where a.owner=auth.uid() and a.remarks like '%[agent:'||v_src||':'||(p_data->>'activity_ref')||']%' limit 1;
+      if v_act is null then raise exception 'activity_ref % was not found for %; send the activity first', p_data->>'activity_ref', v_src; end if;
+    end if;
+    if v_new and v_act is null then raise exception 'an action needs activity_ref of an activity this source sent'; end if;
+    if v_new and coalesce(trim(p_data->>'title'),'')='' then raise exception 'title is required for a new action'; end if;
+    if p_dry then return jsonb_build_object('ok',true,'dry',true,'entity','action','created',v_new); end if;
+    v_text:=trim(coalesce(p_data->>'notes',''))||' '||v_mark;
+    if v_new then
+      insert into public.daily_actions(owner,action_date,title,activity_id,time_cat,priority,status,progress,actual_min,result,notes)
+      values(auth.uid(),coalesce(nullif(p_data->>'date','')::date,v_today),p_data->>'title',v_act,'Work','Medium',coalesce(nullif(v_status,''),'Not Started'),v_prog,
+        nullif(p_data->>'minutes','')::int,p_data->>'result',v_text) returning id into v_id;
+    else
+      update public.daily_actions set title=coalesce(nullif(p_data->>'title',''),title),status=coalesce(nullif(v_status,''),status),
+        progress=case when v_status='' and p_data->>'progress' is null then progress else v_prog end,
+        actual_min=coalesce(nullif(p_data->>'minutes','')::int,actual_min),result=coalesce(p_data->>'result',result)
+      where id=v_id and owner=auth.uid();
+    end if;
+  end if;
+  return jsonb_build_object('ok',true,'id',v_id,'created',v_new);
+end $$;
+revoke all on function public.agent_post(text,text,text,jsonb,boolean) from public, anon;
+grant execute on function public.agent_post(text,text,text,jsonb,boolean) to authenticated;
+`;
+(function(){const _b=buildSQL;buildSQL=function(){return _b.apply(this,arguments)+'\n'+AGENT_SQL}})();
+const agMark=(s,r)=>'[agent:'+s+':'+r+']';
+const agFind=(t,field,s,r)=>(D()[t]||[]).find(x=>String(x[field]||'').includes(agMark(s,r)));
+const agRulesLocal=()=>prefs().agent_rules||{};
+async function agRulesLoad(){
+  if(typeof DB!=='undefined'&&DB.mode==='supabase'&&DB.sb){try{const {data,error}=await DB.sb.from('agent_rules').select('source,area');if(error)throw error;const o={};(data||[]).forEach(r=>{(o[r.source]=o[r.source]||[]).push(r.area)});S.agr=o;return}catch(e){S.agrErr=String(e.message||e)}}
+  S.agr=agRulesLocal()}
+async function agRulesSave(src,areas){
+  if(DB.mode==='supabase'&&DB.sb){await DB.sb.from('agent_rules').delete().eq('source',src);if(areas.length){const {error}=await DB.sb.from('agent_rules').insert(areas.map(a=>({source:src,area:a})));if(error)throw error}}
+  else{const o=Object.assign({},agRulesLocal());o[src]=areas;await setPrefs({agent_rules:o})}
+  S.agr=Object.assign({},S.agr||{});S.agr[src]=areas}
+/* The check an uploaded item goes through, in this order: KPI, Activity, Action. An item is the same as one you already have when its ref was seen before, or when
+   the name matches (KPI: name and year; Activity: name in the same life area; Action: title and day under the same Activity). The same item is not recorded again;
+   a changed value updates it; an Action that matches but belongs to no Activity is attached to its Activity. Nothing is deleted. dry = check only, nothing is saved. */
+const agNorm=s=>String(s||'').replace(/^[A-Z]{2,6}(?:-[A-Z0-9]+)+\s*·\s*/,'').toLowerCase().replace(/[^a-z0-9À-￿]+/g,' ').trim();
+const agMap=()=>prefs().ag_refs||{};
+const AG_T={activity:['activities','remarks'],action:['daily_actions','notes'],kpi:['kpis','notes']};
+const agKey=(src,ent,ref)=>src+'|'+ent+'|'+ref;
+async function agLink(src,ent,ref,id,dry,content){if(dry){(S.agTmp=S.agTmp||{})[agKey(src,ent,ref)]=id;return}const m=Object.assign({},agMap());m[agKey(src,ent,ref)]=(content?'c:':'')+id;const ks=Object.keys(m);if(ks.length>3000)delete m[ks[0]];await setPrefs({ag_refs:m})}
+function agGet(ent,src,ref){const t=AG_T[ent];let r=agFind(t[0],t[1],src,ref);if(r)return r;const k=agKey(src,ent,ref),tmp=S.agTmp&&S.agTmp[k];if(tmp)return byId(t[0],tmp)||{id:tmp,_dry:true};let id=agMap()[k];if(!id)return null;const c=id.startsWith('c:');if(c)id=id.slice(2);const row=byId(t[0],id);return row?(c?Object.assign({},row,{_c:true}):row):null}
+const agSame=(a,b)=>(typeof b==='number'||(a!=null&&a!==''&&b!=null&&b!==''&&!isNaN(+a)&&!isNaN(+b)))?num(a)===num(b):String(a==null?'':a).trim()===String(b==null?'':b).trim();
+const agStrip=(t,src,ref)=>String(t||'').replace(agMark(src,ref),'').trim();
+function agDiff(ex,want){const p={};Object.keys(want).forEach(k=>{if(want[k]===undefined)return;const same=(k==='name'||k==='title')?agNorm(ex[k])===agNorm(want[k]):agSame(ex[k],want[k]);if(!same)p[k]=want[k]});return p}
+async function agApply(src,it,rules,dry){
+  const ent=it.entity,ref=String(it.ref||'').trim();
+  if(!['activity','action','kpi'].includes(ent))throw new Error('entity must be activity, action or kpi');
+  if(!ref||ref.length>80)throw new Error('ref is required (max 80 characters)');
+  const st=it.status?String(it.status):'';if(st&&!AG_STATUS.includes(st))throw new Error('status "'+st+'" is not allowed');
+  const prog=st==='Completed'?100:Math.min(100,Math.max(0,Math.round(num(it.progress))));
+  const done=async(how,ex,patch,table,okey)=>{
+    if(!ex)return null;
+    if(!Object.keys(patch).length){if(how==='content')await agLink(src,ent,ref,ex.id,dry,true);return {st:'same',id:ex.id,note:how==='content'?'already there, matched by name':'already there'}}
+    if(!dry){await patchRow(table,ex.id,patch);if(how==='content')await agLink(src,ent,ref,ex.id,dry,true)}
+    return {st:'updated',id:ex.id,note:'changed: '+Object.keys(patch).join(', ')}};
+  if(ent==='kpi'){
+    const yr=num(it.year)||v3Year(),nm=String(it.name||'').trim();
+    let ex=agGet('kpi',src,ref),how=ex?(ex._c?'content':'ref'):null;
+    if(!ex&&nm){ex=(D().kpis||[]).find(k=>agNorm(k.name)===agNorm(nm)&&+k.year===yr)||null;how=ex?'content':null}
+    const dir=/^low/i.test(String(it.direction||''))?'Lower is better':'Higher is better',auto=it.auto===true?'[v3-auto] ':'';
+    if(!ex){
+      const al=String(it.life_area||'').trim().toLowerCase(),ar=(D().portfolios||[]).find(p=>String(p.name).trim().toLowerCase()===al||(al==='finance'&&String(p.name).toLowerCase()==='financial')||(al==='ibadah islam'&&String(p.name).toLowerCase()==='ibadah'));
+      if(!ar)throw new Error('life area "'+(it.life_area||'')+'" does not exist');
+      if(!nm)throw new Error('name is required for a new KPI');
+      if(it.target==null||isNaN(+it.target))throw new Error('target is required for a new KPI');
+      if(dry){await agLink(src,ent,ref,'dry-new',true);return {st:'created',note:'would be created'}}
+      const row=await saveRow('kpis',{name:nm.slice(0,200),strategic_objective:it.objective||null,portfolio_id:ar.id,year:yr,period:'Annual',unit:it.unit||'%',direction:dir,target:+it.target,actual:it.actual!=null?+it.actual:null,weight:it.weight!=null?+it.weight:1,data_source:it.data_source||'Agent file '+src,notes:(auto+(it.notes||'')+' '+agMark(src,ref)).trim()});
+      return {st:'created',id:row.id}}
+    if(ex._dry)return {st:'same',note:'same item earlier in this file'};
+    const want={actual:it.actual!=null?+it.actual:undefined};if(how==='ref'&&it.target!=null&&!isNaN(+it.target))want.target=+it.target;
+    return done(how,ex,agDiff(ex,want),'kpis')}
+  if(ent==='activity'){
+    let ex=agGet('activity',src,ref),how=ex?(ex._c?'content':'ref'):null;const nm=String(it.name||'').trim();
+    const al=String(it.life_area||'').trim().toLowerCase(),ar=(D().portfolios||[]).find(p=>String(p.name).trim().toLowerCase()===al);
+    if(!ex&&nm){ex=(D().activities||[]).find(a=>agNorm(a.name)===agNorm(nm)&&(!ar||a.portfolio_id===ar.id))||null;how=ex?'content':null}
+    if(!ex){
+      if(!ar)throw new Error('life area "'+(it.life_area||'')+'" does not exist');
+      if(!nm)throw new Error('name is required for a new activity');
+      const k=it.kpi&&(D().kpis||[]).filter(x=>v3Is(x.name,String(it.kpi))).sort((a,b)=>b.year-a.year)[0];
+      if(dry){await agLink(src,ent,ref,'dry-new',true);return {st:'created',note:'would be created'}}
+      const row=await saveRow('activities',{name:nm.slice(0,200),portfolio_id:ar.id,kpi_id:k?k.id:null,type:'Project',priority:it.priority||'Medium',status:st||'Not Started',progress:prog,planned_start:it.planned_start||null,planned_finish:it.planned_finish||null,est_hours:it.est_hours||null,deliverable:it.deliverable||null,remarks:((it.remarks||'')+' '+agMark(src,ref)).trim()});
+      return {st:'created',id:row.id}}
+    if(ex._dry)return {st:'same',note:'same item earlier in this file'};
+    const want={};if(st)want.status=st;if(st||it.progress!=null)want.progress=prog;if(it.planned_finish)want.planned_finish=it.planned_finish;if(it.actual_hours!=null)want.actual_hours=num(it.actual_hours);
+    if(how==='ref'){if(nm)want.name=nm.slice(0,200);if(it.remarks!=null){const cur=agStrip(ex.remarks,src,ref);if(cur!==String(it.remarks).trim())want.remarks=(String(it.remarks)+' '+agMark(src,ref)).trim()}}
+    if(!it.kpi||ex.kpi_id){}else{const k=(D().kpis||[]).filter(x=>v3Is(x.name,String(it.kpi))).sort((a,b)=>b.year-a.year)[0];if(k)want.kpi_id=k.id}
+    return done(how,ex,agDiff(ex,want),'activities')}
+  /* action */
+  const par=it.activity_ref?agGet('activity',src,String(it.activity_ref)):null;
+  if(it.activity_ref&&!par)throw new Error('activity_ref '+it.activity_ref+' was not found for '+src+'; the Activity must come first or already exist');
+  let ex=agGet('action',src,ref),how=ex?(ex._c?'content':'ref'):null;const ti=String(it.title||'').trim(),day=it.date||todayS();
+  if(!ex&&ti&&par&&!par._dry){ex=(D().daily_actions||[]).find(a=>agNorm(a.title)===agNorm(ti)&&a.action_date===day&&(a.activity_id===par.id||!a.activity_id))||null;how=ex?'content':null}
+  if(!ex){
+    if(!par)throw new Error('an action needs activity_ref: it must belong to an Activity');
+    if(!ti)throw new Error('title is required for a new action');
+    if(dry){await agLink(src,ent,ref,'dry-new',true);return {st:'created',note:'would be created'}}
+    const row=await saveRow('daily_actions',{action_date:day,title:ti.slice(0,200),activity_id:par.id,time_cat:'Work',priority:'Medium',status:st||'Not Started',progress:prog,actual_min:it.minutes!=null?num(it.minutes):null,result:it.result||null,notes:((it.notes||'')+' '+agMark(src,ref)).trim()});
+    return {st:'created',id:row.id}}
+  if(ex._dry)return {st:'same',note:'same item earlier in this file'};
+  const want={};if(st)want.status=st;if(st||it.progress!=null)want.progress=prog;if(it.minutes!=null)want.actual_min=num(it.minutes);if(it.result!=null)want.result=it.result;
+  if(par&&!par._dry&&ex.activity_id!==par.id)want.activity_id=par.id;
+  if(how==='ref'&&ti)want.title=ti.slice(0,200);
+  return done(how,ex,agDiff(ex,want),'daily_actions')}
+const AG_EX=`{
+  "schema": "polaris-agent/1",
+  "source": "POLARIS",
+  "items": [
+    {"entity":"activity","ref":"v3-0.1","name":"Deploy api-proxy and test Draft with AI","life_area":"Development","kpi":"v3 · Open tests from v2 closed","status":"Completed","planned_finish":"2026-11-23"},
+    {"entity":"action","ref":"v3-0.1-a1","activity_ref":"v3-0.1","title":"Deployed the function","date":"2026-11-23","status":"Completed","minutes":20,"result":"Version shows current"}
+  ]
+}`;
+function agPrompt(src){
+  const c=inbCfg();
+  return `Add a "Send to Polaris One" feature that reports every Activity and every Daily Action of this application, and its status, as it happens.
+
+CONNECTION
+- Database: Supabase, URL ${c.url}, publishable key ${c.key} (never a secret or service-role key).
+- Sign in as the Polaris One owner (supabase-js: auth.signInWithPassword), keep the session, store the credentials only in the browser of the person using the app. Never log or display the password.
+
+WHAT TO CALL (one call per item, every time something is created, changed, started or completed)
+  await sb.rpc('agent_post', { p_source: '${src}', p_entity: 'activity' | 'action', p_ref: '<fixed id of the item in this app>', p_data: { ... }, p_dry: false })
+
+p_ref is the item's own fixed id (max 80 characters). The same p_ref is the same item: sending again updates it, never adds a copy. Nothing can be deleted this way; to drop something send status "Cancelled".
+
+p_data for an ACTIVITY: name (required when new), life_area (required when new; must be one the owner allowed for ${src}), status (Not Started | In Progress | On Hold | Completed | Cancelled), progress (0-100), planned_finish (YYYY-MM-DD), est_hours, actual_hours, deliverable, remarks, kpi (exact name of an existing KPI, optional).
+p_data for an ACTION: activity_ref (p_ref of an activity already sent, required), title (required when new), date (YYYY-MM-DD, default today), status, progress, minutes (time spent), result, notes.
+Sending status "Completed" completes the item (progress 100). Send the activity before its actions.
+
+Show the last result (ok or the error text) and the time of the last successful send. Use p_dry: true for a test run that changes nothing.`}
+function agFilePrompt(src){return `Whenever this application creates or changes an Activity or a Daily Action, or finishes one, add it to a JSON file named polaris-${src.toLowerCase()}-<date>.json that the owner will upload to Polaris One (Integrations > Connections > Upload an agent file). Do not connect to any database.
+
+FILE FORMAT (polaris-agent/1)
+{"schema":"polaris-agent/1","source":"${src}","items":[ ...up to 200 items... ]}
+
+ACTIVITY item: {"entity":"activity","ref":"<fixed id of the item in this app, max 80 chars>","name":"...","life_area":"<name of an existing Polaris One life area>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact name of an existing KPI, optional>"}
+ACTION item: {"entity":"action","ref":"<fixed id>","activity_ref":"<ref of its activity>","title":"...","date":"YYYY-MM-DD","status":"...","minutes":n,"result":"..."}
+
+RULES
+- The same ref is the same item: uploading again updates it and never adds a copy. Keep refs fixed for the life of the item.
+- name and life_area are required the first time an activity appears; title and activity_ref the first time an action appears. Put the activity before its actions.
+- status "Completed" completes the item. Nothing can be deleted this way; use status "Cancelled".
+- Only include items that are new or changed since the last file. No secrets, no passwords, no personal data beyond the item text.`}
+function agNotionPrompt(){return `You are the Notion side of Polaris One. Read my Notion databases KPIs, Activities and Daily Actions (and only rows I ask for) and write ONE JSON block, nothing else, in this exact format. I will copy it into Polaris One.
+
+{"schema":"polaris-agent/1","source":"NOTION","items":[ ... up to 200 items ... ]}
+
+KPI item: {"entity":"kpi","ref":"<Notion page id>","name":"...","life_area":"<Domain>","year":2026,"unit":"%","direction":"HIGHER|LOWER","target":n,"actual":n}
+ACTIVITY item: {"entity":"activity","ref":"<Notion page id>","name":"...","life_area":"<Domain>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact KPI name, optional>"}
+ACTION item: {"entity":"action","ref":"<Notion page id>","activity_ref":"<Notion page id of its Activity>","title":"...","date":"YYYY-MM-DD","status":"...","minutes":n,"result":"..."}
+
+RULES: ref is the page id and never changes. Put KPIs first, then Activities, then Actions. Use my Domain value as life_area (Financial, Ibadah, Development, Personal Development, Trading, Investment). Status must be one of the five words; map my own words to them. Include only rows that are new or changed since I last asked. Never invent a value: leave the key out when the cell is empty. No secrets, no comments, valid JSON.`}
+const AG_UI=()=>S.ui.ag=S.ui.ag||{};
+function agCard(){
+  if(!S.agr&&!S.agrBusy){S.agrBusy=true;agRulesLoad().then(()=>{S.agrBusy=false})}
+  const rules=S.agr||{},ps=(D().portfolios||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const seen=src=>{const last=((D().activities||[]).filter(a=>String(a.remarks||'').includes('[agent:'+src+':')).concat((D().daily_actions||[]).filter(a=>String(a.notes||'').includes('[agent:'+src+':')))).reduce((m,r)=>{const t=String(r.updated_at||r.created_at||'');return t>m?t:m},'');return last?'Last received '+fmtDT(last):'Nothing received yet'};
+  const fileRows=AG_SRC.filter(s=>s[0]!=='POLARIS'&&s[0]!=='NOTION').map(s=>`<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;padding:6px 0;border-top:1px solid var(--line)"><b style="flex:1;min-width:180px">${esc(s[1])}</b><span class="sm mut">${esc(seen(s[0]))}</span><button class="btn s" data-act="copycmd" data-c="${esc(agFilePrompt(s[0]))}">${ic('copy',14)} Copy prompt</button></div>`).join('');
+  const rows=AG_SRC.filter(s=>s[0]!=='POLARIS').map(s=>{const on=(rules[s[0]]||[]).map(x=>x.toLowerCase());
+    return `<div class="card mt"><div class="ch"><h3>${esc(s[1])}</h3></div><p class="sm ink2">Life areas it may write to:</p><div class="row" style="flex-wrap:wrap;gap:6px 14px;margin:6px 0">${ps.map(p=>`<label class="sm"><input type="checkbox" data-change="agarea" data-src="${s[0]}" data-a="${esc(p.name)}" ${on.includes(String(p.name).toLowerCase())?'checked':''}> ${esc((p.icon||'')+' '+p.name)}</label>`).join('')}</div>
+    <button class="btn s" data-act="copycmd" data-c="${esc(agPrompt(s[0]))}">${ic('copy',14)} Copy prompt for the direct link</button></div>`}).join('');
+  return `<div class="card mt"><div class="ch"><h3>Agent files: Activities and Actions</h3><label class="btn s p" for="ag_file">${ic('up',14)} Upload agent file</label><input class="sr" id="ag_file" type="file" accept=".json,application/json" data-change="agfile"></div>
+   <p class="sm ink2">Each agent (Altair Project Management, Aero Engineering, Auto, and Polaris One development) hands you one JSON file. You upload it here: no database access, no key, nothing is opened. Items are created or updated, a “Completed” status completes them, and a KPI named in the file counts them. The same ref is never added twice, and nothing is deleted.</p>
+   ${fileRows}
+   <div class="fld wide" style="margin-top:10px"><label class="sm" for="ag_paste">Or paste the JSON here (for example the answer of Notion AI)</label><textarea class="in" id="ag_paste" rows="4" placeholder='{"schema":"polaris-agent/1", ...}'></textarea></div>
+   <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn s p" data-act="agpaste">${ic('check',14)} Apply pasted JSON</button><button class="btn s" data-act="agpaste" data-dry="1">Check only (save nothing)</button><button class="btn s" data-act="copycmd" data-c="${esc(agNotionPrompt())}">${ic('copy',14)} Copy prompt for Notion AI</button></div>
+   <pre tabindex="0" style="margin:10px 0 0;padding:10px 12px;background:var(--soft);border:1px solid var(--line);border-radius:8px;overflow:auto;max-height:200px;font-size:12px;line-height:1.5">${esc(AG_EX)}</pre></div>
+   <details class="card mt"><summary class="b" style="cursor:pointer">Optional: a direct link for an agent that can reach the database</summary>
+   <p class="sm ink2" style="margin-top:8px">Only if an agent should report by itself without a file. Run the SQL once in Supabase (one table and one function), allow the life areas below, and give that agent its prompt. ${S.agrErr?'<span style="color:var(--amber)">Rules could not be read ('+esc(S.agrErr)+'): run the SQL first.</span>':''}</p>
+   <button class="btn s" data-act="copycmd" data-c="${esc(AGENT_SQL)}">${ic('copy',14)} Copy SQL</button>${rows}</details>`}
+{const v0=VIEWS['integrations/inbound'];VIEWS['integrations/inbound']=adminOnly(function(){return v0.apply(this,arguments)+agCard()})}
+CHG.agarea=async el=>{const src=el.dataset.src,box=[...document.querySelectorAll('input[data-change="agarea"][data-src="'+src+'"]')],areas=box.filter(b=>b.checked).map(b=>b.dataset.a);
+  try{await agRulesSave(src,areas);toast('Saved')}catch(e){toast('Could not save: '+(e&&e.message||e),true)}};
+async function agRunText(text,dry){
+  try{
+    const j=JSON.parse(text);
+    if(j.schema!=='polaris-agent/1')throw new Error('schema must be polaris-agent/1');
+    const src=String(j.source||'').toUpperCase();if(!AG_SRC.some(s=>s[0]===src))throw new Error('source must be APM, AERO, AUTO, NOTION or POLARIS');
+    if(!Array.isArray(j.items)||!j.items.length||j.items.length>200)throw new Error('items must hold 1 to 200 entries');
+    if(!S.agr)await agRulesLoad();
+    S.agTmp={};
+    const order={kpi:0,activity:1,action:2},items=j.items.map((it,i)=>[it,i]).sort((a,b)=>(order[a[0]&&a[0].entity]??3)-(order[b[0]&&b[0].entity]??3)||a[1]-b[1]).map(x=>x[0]);
+    const res=[],c={created:0,updated:0,same:0,bad:0};
+    for(const it of items){const nm=(it&&it.entity)+' '+(it&&it.ref);try{const r=await agApply(src,it,S.agr||{},dry);c[r.st]++;res.push([nm,r.st+(r.note?' · '+r.note:''),r.st]) }catch(e){c.bad++;res.push([nm,String(e.message||e),'bad'])}}
+    S.agTmp=null;if(!dry)await v3Sync();
+    const col={created:'var(--green)',updated:'var(--brand)',same:'var(--mut)',bad:'var(--red)'};
+    openModal((dry?'Check only · ':'Agent file · ')+src,`<p class="sm">${dry?'<b>Nothing was saved.</b> ':''}<b>${c.created}</b> ${dry?'would be created':'created'}, <b>${c.updated}</b> ${dry?'would change':'updated'}, <b>${c.same}</b> already there (not recorded again), <b>${c.bad}</b> refused. ${c.created+c.updated+c.same} done, ${c.bad} refused. Nothing is deleted.</p><ul class="sm">${res.map(r=>`<li style="color:${col[r[2]]}">${esc(r[0])}: ${esc(r[1])}</li>`).join('')}</ul>`,`<button class="btn p" data-act="closeModal">Close</button>`)
+  }catch(e){S.agTmp=null;toast('The file could not be used: '+(e&&e.message||e),true)}}
+CHG.agfile=async el=>{const f=el.files&&el.files[0];el.value='';if(!f)return;await agRunText(await f.text(),false)};
+ACT.agpaste=async el=>{const t=$('#ag_paste');if(!t||!t.value.trim())return toast('Paste the JSON first',true);let v=t.value.trim();const m=v.match(/```(?:json)?\s*([\s\S]*?)```/);if(m)v=m[1].trim();await agRunText(v,!!(el&&el.dataset&&el.dataset.dry))};
+/* ---- r94: Test lab (learning mode) ---- */
+/* Every test has steps and what you should see. You mark Pass, Fail or Skip and write what happened and what we should learn.
+   Pass completes the matching plan activity; Fail keeps it in progress and adds a "Fix" daily action. The lessons stay in your settings (they travel with the backup)
+   and can be sent to Claude as a file, so the next piece of work starts from what the tests taught. */
+const TL_TESTS=[
+ ['0.1','Draft with AI for a meeting','Needs api-proxy 2026.11.22 deployed.',['Supabase > Edge Functions > api-proxy: paste api-proxy-index.ts and Deploy.','In Polaris One open Integrations > API status: api-proxy must not say stale.','Open a meeting that has minutes, press Draft with AI, read the preview, then apply it.'],'A draft appears with its sources; the version shows current; nothing is saved until you apply.'],
+ ['0.2','Carried meeting items and follow-up bar (iPhone)','Rev 86 and 88.',['Open a meeting that comes after an earlier meeting with open items.','Check the box that offers the earlier open items; carry one over.','Open Meeting follow-ups and look at the bars.'],'The item appears in the new meeting; bars stay inside the card.'],
+ ['0.3','Analysis journal and data freshness','Rev 89 and 90.',['Market Desk > Decision playbook: answer the checklist and save to the journal.','Open the saved row, link a trade, record the outcome.','Open Analysis journal > Does it work? and Market Analysis (the freshness strip above it).'],'The journal row keeps your answers; groups under 5 closed results are marked; each source shows when it last answered.'],
+ ['0.4','APM numbering (Rev 37)','Needs a real renumber in Altair Project Management.',['In APM change the code of one test task or move it.','Wait for the sync or press Sync now.','Open the matching Activity in Polaris One.'],'The new APM code shows on the Activity and its Actions.'],
+ ['0.5','Notion import with real data','',['Integrations > Notion: Check with Notion.','Import one database with a few pages.','Re-share a page in Notion and import again.'],'Rows appear once; the status after re-share is right; nothing is duplicated.'],
+ ['0.6','APM owner confirms the clean-up','Candidates 4, 5 and 9.',['Send the APM owner the list of cleaned codes.','Ask them to open each in APM.','Write down their answer in the note.'],'Written confirmation. After that the v2_cleanup tables may be dropped (your choice).'],
+ ['0.7','Restore from backup, one example','Use POLA-MIGRASI-STANDAR.sql step 5.',['Pick one backed-up row from a v2_cleanup table.','Restore only that row in a copy, or read the restore statement and run it on one row.','Compare the row with the original.'],'One row is restored and matches.'],
+ ['0.8','Decide clean-up candidates 6 to 8 and 10','',['Open the list of candidates.','For each one write keep, merge or remove in the note.'],'A decision per candidate. Nothing is removed before you choose.'],
+ ['0.9','Starter plan v3 (Rev 91)','',['Performance > KPIs > Starter plan v3 > Preview and create.','Read the preview, then Create.','Press Create again.'],'28 activities, KPIs and first-week actions appear; the second press creates nothing.'],
+ ['0.10','Agent files: history and KPI JSON (Rev 92 and 93)','',['Connections > Inbound links > Agent files.','Upload polaris-one-riwayat-activity-action.json, then polaris-one-kpi.json.','Upload each a second time.'],'Items are created once; the second upload adds no copy; nothing is deleted.'],
+ ['0.11','Altair report import (Rev 91)','Use Altair-Report-Contoh.pdf.',['Performance > KPIs > Import Altair report; choose the sample PDF.','Read the preview, apply.','Import the same file again.'],'4 KPIs are created; the second import is refused as already imported.']];
+const tlState=()=>prefs().testlab||{};
+const tlCounts=()=>{const s=tlState();return {pass:TL_TESTS.filter(t=>(s[t[0]]||{}).r==='pass').length,fail:TL_TESTS.filter(t=>(s[t[0]]||{}).r==='fail').length,skip:TL_TESTS.filter(t=>(s[t[0]]||{}).r==='skip').length,left:TL_TESTS.filter(t=>!(s[t[0]]||{}).r).length}};
+(function(){const it=navP('performance');if(it&&!it.subs.some(s=>s[0]==='testlab'))it.subs.push(['testlab','Test lab'])})();
+Object.assign(PAGEHELP,{'performance/testlab':'Learning mode: each test has steps and what you should see. Mark Pass, Fail or Skip, write what happened and what we should learn. Pass completes the matching plan activity; Fail adds a Fix action. Download the results to send them to Claude.'});
+VIEWS['performance/testlab']=()=>{
+  const s=tlState(),c=tlCounts();
+  const card=t=>{const e=s[t[0]]||{},tone=e.r==='pass'?'var(--green)':e.r==='fail'?'var(--red)':e.r==='skip'?'var(--amber)':'var(--line)';
+    return `<div class="card mt" style="border-left:4px solid ${tone}"><div class="ch"><h3>${esc(t[0])} · ${esc(t[1])}</h3><span class="sp"></span><span class="sm mut">${e.r?esc(e.r.toUpperCase())+' · '+esc(e.at||''):'Not tested'}</span></div>
+    ${t[2]?`<p class="sm mut">${esc(t[2])}</p>`:''}<ol class="sm" style="margin:6px 0 6px 18px;line-height:1.6">${t[3].map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
+    <p class="sm"><b>You should see:</b> ${esc(t[4])}</p>
+    <div class="fld wide"><label class="sm" for="tln_${esc(t[0])}">What happened</label><textarea class="in" id="tln_${esc(t[0])}" rows="2" data-change="tlnote" data-id="${esc(t[0])}" data-f="note">${esc(e.note||'')}</textarea></div>
+    <div class="fld wide"><label class="sm" for="tll_${esc(t[0])}">What should we learn or change in the app or the process</label><textarea class="in" id="tll_${esc(t[0])}" rows="2" data-change="tlnote" data-id="${esc(t[0])}" data-f="learn">${esc(e.learn||'')}</textarea></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn s" data-act="tlset" data-id="${esc(t[0])}" data-r="pass">${ic('check',14)} Pass</button><button class="btn s" data-act="tlset" data-id="${esc(t[0])}" data-r="fail">Fail</button><button class="btn s" data-act="tlset" data-id="${esc(t[0])}" data-r="skip">Skip</button></div></div>`};
+  const lessons=TL_TESTS.filter(t=>(s[t[0]]||{}).learn).map(t=>`<li><b>${esc(t[0])}</b> ${esc(s[t[0]].learn)}</li>`).join('');
+  return `<div class="g g4" style="margin-bottom:12px">${stat('Passed',c.pass,'of '+TL_TESTS.length,'green')}${stat('Failed',c.fail,'need a fix',c.fail?'red':'')}${stat('Skipped',c.skip,'')}${stat('Not tested',c.left,'')}</div>
+  <div class="card"><div class="ch"><h3>What we learned</h3><span class="sp"></span><button class="btn s" data-act="tlexport">${ic('down',14)} Download results</button></div>${lessons?`<ul class="sm" style="margin:0;padding-left:18px;line-height:1.7">${lessons}</ul>`:'<p class="sm mut">Nothing yet. After each test, write what the test taught you. Send the downloaded file to Claude and it becomes the first thing we fix or add.</p>'}</div>${TL_TESTS.map(card).join('')}`};
+CHG.tlnote=async el=>{const id=el.dataset.id,f=el.dataset.f,s=Object.assign({},tlState());s[id]=Object.assign({},s[id]);s[id][f]=el.value.slice(0,1500);await setPrefs({testlab:s})};
+ACT.tlset=async el=>{
+  const id=el.dataset.id,r=el.dataset.r,t=TL_TESTS.find(x=>x[0]===id);if(!t)return;
+  const s=Object.assign({},tlState());s[id]=Object.assign({},s[id],{r,at:todayS()});
+  const act=(D().activities||[]).find(a=>v3Is(a.name,'['+id+'] ')||String(a.name||'').includes('['+id+'] '));
+  try{
+    if(act&&r==='pass')await patchRow('activities',act.id,{status:'Completed'});
+    if(act&&r==='fail'){if(act.status==='Completed'||act.status==='Not Started')await patchRow('activities',act.id,{status:'In Progress'});
+      const ti='Fix: '+t[1];if(!(D().daily_actions||[]).some(x=>v3Is(x.title,ti)&&x.status!=='Completed'))await saveRow('daily_actions',{action_date:todayS(),title:ti,activity_id:act.id,time_cat:'Work',priority:'High',status:'Not Started',progress:0,next_action:(s[id].note||'').slice(0,200)||null})}
+  }catch(e){console.warn('tlset',e)}
+  await setPrefs({testlab:s});await v3Sync();renderView();
+  toast(r==='pass'?'Marked passed'+(act?' and activity completed':''):r==='fail'?'Marked failed'+(act?'; a Fix action was added':''):'Skipped')};
+ACT.tlexport=()=>{
+  const s=tlState(),items=[];
+  TL_TESTS.forEach(t=>{const e=s[t[0]];if(!e||!e.r)return;
+    items.push({entity:'action',ref:'test-'+t[0],activity_ref:'h-TL',title:'Test '+t[0]+': '+t[1]+' - '+e.r.toUpperCase(),date:e.at||todayS(),status:e.r==='pass'?'Completed':'Not Started',result:[e.note,e.learn&&('LEARNED: '+e.learn)].filter(Boolean).join(' | ').slice(0,900)||null})});
+  const j={schema:'polaris-agent/1',source:'POLARIS',items:[{entity:'activity',ref:'h-TL',name:'Test lab results (learning mode)',life_area:'Development',status:'In Progress',progress:Math.round(tlCounts().pass/TL_TESTS.length*100),remarks:'Results of the guided tests.'}].concat(items)};
+  download('polaris-testlab-'+todayS()+'.json',JSON.stringify(j,null,1))};
+RELEASE_NOTES.unshift({rev:96,date:'2026-11-22',groups:[
+ {t:'Integrations',items:[
+  ['No duplicates from any JSON','Every uploaded or pasted JSON is checked KPI first, then Activity, then Action. An item you already have (same ref, or the same name in the same life area, or the same action title and day under the same Activity) is not recorded again; a changed value updates it; an Action without an Activity is attached to its Activity. Check only shows the result without saving.','integrations','inbound','Open Inbound links']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:95,date:'2026-11-22',groups:[
+ {t:'Integrations',items:[
+  ['Notion AI can report in the same format','Paste the JSON that Notion AI writes (KPIs, Activities, Actions) into Agent files, or upload it as a file. There is a copy-ready prompt for Notion AI. The same ref is never added twice.','integrations','inbound','Open Inbound links']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:94,date:'2026-11-22',groups:[
+ {t:'Performance',items:[
+  ['Test lab (learning mode)','Each test has steps and what you should see. Mark Pass, Fail or Skip and write what happened and what we should learn. Pass completes the matching plan activity, Fail adds a Fix action, and the lessons can be downloaded as a file for Claude.','performance','testlab','Open Test lab']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:93,date:'2026-11-22',groups:[
+ {t:'Integrations',items:[
+  ['KPIs in an agent file','An agent file can now carry KPIs (entity "kpi": name, life_area, target, actual, unit, direction). A KPI with the same name and year is updated, never copied.','integrations','inbound','Open Inbound links']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:92,date:'2026-11-22',groups:[
+ {t:'Integrations',items:[
+  ['Agents send Activities and Actions','Altair Project Management, Aero Engineering and Auto can report each Activity and Daily Action through one function. Completed items complete here and move the KPI they name. You choose the life areas each agent may write to.','integrations','inbound','Open Inbound links'],
+  ['Agent file','The same messages as a JSON file you upload once, for example the work recorded for Polaris One development.','integrations','inbound','Open Inbound links']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:91,date:'2026-11-22',groups:[
+ {t:'Polaris One 2.0',items:[
+  ['Starter plan v3','Creates KPIs for six life areas (it never creates a life area; Development must exist), the v3 activities (in Development) and the first week of daily actions. You see a preview first; only what is missing is created.','performance','kpi','Open KPIs'],
+  ['Altair reports','Upload a PDF in the Altair Performance Report format from Altair Project Management, Aero Engineering or Auto. It is read from text, or by OCR for a picture, checked with a row count and a checksum, and shown before it updates your KPIs.','performance','kpi','Open KPIs']
+ ]}
+]});
+RELEASE_NOTES.unshift({rev:90,date:'2026-11-22',groups:[
+ {t:'Market Analysis',items:[
+  ['Does it work? in the Analysis journal','Win rate and net result by section, by decision and by how many criteria agreed. A group with fewer than 5 closed results is marked so you do not draw a conclusion from it.','market','journal','Open Analysis journal'],
+  ['Data freshness above Market Analysis','Shows when each live source last answered, or that it failed and why, so you know whether a number is old.','market','analysis','Open Market Analysis']
+ ]}
+]});
 RELEASE_NOTES.unshift({rev:89,date:'2026-11-22',groups:[
  {t:'Polaris One 2.0',items:[
   ['Decision playbook goes to the Analysis journal','Save a reading to Market Desk → Analysis journal with the verdict, scores, red flags, macro and thesis. Open it later to link the trade and record the outcome.','market','playbook','Open Decision playbook'],
