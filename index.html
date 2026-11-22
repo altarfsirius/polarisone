@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='98',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='99',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -1676,7 +1676,7 @@ function cell(m,c,r){
    case 'range':return pbar(v);
    case 'url':return `<a href="${esc(safeUrl(v))}" target="_blank" rel="noopener noreferrer" data-stop>${ic('link',14)} link</a>`;
    case 'color':return `<span class="sw" style="background:${esc(v)}"></span>`;
-   case 'number':return fmtN(v,2);
+   case 'number':return f.k==='year'&&v!=null&&v!==''?String(v):fmtN(v,2);
    default:return `<span class="${c==='description'||c==='next_actions'?'sm ink2':''}">${esc(trunc(v,c==='description'?90:70))}</span>`}
 }
 function searchText(m,r){return m.fields.map(f=>f.t==='ref'?refLabel(f.ref,r[f.k]):f.t==='hidden'||f.t==='secret'||f.t==='heading'?'':String(r[f.k]??'')).join(' ').toLowerCase()}
@@ -1799,7 +1799,7 @@ function fmtField(f,v,r){
    case 'nsel':{const o=optList(f).find(x=>String(x[0])===String(v));return esc(o?o[1]:v)}
    case 'url':return safeUrl(v)==='#'?`<span title="Blocked: only http(s) links are opened">${esc(trunc(v,60))} <span class="badge b-red">blocked</span></span>`:`<a href="${esc(safeUrl(v))}" target="_blank" rel="noopener noreferrer">${esc(trunc(v,60))}</a>`;
    case 'color':return `<span class="sw" style="background:${esc(v)}"></span> ${esc(v)}`;
-   case 'number':return fmtN(v,2);default:return esc(v)}}
+   case 'number':return f.k==='year'&&v!=null&&v!==''?String(v):fmtN(v,2);default:return esc(v)}}
 function evidenceBlock(key,id){
   const ev=(D().evidence||[]).filter(e=>e.link_type===key&&e.link_id===id);
   return `<div class="ch" style="margin-top:18px"><h3>Evidence (${ev.length})</h3><span class="sp"></span>${typeof canDo==='function'&&canDo('evidence','create')==='deny'?'':`<button class="btn s" data-act="addev" data-k="${key}" data-id="${id}">${ic('plus',14)} Add evidence</button>`}</div>${ev.length?`<div class="list">${ev.map(e=>`<div class="item"><div style="flex:1;min-width:0"><div class="t">${esc(e.title)}</div><div class="sm mut">${esc(e.type)} · ${fmtD(e.evidence_date)}</div></div>${(e.url||e.file_path)?`<button class="btn s" data-act="openev" data-id="${e.id}">${ic('link',14)} Open</button>`:''}</div>`).join('')}</div>`:'<p class="sm mut">No proof attached yet. Add a link or a file so the result can be verified.</p>'}`;
@@ -24316,8 +24316,8 @@ async function agRunText(text,dry){
     const src=String(j.source||'').toUpperCase();if(!AG_SRC.some(s=>s[0]===src))throw new Error('source must be APM, AERO, AUTO, NOTION or POLARIS');
     if(!Array.isArray(j.items)||!j.items.length||j.items.length>200)throw new Error('items must hold 1 to 200 entries');
     if(!S.agr)await agRulesLoad();
-    S.agTmp={};
-    const order={kpi:0,activity:1,action:2},items=j.items.map((it,i)=>[it,i]).sort((a,b)=>(order[a[0]&&a[0].entity]??3)-(order[b[0]&&b[0].entity]??3)||a[1]-b[1]).map(x=>x[0]);
+    S.agTmp={};S.agGoals={};
+    const order={goal:-1,kpi:0,activity:1,action:2},items=j.items.map((it,i)=>[it,i]).sort((a,b)=>(order[a[0]&&a[0].entity]??3)-(order[b[0]&&b[0].entity]??3)||((a[0]&&a[0].entity==='goal')?(GRANK[String(a[0].level||'Goal').replace(/^./,c=>c.toUpperCase()).toLowerCase().replace(/^./,c=>c.toUpperCase())]??2)-(GRANK[String(b[0].level||'Goal').toLowerCase().replace(/^./,c=>c.toUpperCase())]??2):0)||a[1]-b[1]).map(x=>x[0]);
     const res=[],c={created:0,updated:0,same:0,bad:0};
     for(const it of items){const nm=(it&&it.entity)+' '+(it&&it.ref);try{const r=await agApply(src,it,S.agr||{},dry);c[r.st]++;res.push([nm,r.st+(r.note?' · '+r.note:''),r.st]) }catch(e){c.bad++;res.push([nm,String(e.message||e),'bad'])}}
     S.agTmp=null;if(!dry)await v3Sync();
@@ -24385,6 +24385,51 @@ ACT.hardrefresh=async()=>{
   try{if(window.caches)for(const k of await caches.keys())await caches.delete(k)}catch(e){}
   try{const u=new URL(location.href);u.searchParams.set('r',Date.now().toString(36));location.replace(u.toString())}catch(e){location.reload()}};
 document.addEventListener('keydown',e=>{const t=e.target;if((e.key==='Enter'||e.key===' ')&&t&&t.matches&&t.matches('.brand[data-act="hardrefresh"]')){e.preventDefault();ACT.hardrefresh()}});
+/* ---------- Rev 99 · Goals: nothing without a purpose (stage 2.1) ---------- */
+const goalFind=(t,lv)=>(D().goals||[]).find(g=>agNorm(g.title)===agNorm(t)&&(!lv||g.type===lv))||null;
+const actGoalId=a=>{const act=a.activity_id?byId('activities',a.activity_id):null;return act&&act.goal_id?act.goal_id:null};
+function goalGaps(){
+  const acts=(D().activities||[]).filter(a=>!['Completed','Cancelled'].includes(a.status)&&!a.goal_id),
+    kp=(D().kpis||[]).filter(k=>!k.goal_id),
+    da=(D().daily_actions||[]).filter(x=>!['Completed','Cancelled'].includes(x.status)&&!actGoalId(x));
+  return {acts,kp,da}}
+VIEWS['plan/nogoal']=()=>{
+  const g=goalGaps(),goals=(D().goals||[]).length;
+  const sec=(title,k,rows,lab,more)=>`<div class="card" style="margin-bottom:12px"><div class="ch"><h3>${title} (${rows.length})</h3></div>${rows.length?`<div class="list">${rows.slice(0,40).map(r=>`<div class="item" data-act="open" data-k="${k}" data-id="${r.id}"><span class="t" style="flex:1;min-width:0">${esc(lab(r))}</span>${badge(r.status)}</div>`).join('')}</div>${rows.length>40?`<p class="sm mut">${rows.length-40} more not shown. Open the list page and filter.</p>`:''}`:'<p class="sm mut">Everything here points to a goal.</p>'}</div>`;
+  return `<div class="card" style="margin-bottom:12px"><p class="sm ink2">${goals?'':'<b>No goals exist yet.</b> Create a Vision and yearly Goals first (Plan → Goals). '}Open an item below and choose its <b>Goal</b> (a KPI has <b>Linked goal</b>). An Action follows the goal of its Activity, so only the Activity needs one. Open work that serves no goal is listed here on purpose: it is either missing a link or not worth doing.</p>
+  <div class="row"><button class="btn" data-act="go" data-p="plan" data-s="goals">${ic('target',15)} Open Goals</button></div></div>`+
+  sec('Activities without a goal','activities',g.acts,r=>r.name)+sec('KPIs without a goal','kpis',g.kp,r=>`${r.name} (${r.year})`)+sec('Actions whose Activity has no goal','daily_actions',g.da,r=>`${fmtS(r.action_date)} · ${r.title}`)};
+navP('plan').subs.splice(2,0,['nogoal','Without a goal']);
+PAGEHELP['plan/nogoal']='Shows open Activities, KPIs and Actions that do not lead to any goal, so every piece of work can be traced to a Vision, Goal or Objective. An Action takes the goal of its Activity.';
+{const e0=EXTRA.goals;EXTRA.goals=function(g){const h=e0.apply(this,arguments),ks=(D().kpis||[]).filter(k=>k.goal_id===g.id),acts=(D().activities||[]).filter(a=>a.goal_id===g.id),ids=new Set(acts.map(a=>a.id)),da=(D().daily_actions||[]).filter(x=>ids.has(x.activity_id)),dn=da.filter(x=>x.status==='Completed').length;
+  return h+`<div class="ch" style="margin-top:14px"><h3>Linked KPIs (${ks.length})</h3></div>${ks.length?`<div class="list">${ks.map(k=>`<div class="item" data-act="open" data-k="kpis" data-id="${k.id}"><span class="t" style="flex:1;min-width:0">${esc(k.name)}</span><span class="sm mut">${esc(k.year)}</span></div>`).join('')}</div>`:'<p class="sm mut">No KPI is linked to this goal yet.</p>'}<p class="sm mut" style="margin-top:8px">Actions through its activities: ${dn} of ${da.length} completed.</p>`}}
+/* agent file: goal items, and a goal on a KPI or Activity */
+{const a0=agApply;
+agApply=async function(src,it,rules,dry){
+  if(it&&it.entity==='goal'){
+    const ti=String(it.title||'').trim(),lv=['Vision','Mission','Goal','Objective'].find(x=>x.toLowerCase()===String(it.level||'Goal').toLowerCase());
+    if(!String(it.ref||'').trim())throw new Error('ref is required (max 80 characters)');
+    if(!ti)throw new Error('title is required for a goal');if(!lv)throw new Error('level must be Vision, Mission, Goal or Objective');
+    const st=it.status?String(it.status):'';if(st&&!AG_STATUS.includes(st))throw new Error('status "'+st+'" is not allowed');
+    let ex=goalFind(ti,lv);
+    if(!ex&&(S.agGoals||{})[agNorm(ti)])return {st:'same',note:'same item earlier in this file'};
+    const ps=it.parent?goalFind(String(it.parent)):null;if(it.parent&&!ps&&!(S.agGoals||{})[agNorm(it.parent)])throw new Error('parent goal "'+it.parent+'" does not exist; list it earlier in the file');
+    if(ex){const want={};if(st)want.status=st;if(it.end_date)want.end_date=it.end_date;if(it.success_measure)want.success_measure=it.success_measure;if(ps&&!ex.parent_id&&ps.id!==ex.id)want.parent_id=ps.id;
+      const p=agDiff(ex,want);if(!Object.keys(p).length)return {st:'same',id:ex.id,note:'already there'};if(!dry)await patchRow('goals',ex.id,p);return {st:'updated',id:ex.id,note:'changed: '+Object.keys(p).join(', ')}}
+    const al=String(it.life_area||'').trim().toLowerCase(),ar=al?(D().portfolios||[]).find(p=>String(p.name).trim().toLowerCase()===al):null;
+    if(al&&!ar)throw new Error('life area "'+it.life_area+'" does not exist');
+    S.agGoals=S.agGoals||{};S.agGoals[agNorm(ti)]=1;
+    if(dry)return {st:'created',note:'would be created'};
+    const row=await saveRow('goals',{type:lv,title:ti.slice(0,200),portfolio_id:ar?ar.id:(ps?ps.portfolio_id:null),parent_id:ps?ps.id:null,description:it.description||null,success_measure:it.success_measure||null,end_date:it.end_date||null,priority:it.priority||'Medium',status:st||'Not Started',progress:st==='Completed'?100:0});
+    return {st:'created',id:row.id}}
+  const r=await a0.apply(this,arguments);
+  if(!dry&&it&&it.goal&&r&&r.id&&(it.entity==='kpi'||it.entity==='activity')){
+    const g=goalFind(String(it.goal)),tb=it.entity==='kpi'?'kpis':'activities',cur=byId(tb,r.id);
+    if(g&&cur&&!cur.goal_id){await patchRow(tb,r.id,{goal_id:g.id});r.st=r.st==='same'?'updated':r.st;r.note=(r.note?r.note+'; ':'')+'linked to goal'}
+    else if(!g)r.note=(r.note?r.note+'; ':'')+'goal "'+it.goal+'" not found, not linked'}
+  return r}}
+
+RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
 RELEASE_NOTES.unshift({rev:98,date:'2026-11-22',groups:[{t:'Easier to find',items:[['Upload JSON button','The KPI page now has an Upload JSON button that opens the agent file card directly, so you no longer need the API Hub menu.','performance','kpi','Open']]}]});
 RELEASE_NOTES.unshift({rev:97,date:'2026-11-22',groups:[
  {t:'Polaris One 2.0',items:[
