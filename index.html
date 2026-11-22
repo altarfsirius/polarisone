@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='87',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='88',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -23833,6 +23833,11 @@ ACT.peershow=()=>{const g=peerState();g.show=!g.show;renderView()};
 /* r85 backup: settings travel too, but never anything that looks like a key, token, secret or password */
 const BK_SECRET=/key|token|secret|pass|auth|bearer|cookie/i;
 function bkPrefs(){const p=prefs(),o={};Object.keys(p).forEach(k=>{if(!BK_SECRET.test(k))o[k]=p[k]});return o}
+RELEASE_NOTES.unshift({rev:88,date:'2026-11-22',groups:[
+ {t:'Fixes',items:[
+  ['Meeting follow-ups: bars stay inside the card','A bar for a group larger than the first row ran past the edge of the card. Every bar is now measured against the largest group.','dash','home','Open Home']
+ ]}
+]});
 RELEASE_NOTES.unshift({rev:87,date:'2026-11-22',groups:[
  {t:'Polaris One 2.0',items:[
   ['AI draft for a meeting','From a meeting: a summary, proposed action items with the sentence each came from, and a progress note. You see what is sent first, can leave items out, edit or reject each proposal, and nothing is saved until you add it. Needs the latest api-proxy.','meetings','list','Open Meetings']
@@ -24359,7 +24364,7 @@ function mfCard(){
   if(!(D().meeting_items||[]).length)return '';
   const v=mfData(),S_=v.sets,tile=(k,l,n,s,tone)=>`<div data-act="mfopen" data-k="${k}" role="button" tabindex="0" style="cursor:pointer" onkeydown="if(event.key==='Enter')this.click()" class="stat ${tone||''}"><div class="l">${l}</div><div class="v">${n}</div><div class="s">${s}</div></div>`;
   const tiles=`<div class="g g6">${tile('open','Open items',S_.open.length,'still to follow up','blue')}${tile('over','Overdue',S_.over.length,'past follow-up date',S_.over.length?'red':'')}${tile('today','Due today',S_.today.length,'follow up today',S_.today.length?'amber':'')}${tile('soon','Next 7 days',S_.soon.length,'coming up')}${tile('nopic','No owner',S_.nopic.length,'nobody responsible',S_.nopic.length?'amber':'')}${tile('nodue','No date',S_.nodue.length,'no follow-up date')}</div>`;
-  const rows=(a,lab)=>a.length?a.slice(0,6).map(e=>{const w=Math.max(4,Math.round(e.n/(a[0].n||1)*100));return `<div data-act="mfopen" data-k="grp" data-g="${esc(lab==='p'?'p:'+e.k:'o:'+e.k)}" style="cursor:pointer;margin:7px 0" role="button" tabindex="0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lab==='p'?(e.k?trunc(refLabel('projects',e.k),44):'No project'):e.k)}</span><b>${e.n}${e.over?` <span class="badge b-red">${e.over} overdue</span>`:''}</b></div><div style="height:6px;border-radius:4px;background:var(--line,#e5e7eb);margin-top:3px"><div style="height:6px;border-radius:4px;width:${w}%;background:${e.over?'#B42318':'var(--brand)'}"></div></div></div>`}).join(''):'<div class="sm mut">Nothing open.</div>';
+  const rows=(a,lab)=>a.length?a.slice(0,6).map(e=>{const w=Math.min(100,Math.max(4,Math.round(e.n/(Math.max(1,...a.map(x=>x.n)))*100)));return `<div data-act="mfopen" data-k="grp" data-g="${esc(lab==='p'?'p:'+e.k:'o:'+e.k)}" style="cursor:pointer;margin:7px 0" role="button" tabindex="0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lab==='p'?(e.k?trunc(refLabel('projects',e.k),44):'No project'):e.k)}</span><b>${e.n}${e.over?` <span class="badge b-red">${e.over} overdue</span>`:''}</b></div><div style="height:6px;border-radius:4px;background:var(--line,#e5e7eb);margin-top:3px"><div style="height:6px;border-radius:4px;width:${w}%;background:${e.over?'#B42318':'var(--brand)'}"></div></div></div>`}).join(''):'<div class="sm mut">Nothing open.</div>';
   const next=S_.open.filter(i=>v.due(i)).sort((a,b)=>v.due(a).localeCompare(v.due(b))).slice(0,5);
   const nx=next.length?next.map(i=>`<div class="item" data-act="open" data-k="meeting_items" data-id="${i.id}" style="gap:10px"><div style="flex:1;min-width:0"><div class="t" style="white-space:normal;overflow-wrap:anywhere">${esc(i.topic)}</div><div class="sm mut">${esc(i.pic||'No owner')} · due ${esc(fmtS(i.due_date))}${i.project_id?' · '+esc(trunc(refLabel('projects',i.project_id),30)):''}</div></div>${v.due(i)<v.t?'<span class="badge b-red">Overdue</span>':v.due(i)===v.t?'<span class="badge b-amber">Today</span>':''}</div>`).join(''):'<div class="sm mut">No open item has a follow-up date.</div>';
   return `<div class="card mt"><div class="ch"><h3>Meeting follow-ups</h3><span class="sp"></span><span class="sm mut">${S_.done.length} closed of ${v.all.length}</span><button class="btn s" data-act="go" data-p="meetings" data-s="items">All items</button></div>${tiles}<div class="g g3 g1m mt"><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">By project</div>${rows(v.prj,'p')}</div><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">By person responsible</div>${rows(v.pic,'o')}</div><div><div class="sm mut" style="text-transform:uppercase;letter-spacing:.05em">Next due</div><div class="list">${nx}</div></div></div></div>`}
