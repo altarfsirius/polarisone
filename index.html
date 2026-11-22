@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='97',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='98',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -23979,9 +23979,10 @@ function v3Plan(){
 function v3Card(){
   const p=v3Plan(),n=(l)=>l.filter(x=>!x.have).length;
   const left=n(p.areas)+n(p.kpis)+n(p.acts);
-  return `<div class="card noprint" id="v3card" style="margin-bottom:14px"><div class="ch"><h3>Starter plan v3</h3><span class="sp"></span><button class="btn s" data-act="v3open">${left?'Preview and create':'Review'}</button><label class="btn s" for="ar_file" style="margin-left:6px">Import Altair report</label><input class="sr" id="ar_file" type="file" accept="application/pdf,image/*" data-change="arfile"></div>
+  return `<div class="card noprint" id="v3card" style="margin-bottom:14px"><div class="ch"><h3>Starter plan v3</h3><span class="sp"></span><button class="btn s" data-act="v3open">${left?'Preview and create':'Review'}</button><button class="btn s" data-act="go" data-p="integrations" data-s="inbound" style="margin-left:6px">Upload JSON</button><label class="btn s" for="ar_file" style="margin-left:6px">Import Altair report</label><input class="sr" id="ar_file" type="file" accept="application/pdf,image/*" data-change="arfile"></div>
   <p class="sm ink2">${left?`Not created yet: ${n(p.kpis)} KPI(s), ${n(p.acts)} activity(ies). Everything is created only when missing, nothing is changed or deleted.`:'The starter plan is in place. The KPIs of Development count their own completed activities.'} A report from Altair Project Management, Altair Aero Engineering or Altair Auto (PDF in the Altair format) updates matching KPIs after you check a preview.</p></div>`}
 {const v0=VIEWS['performance/kpi'];VIEWS['performance/kpi']=function(){setTimeout(()=>v3Sync().then(c=>{if(c&&S.route&&S.route.p==='performance'&&S.route.s==='kpi')renderView()}),150);return v3Card()+v0.apply(this,arguments)}}
+{const v1=VIEWS['execute/activities'];VIEWS['execute/activities']=function(){const h=v1.apply(this,arguments);return (isAdmin()?`<div class="row noprint" style="margin-bottom:8px"><span class="sp"></span><button class="btn s" data-act="go" data-p="integrations" data-s="inbound">${ic('plug',14)} Upload JSON</button></div>`:'')+h}}
 ACT.v3open=()=>{
   const p=v3Plan(),nw=l=>l.filter(x=>!x.have).length,list=(l,f)=>l.filter(x=>!x.have).map(f).join('');
   const body=`<p class="sm ink2" style="margin-bottom:8px">Preview. Nothing is created until you press Create. Names that already exist are skipped, so you can press it again safely.</p>
@@ -24385,6 +24386,7 @@ ACT.hardrefresh=async()=>{
   try{if(window.caches)for(const k of await caches.keys())await caches.delete(k)}catch(e){}
   try{const u=new URL(location.href);u.searchParams.set('r',Date.now().toString(36));location.replace(u.toString())}catch(e){location.reload()}};
 document.addEventListener('keydown',e=>{const t=e.target;if((e.key==='Enter'||e.key===' ')&&t&&t.matches&&t.matches('.brand[data-act="hardrefresh"]')){e.preventDefault();ACT.hardrefresh()}});
+RELEASE_NOTES.unshift({rev:98,date:'2026-11-22',groups:[{t:'Easier to find',items:[['Upload JSON button','The KPI page now has an Upload JSON button that opens the agent file card directly, so you no longer need the API Hub menu.','performance','kpi','Open']]}]});
 RELEASE_NOTES.unshift({rev:97,date:'2026-11-22',groups:[
  {t:'Polaris One 2.0',items:[
   ['Click the logo to hard refresh','Click or press Enter on the Polaris One logo at the top of the menu to load the newest version: the app files kept on this device are cleared and the page reloads. Your sign-in and data stay.','','','']
