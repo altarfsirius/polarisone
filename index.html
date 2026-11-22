@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='96',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='97',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -1608,7 +1608,7 @@ function mountShell(){
 }
 function renderNav(){
   const n=alerts().filter(a=>a.tone==='red').length;
-  $('#side').innerHTML=`<div class="brand">${appIcon(38)}<div><b>${APP_WORD}</b><small>${APP_TAG}</small></div></div>
+  $('#side').innerHTML=`<div class="brand" data-act="hardrefresh" role="button" tabindex="0" title="Hard refresh: load the newest version" aria-label="Hard refresh: load the newest version of Polaris One" style="cursor:pointer">${appIcon(38)}<div><b>${APP_WORD}</b><small>${APP_TAG}</small></div></div>
   ${NAV.filter(x=>(!x.admin||isAdmin())&&subsOf(x).length).map(x=>`<button class="np ${x.id===S.route.p?'on':''}" data-act="nav" data-p="${x.id}">${ic(x.ic)}<span>${x.label}</span>${x.id==='dashboard'&&n?`<span class="n">${n}</span>`:''}</button>`).join('')}
   <div class="sidefoot"><div id="pwabox" style="margin-bottom:8px"></div><div class="me"><div class="av">${esc(initials(S.profile.full_name))}</div><div style="min-width:0;flex:1"><b class="sm" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.profile.full_name||S.profile.email)}</b><span class="xs mut">${S.profile.role==='admin'?'Admin':'User'} · ${DB.mode==='demo'?'Demo':'Supabase'}</span></div><button class="iconbtn" data-act="logout" title="Sign out" aria-label="Sign out">${ic('out')}</button></div></div>`;
 }
@@ -24376,6 +24376,20 @@ ACT.tlexport=()=>{
     items.push({entity:'action',ref:'test-'+t[0],activity_ref:'h-TL',title:'Test '+t[0]+': '+t[1]+' - '+e.r.toUpperCase(),date:e.at||todayS(),status:e.r==='pass'?'Completed':'Not Started',result:[e.note,e.learn&&('LEARNED: '+e.learn)].filter(Boolean).join(' | ').slice(0,900)||null})});
   const j={schema:'polaris-agent/1',source:'POLARIS',items:[{entity:'activity',ref:'h-TL',name:'Test lab results (learning mode)',life_area:'Development',status:'In Progress',progress:Math.round(tlCounts().pass/TL_TESTS.length*100),remarks:'Results of the guided tests.'}].concat(items)};
   download('polaris-testlab-'+todayS()+'.json',JSON.stringify(j,null,1))};
+/* ---- r97: click the logo = hard refresh. Clears the app's cached files and the service worker, then reloads with a new address so the newest index.html is fetched.
+   Your sign-in, settings and data are not touched (they are not in those caches). ---- */
+try{const u=new URL(location.href);if(u.searchParams.has('r')){u.searchParams.delete('r');history.replaceState(null,'',u.toString())}}catch(e){}
+ACT.hardrefresh=async()=>{
+  toast('Refreshing to the newest version…');
+  try{const rs=navigator.serviceWorker?await navigator.serviceWorker.getRegistrations():[];for(const r of rs)await r.unregister()}catch(e){}
+  try{if(window.caches)for(const k of await caches.keys())await caches.delete(k)}catch(e){}
+  try{const u=new URL(location.href);u.searchParams.set('r',Date.now().toString(36));location.replace(u.toString())}catch(e){location.reload()}};
+document.addEventListener('keydown',e=>{const t=e.target;if((e.key==='Enter'||e.key===' ')&&t&&t.matches&&t.matches('.brand[data-act="hardrefresh"]')){e.preventDefault();ACT.hardrefresh()}});
+RELEASE_NOTES.unshift({rev:97,date:'2026-11-22',groups:[
+ {t:'Polaris One 2.0',items:[
+  ['Click the logo to hard refresh','Click or press Enter on the Polaris One logo at the top of the menu to load the newest version: the app files kept on this device are cleared and the page reloads. Your sign-in and data stay.','','','']
+ ]}
+]});
 RELEASE_NOTES.unshift({rev:96,date:'2026-11-22',groups:[
  {t:'Integrations',items:[
   ['No duplicates from any JSON','Every uploaded or pasted JSON is checked KPI first, then Activity, then Action. An item you already have (same ref, or the same name in the same life area, or the same action title and day under the same Activity) is not recorded again; a changed value updates it; an Action without an Activity is attached to its Activity. Check only shows the result without saving.','integrations','inbound','Open Inbound links']
