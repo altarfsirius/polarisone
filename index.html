@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='88',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='89',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -23734,7 +23734,8 @@ const PB_MAC=[
  ['k','Capital flow','Is global money moving toward this country, sector or asset, or away from it?'],
  ['r','Relative value','Not "good or bad" but "stronger or weaker than the alternatives"']];
 const PB_GLOS=[['Stock / share','A small ownership stake in a company.'],['Market capitalisation','Share price × shares outstanding.'],['IPO','The first public sale of a company’s shares.'],['Bull market','Prices are generally rising.'],['Bear market','Prices are generally falling.'],['52-week high / low','The highest and lowest price in the last year.'],['Volume','How many shares were traded in a period.'],['Volatility','How sharply the price moves up and down.'],['Liquidity','How easily you can buy or sell without moving the price.'],['Dividend','Part of the profit paid to shareholders.'],['Dividend yield','Dividend ÷ price: income relative to the price.'],['CAGR','Annual growth rate over several years.'],['Capital gain','Profit from selling above the purchase price.'],['ROE','Net profit ÷ shareholders’ equity: how well equity is used.'],['EPS','Profit per outstanding share.'],['P/E ratio','Price ÷ EPS: price compared with earnings.'],['Book value','Net worth of the company (assets − liabilities).'],['P/B ratio','Price ÷ book value per share.'],['Debt-to-equity','Total debt ÷ shareholders’ equity.'],['Current ratio','Current assets ÷ current liabilities: can it pay what is due within a year?']];
-const pbUi=()=>S.ui.pb=S.ui.pb||{tab:'check',own:false,name:'',a:{},th:{base:'',conf:'',inv:'',alt:'',hor:'Months'},mac:{},rt:{exp:'',act:'',hi:'1'},ra:{}};
+const pbBase=()=>({tab:'check',own:false,name:'',a:{},th:{base:'',conf:'',inv:'',alt:'',hor:'Months'},mac:{},rt:{exp:'',act:'',hi:'1'},ra:{}});
+const pbUi=()=>S.ui.pb=S.ui.pb||(()=>{const b=pbBase(),sv=prefs().pb_state||{};try{return Object.assign(b,JSON.parse(JSON.stringify(sv)),{tab:'check'},{th:Object.assign(b.th,sv.th||{}),rt:Object.assign(b.rt,sv.rt||{})})}catch(e){return b}})();
 const pbN=v=>{const x=parseFloat(String(v==null?'':v).replace(/,/g,''));return isFinite(x)?x:null};
 function pbScore(u){let q=0,qa=0,v=0,va=0,red=0,ans=0;
  PB_Q.forEach(c=>{const a=u.a[c.id];if(!a)return;ans++;const ok=(c.k==='g')===(a==='y');if(c.g==='v'){va++;if(ok)v++}else{qa++;if(ok)q++}if(c.k==='b'&&a==='y')red++});
@@ -23758,12 +23759,12 @@ function pbCheck(u){
   <div class="card"><div class="ch"><h3>Reading</h3></div>
   <div class="g g2" style="margin-bottom:10px">${stat('Decision aid',esc(r.t),r.ans+' answered',r.tone)}${stat('Quality',r.Q==null?'–':r.Q+'%','business, people, financials, risk')}${stat('Valuation',r.V==null?'–':r.V+'%','price against value')}${stat('Red flags',String(r.red),'answers marked Yes on a warning',r.red?'red':'')}</div>
   <div class="sm">${esc(r.why)}</div>
-  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn s p" data-act="pbsave">${ic('plus',14)} Save this evaluation</button><button class="btn s" data-act="pbclear">Clear</button><button class="btn s" data-act="pbgo" data-s="sizing">Position size</button></div>
+  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn s p" data-act="pbsave">${ic('plus',14)} Save this evaluation</button><button class="btn s" data-act="pbjournal">${ic('edit',14)} Save to Analysis journal</button><button class="btn s" data-act="pbclear">Clear</button><button class="btn s" data-act="pbgo" data-s="sizing">Position size</button></div>
   <p class="xs mut" style="margin-top:10px">A learning aid built from your own answers. It does not know the market, the news or your situation. It is not advice.</p></div></div>
   ${rows}
   <div class="card mt"><div class="ch"><h3>Thesis: it must be able to be wrong</h3></div><div class="g g2">${tl.map(x=>`<div><label class="sm" for="pb_${x[0]}"><b>${x[1]}</b></label><textarea class="in" id="pb_${x[0]}" data-pb="th.${x[0]}" rows="2" placeholder="${x[2]}" style="width:100%">${esc(u.th[x[0]])}</textarea></div>`).join('')}
   <div><label class="sm" for="pb_hor"><b>Time horizon</b></label><select class="in" id="pb_hor" data-pb="th.hor" style="width:100%">${['Short term (weeks)','Months','Long term (years)'].map(o=>`<option ${u.th.hor===o?'selected':''}>${o}</option>`).join('')}</select><div class="xs mut">The same fact can read bearish in the short term and bullish in the long term.</div></div></div></div>
-  ${sv.length?`<div class="card mt"><div class="ch"><h3>Saved evaluations</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Date</th><th>Name</th><th>Decision aid</th><th>Quality</th><th>Valuation</th><th></th></tr></thead><tbody>${sv.map((x,i)=>`<tr><td>${esc(x.d)}</td><td>${esc(x.n||'–')}${x.own?' <span class="xs mut">(owned)</span>':''}</td><td>${esc(x.t)}</td><td>${x.q==null?'–':x.q+'%'}</td><td>${x.v==null?'–':x.v+'%'}</td><td style="white-space:nowrap"><button class="btn s" data-act="pbload" data-id="${i}">Open</button> <button class="btn s" data-act="pbdel" data-id="${i}" aria-label="Delete saved evaluation">${ic('trash',14)}</button></td></tr>`).join('')}</tbody></table></div></div>`:''}`}
+  ${sv.length?`<div class="card mt"><div class="ch"><h3>Saved evaluations</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Date</th><th>Name</th><th>Decision aid</th><th>Quality</th><th>Valuation</th><th></th></tr></thead><tbody>${sv.map((x,i)=>`<tr><td>${esc(x.d)}</td><td>${esc(x.n||'–')}${x.own?' <span class="xs mut">(owned)</span>':''}</td><td>${esc(x.t)}</td><td>${x.q==null?'–':x.q+'%'}</td><td>${x.v==null?'–':x.v+'%'}</td><td style="white-space:nowrap"><button class="btn s" data-act="pbload" data-id="${i}">Open</button> ${x.j&&byId('matrixrade_runs',x.j)?`<button class="btn s" data-act="pbjopen" data-id="${i}">Journal</button> `:''}<button class="btn s" data-act="pbdel" data-id="${i}" aria-label="Delete saved evaluation">${ic('trash',14)}</button></td></tr>`).join('')}</tbody></table></div></div>`:''}`}
 function pbRatios(u){
  const a=u.ra,n=k=>pbN(a[k]),f=(k,l,h)=>`<div><label class="sm" for="pr_${k}"><b>${l}</b></label><input class="in" id="pr_${k}" data-pb="ra.${k}" data-re="1" inputmode="decimal" value="${esc(a[k]||'')}" style="width:100%">${h?`<div class="xs mut">${h}</div>`:''}</div>`;
  const d=(x,y)=>x!=null&&y!=null&&y!==0?x/y:null,fx=(v,p)=>v==null?'–':fmtN(v,p==null?2:p);
@@ -23798,9 +23799,9 @@ function pbMacro(u){
 function pbGlos(){const hw=['Understand the business','Check sales and profit','Study debt levels','Look at valuation','Decide with discipline'];
  return `<div class="card"><div class="ch"><h3>How to read a stock</h3></div><ol class="sm ink2" style="margin:0;padding-left:20px">${hw.map(x=>`<li style="margin:3px 0">${x}</li>`).join('')}</ol><p class="sm" style="margin-top:8px"><b>Three golden rules.</b> Learn the business before you buy the stock. Compare ratios with industry peers. Never invest only because the price is rising.</p><p class="xs mut">Example: EPS 20 and price 300 gives P/E 15. Dividend 6 and price 120 gives a yield of 5%. Market cap = shares outstanding × share price.</p></div>
  <div class="card mt"><div class="ch"><h3>20 terms every investor must know</h3></div><div class="tw"><table class="tbl"><thead><tr><th>Term</th><th>Meaning</th></tr></thead><tbody>${PB_GLOS.map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td></tr>`).join('')}</tbody></table></div></div>`}
-VIEWS['market/playbook']=()=>{const u=pbUi(),tabs=[['check','Buy / Hold / Sell'],['ratios','Ratios'],['macro','Macro'],['terms','Terms']];
+VIEWS['market/playbook']=()=>{const u=pbUi(),tabs=[['check','Buy / Hold / Sell'],['ratios','Ratios'],['macro','Macro'],['rem','Reminders'],['terms','Terms']];
  return `<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${tabs.map(t=>`<button class="btn s ${u.tab===t[0]?'p':''}" data-act="pbtab" data-id="${t[0]}" aria-pressed="${u.tab===t[0]}">${t[1]}</button>`).join('')}</div>`+
-  (u.tab==='ratios'?pbRatios(u):u.tab==='macro'?pbMacro(u):u.tab==='terms'?pbGlos():pbCheck(u))+`<p class="xs mut" style="margin-top:12px">For learning, built from the reference sheets you gave. Ratios need context, quality and risk. Not advice.</p>`};
+  (u.tab==='ratios'?pbRatios(u):u.tab==='macro'?pbMacro(u):u.tab==='rem'?pbRem():u.tab==='terms'?pbGlos():pbCheck(u))+`<p class="xs mut" style="margin-top:12px">For learning, built from the reference sheets you gave. Ratios need context, quality and risk. Not advice.</p>`};
 ACT.pbtab=el=>{pbUi().tab=el.dataset.id;renderView()};
 ACT.pbown=el=>{pbUi().own=el.dataset.v==='1';renderView()};
 ACT.pbans=el=>{const u=pbUi(),id=el.dataset.id;if(u.a[id]===el.dataset.v)delete u.a[id];else u.a[id]=el.dataset.v;renderView()};
@@ -23808,15 +23809,66 @@ ACT.pbmac=el=>{const u=pbUi(),id=el.dataset.id,v=+el.dataset.v;if(u.mac[id]===v)
 ACT.pbhi=el=>{pbUi().rt.hi=el.dataset.v;renderView()};
 ACT.pbclear=()=>{const u=pbUi();u.a={};u.name='';u.th={base:'',conf:'',inv:'',alt:'',hor:'Months'};renderView()};
 ACT.pbgo=el=>go('market',el.dataset.s);
-ACT.pbsave=async()=>{const u=pbUi(),r=pbScore(u);if(!u.name.trim()){toast('Type the name or code first.');return}
- const sv=(prefs().pb_saved||[]).filter(x=>!(x.n===u.name.trim()&&x.d===todayS()));sv.unshift({n:u.name.trim(),d:todayS(),own:u.own,q:r.Q,v:r.V,red:r.red,t:r.t,a:Object.assign({},u.a),th:Object.assign({},u.th)});
- await setPrefs({pb_saved:sv.slice(0,30)});toast('Evaluation saved.');renderView()};
+async function pbSaveEval(jid){const u=pbUi(),r=pbScore(u);if(!u.name.trim()){toast('Type the name or code first.');return false}
+ const all=prefs().pb_saved||[],prev=all.find(x=>x.n===u.name.trim()&&x.d===todayS()),sv=all.filter(x=>x!==prev);
+ sv.unshift({n:u.name.trim(),d:todayS(),own:u.own,q:r.Q,v:r.V,red:r.red,t:r.t,a:Object.assign({},u.a),th:Object.assign({},u.th),j:jid||(prev&&prev.j)||undefined});
+ await setPrefs({pb_saved:sv.slice(0,30)});return true}
+ACT.pbsave=async()=>{if(await pbSaveEval()){toast('Evaluation saved.');renderView()}};
 ACT.pbload=el=>{const x=(prefs().pb_saved||[])[+el.dataset.id];if(!x)return;const u=pbUi();u.name=x.n;u.own=!!x.own;u.a=Object.assign({},x.a);u.th=Object.assign({base:'',conf:'',inv:'',alt:'',hor:'Months'},x.th);u.tab='check';renderView()};
 ACT.pbdel=async el=>{const sv=(prefs().pb_saved||[]).slice();sv.splice(+el.dataset.id,1);await setPrefs({pb_saved:sv});renderView()};
 document.addEventListener('input',e=>{const t=e.target;if(!t||!t.dataset||!t.dataset.pb)return;const u=pbUi(),p=t.dataset.pb.split('.');
  if(p.length===1)u[p[0]]=t.value;else u[p[0]][p[1]]=t.value;
  if(t.dataset.re){const keep=t.id,pos=t.selectionStart;renderView();const n=document.getElementById(keep);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}}});
 document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.pb==='th.hor')pbUi().th.hor=t.value});
+/* ---- r89: playbook results go to the Analysis journal; the draft and macro answers are kept; own reminders ---- */
+const PB_DEC=t=>/^Sell/.test(t)?'Sell':/^Pass/.test(t)?'Skip':/^Buy/.test(t)?'Buy':/^Hold/.test(t)?'Hold':/^Watchlist/.test(t)?'Wait':'Not decided';
+function pbJournalRow(u,r){
+  const red=PB_Q.filter(c=>c.k==='b'&&u.a[c.id]==='y').map(c=>'- '+c.t),th=u.th||{},mac=PB_MAC.filter(m=>u.mac[m[0]]!=null).map(m=>m[1]+': '+(u.mac[m[0]]>0?'supportive':u.mac[m[0]]<0?'negative':'neutral'));
+  const detail=['Decision playbook · '+todayS(),'Reading: '+r.t+(u.own?' (owned)':' (not owned)'),'Quality '+(r.Q==null?'–':r.Q+'%')+' · Valuation '+(r.V==null?'–':r.V+'%')+' · Red flags '+r.red+' · '+r.ans+' answered','Why: '+r.why,
+    red.length?'Red flags:\n'+red.join('\n'):'',mac.length?'Macro: '+mac.join(', '):'',
+    th.base?'Base case: '+th.base:'',th.conf?'Confirmation: '+th.conf:'',th.inv?'Invalidation: '+th.inv:'',th.alt?'Alternative: '+th.alt:'',th.hor?'Horizon: '+th.hor:''].filter(Boolean).join('\n');
+  const n=new Date();
+  return {run_date:todayS(),run_time:String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'),section:'Decision playbook',ticker:trunc(u.name.trim(),30),detail,decision:PB_DEC(r.t),
+    decision_note:trunc(r.why+(th.inv?' Invalidation: '+th.inv:''),400),outcome:'Open'}}
+ACT.pbjournal=async el=>{const u=pbUi(),r=pbScore(u);
+  if(!u.name.trim())return toast('Type the name or code first.');
+  if(r.t==='Keep answering')return toast('Answer at least 10 questions first, then save it to the journal.',1);
+  el.disabled=true;
+  try{const prev=(prefs().pb_saved||[]).find(x=>x.n===u.name.trim()&&x.d===todayS()),old=prev&&prev.j&&byId('matrixrade_runs',prev.j),row=pbJournalRow(u,r);
+    let saved;if(old){delete row.outcome;saved=await saveRow('matrixrade_runs',row,old.id)}else saved=await saveRow('matrixrade_runs',row);
+    if(saved){await pbSaveEval(saved.id);toast(old?'Journal entry updated. Add the trade to it when you act.':'Saved to Analysis journal. Open it to link the trade when you act.')}else toast('Sent for approval or skipped')}
+  catch(e){if(e&&e.pending)toast('Sent for approval');else{console.warn(e);toast('Could not save to the journal',1)}}
+  renderView()};
+ACT.pbjopen=el=>{const x=(prefs().pb_saved||[])[+el.dataset.id];if(x&&x.j&&byId('matrixrade_runs',x.j))openDetail('matrixrade_runs',x.j)};
+/* keep the draft and macro answers across pages and sessions */
+let _pbT=null;const pbPack=u=>({own:u.own,name:u.name,a:u.a,th:u.th,mac:u.mac,rt:u.rt,ra:u.ra});
+function pbSched(){clearTimeout(_pbT);_pbT=setTimeout(()=>{const u=S.ui.pb;if(!u)return;const j=JSON.stringify(pbPack(u));if(j===(S.ui.pbLast!=null?S.ui.pbLast:JSON.stringify(prefs().pb_state||{})))return;S.ui.pbLast=j;setPrefs({pb_state:pbPack(u)})},700)}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-act^="pb"]'))pbSched()});
+document.addEventListener('input',e=>{if(e.target&&e.target.dataset&&e.target.dataset.pb)pbSched()});
+document.addEventListener('change',e=>{if(e.target&&e.target.dataset&&e.target.dataset.pb)pbSched()});
+/* own reminders: a date raises an alert; a price level is a note you check yourself (no live price here) */
+const pbRems=()=>(prefs().pb_rem||[]).slice();
+function pbRem(){const u=pbUi(),L=pbRems(),t=todayS();
+  return `<div class="card"><div class="ch"><h3>New reminder</h3></div>
+  <p class="sm ink2">A <b>date</b> reminder shows in the bell on that day. A <b>price level</b> is a note for you: Polaris One has no live price for a single stock, so it cannot warn you when the price is reached. Check it yourself when you review.</p>
+  <div class="fgrid" style="margin-top:8px">
+   <div class="fld"><label for="pr_n">Asset</label><input class="in" id="pr_n" value="${esc(u.name)}" maxlength="40" autocomplete="off"></div>
+   <div class="fld"><label for="pr_k">Type</label><select class="in" id="pr_k"><option value="date">Date</option><option value="level">Price level (note)</option></select></div>
+   <div class="fld"><label for="pr_d">Date</label><input class="in" id="pr_d" type="date" value="${esc(addD(t,30))}"></div>
+   <div class="fld"><label for="pr_l">Level</label><input class="in" id="pr_l" inputmode="decimal" placeholder="e.g. 9000" autocomplete="off"></div>
+   <div class="fld"><label for="pr_w">Direction</label><select class="in" id="pr_w"><option value="below">Falls to or below</option><option value="above">Rises to or above</option></select></div>
+   <div class="fld wide"><label for="pr_t">What to do or check</label><input class="in" id="pr_t" maxlength="160" placeholder="e.g. Review the thesis after the next report" autocomplete="off"></div></div>
+  <div class="row" style="margin-top:10px"><button class="btn p" data-act="pbremadd">${ic('plus',15)} Add reminder</button></div></div>
+  <div class="card mt"><div class="ch"><h3>My reminders (${L.length})</h3></div>${L.length?`<div class="list">${L.map((x,i)=>`<div class="item" style="align-items:flex-start"><span style="flex:1;min-width:0;white-space:normal"><b>${esc(x.n||'–')}</b><span class="sm ink2" style="display:block">${x.k==='date'?'On '+esc(fmtS(x.d))+(x.d<t?' · <b>due</b>':x.d===t?' · <b>today</b>':''):'Price '+(x.w==='above'?'rises to or above ':'falls to or below ')+esc(String(x.l))+' · check it yourself'}${x.t?' · '+esc(x.t):''}</span></span><button class="btn s" data-act="pbremdel" data-id="${i}" aria-label="Done">${ic('check',14)} Done</button></div>`).join('')}</div>`:'<p class="sm mut">No reminder yet.</p>'}</div>`}
+ACT.pbremadd=async()=>{const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''},k=v('pr_k')||'date',n=v('pr_n');
+  if(!n)return toast('Type the asset name.',1);
+  const x={n:trunc(n,40),k,t:trunc(v('pr_t'),160)};
+  if(k==='date'){if(!/^\d{4}-\d{2}-\d{2}$/.test(v('pr_d')))return toast('Choose the date.',1);x.d=v('pr_d')}
+  else{const l=parseFloat(v('pr_l').replace(',','.'));if(!isFinite(l)||l<=0)return toast('Type the price level as a number.',1);x.l=l;x.w=v('pr_w')==='above'?'above':'below'}
+  const L=pbRems();L.unshift(x);await setPrefs({pb_rem:L.slice(0,60)});toast('Reminder saved.');renderView()};
+ACT.pbremdel=async el=>{const L=pbRems();L.splice(+el.dataset.id,1);await setPrefs({pb_rem:L});renderView()};
+ACT.pbremgo=()=>{pbUi().tab='rem';go('market','playbook')};
+const _alerts89=alerts;alerts=function(){const out=_alerts89(),t=todayS();pbRems().filter(x=>x.k==='date'&&x.d&&x.d<=t).slice(0,10).forEach(x=>out.push({tone:x.d<t?'red':'amber',t:'Market reminder',m:x.n+(x.t?' · '+x.t:'')+' · '+fmtS(x.d),go:['market','playbook'],fn:'pbremgo'}));return out};
 PAGEHELP['market/playbook']='A decision aid for Buy, Hold or Sell: a checklist of the business, people, financials, red flags, valuation and risk, ratio calculators, a macro bias and a thesis that can be proven wrong. It is built from your answers, not from live prices. Not advice.';
 (function(){const n=NAV.find(x=>x.id==='market');if(n&&!n.subs.some(s=>s[0]==='playbook')){const i=n.subs.findIndex(s=>s[0]==='sizing');n.subs.splice(i+1,0,['playbook','Decision playbook'])}})();
 
@@ -23833,6 +23885,13 @@ ACT.peershow=()=>{const g=peerState();g.show=!g.show;renderView()};
 /* r85 backup: settings travel too, but never anything that looks like a key, token, secret or password */
 const BK_SECRET=/key|token|secret|pass|auth|bearer|cookie/i;
 function bkPrefs(){const p=prefs(),o={};Object.keys(p).forEach(k=>{if(!BK_SECRET.test(k))o[k]=p[k]});return o}
+RELEASE_NOTES.unshift({rev:89,date:'2026-11-22',groups:[
+ {t:'Polaris One 2.0',items:[
+  ['Decision playbook goes to the Analysis journal','Save a reading to Market Desk → Analysis journal with the verdict, scores, red flags, macro and thesis. Open it later to link the trade and record the outcome.','market','playbook','Open Decision playbook'],
+  ['Your answers are kept','The checklist, thesis and macro answers stay when you leave the page or close the app, and come back with your backup.','market','playbook','Open Decision playbook'],
+  ['Your own reminders','A date reminder shows in the bell on its day. A price level is a note you check yourself, because there is no live price for a single stock.','market','playbook','Open Reminders']
+ ]}
+]});
 RELEASE_NOTES.unshift({rev:88,date:'2026-11-22',groups:[
  {t:'Fixes',items:[
   ['Meeting follow-ups: bars stay inside the card','A bar for a group larger than the first row ran past the edge of the card. Every bar is now measured against the largest group.','dash','home','Open Home']
