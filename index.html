@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='99',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='100',APP_DATE='2026-11-22';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -24429,6 +24429,41 @@ agApply=async function(src,it,rules,dry){
     else if(!g)r.note=(r.note?r.note+'; ':'')+'goal "'+it.goal+'" not found, not linked'}
   return r}}
 
+/* ---------- Rev 100 · Link many items to a goal at once ---------- */
+const NG_STOP=new Set(['and','the','for','with','from','performed','target','perform','new','per','yang','dan','untuk','dengan','dari','pada','ke','di','act','tsk','year','tahun']);
+const ngStems=s=>[...new Set(String(s||'').toLowerCase().replace(/^(act|tsk)[-\d.]+\s*[·-]?\s*/,'').split(/[^a-z0-9]+/).filter(w=>w.length>=4&&!NG_STOP.has(w)).map(w=>w.slice(0,5)))];
+function ngSuggest(r,kind){
+  const nm=kind==='kpis'?r.name:r.name,st=ngStems(nm);if(!st.length)return null;
+  let best=null,tie=false;
+  (D().goals||[]).filter(g=>['Goal','Objective'].includes(g.type)&&(!r.portfolio_id||!g.portfolio_id||r.portfolio_id===g.portfolio_id)).forEach(g=>{
+    const gs=new Set(ngStems(g.title+' '+(g.description||'')+' '+(g.success_measure||''))),sc=st.filter(x=>gs.has(x)).length;
+    if(sc>0){if(!best||sc>best.sc){best={g,sc};tie=false}else if(sc===best.sc)tie=true}});
+  return best&&!tie?best.g:null}
+S.ngSel=S.ngSel||{};
+const ngGoalOpts=()=>(D().goals||[]).slice().sort((a,b)=>GRANK[a.type]-GRANK[b.type]||String(a.title).localeCompare(b.title)).map(g=>`<option value="${g.id}">${esc(g.type)}: ${esc(trunc(g.title,70))}</option>`).join('');
+VIEWS['plan/nogoal']=()=>{
+  const g=goalGaps(),goals=(D().goals||[]).length,sel=S.ngSel,n=Object.keys(sel).length;
+  const sg={};
+  const row=(k,r,lab)=>{const s=k==='daily_actions'?null:ngSuggest(r,k);if(s){(sg[s.id]=sg[s.id]||{g:s,keys:[]}).keys.push(k+':'+r.id)}
+    const tick=k==='daily_actions'?'<span style="width:22px"></span>':`<input type="checkbox" class="ngtick" data-change="ngtick" data-k="${k}" data-id="${r.id}" ${sel[k+':'+r.id]?'checked':''} aria-label="Select">`;
+    return `<div class="item" style="gap:8px">${tick}<span class="t" style="flex:1;min-width:0;cursor:pointer" data-act="open" data-k="${k}" data-id="${r.id}">${esc(lab(r))}${s?`<br><span class="sm mut">Suggested: ${esc(trunc(s.title,60))}</span>`:''}</span>${badge(r.status)}</div>`};
+  const sec=(title,k,rows,lab)=>`<div class="card" style="margin-bottom:12px"><div class="ch"><h3>${title} (${rows.length})</h3></div>${rows.length?`<div class="list">${rows.slice(0,60).map(r=>row(k,r,lab)).join('')}</div>${rows.length>60?`<p class="sm mut">${rows.length-60} more not shown. Link these first, then the rest appear.</p>`:''}`:'<p class="sm mut">Everything here points to a goal.</p>'}</div>`;
+  const body=sec('Activities without a goal','activities',g.acts,r=>r.name)+sec('KPIs without a goal','kpis',g.kp,r=>`${r.name} (${r.year})`)+sec('Actions whose Activity has no goal','daily_actions',g.da,r=>`${fmtS(r.action_date)} · ${r.title}`);
+  const sgl=Object.values(sg).sort((a,b)=>b.keys.length-a.keys.length);
+  return `<div class="card" style="margin-bottom:12px"><p class="sm ink2">${goals?'':'<b>No goals exist yet.</b> Create a Vision and yearly Goals first (Plan → Goals). '}Tick Activities or KPIs, choose a goal and press <b>Link</b>. Only the Goal field changes, and an item that already has a goal is never overwritten. An Action takes the goal of its Activity. Suggestions come from similar words and are only a hint: check them.</p>
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><select class="in" id="ng_goal" aria-label="Goal" style="max-width:420px"><option value="">— choose a goal —</option>${ngGoalOpts()}</select><button class="btn p" data-act="nglink">${ic('link',15)} Link <span id="ng_n">${n}</span> ticked</button><button class="btn" data-act="ngclear">Clear ticks</button><button class="btn" data-act="go" data-p="plan" data-s="goals">${ic('target',15)} Open Goals</button></div>
+  ${sgl.length?`<div class="sm" style="margin-top:10px"><b>Tick the suggested ones:</b></div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${sgl.slice(0,8).map(x=>`<button class="btn s" data-act="ngsuggest" data-g="${x.g.id}" data-keys="${esc(x.keys.join(','))}">${x.keys.length} → ${esc(trunc(x.g.title,40))}</button>`).join('')}</div>`:''}</div>`+body};
+CHG.ngtick=el=>{const k=el.dataset.k+':'+el.dataset.id;if(el.checked)S.ngSel[k]=1;else delete S.ngSel[k];const c=document.getElementById('ng_n');if(c)c.textContent=Object.keys(S.ngSel).length};
+ACT.ngclear=()=>{S.ngSel={};renderView()};
+ACT.ngsuggest=el=>{String(el.dataset.keys||'').split(',').filter(Boolean).forEach(k=>{S.ngSel[k]=1});const s=document.getElementById('ng_goal');renderView();setTimeout(()=>{const s2=document.getElementById('ng_goal');if(s2)s2.value=el.dataset.g},0)};
+ACT.nglink=async()=>{
+  const gid=(document.getElementById('ng_goal')||{}).value,keys=Object.keys(S.ngSel);
+  if(!gid)return toast('Choose a goal first.',true);if(!keys.length)return toast('Tick at least one Activity or KPI.',true);
+  let ok=0,skip=0;
+  for(const k of keys){const [t,id]=k.split(':'),r=byId(t,id);if(!r||r.goal_id){skip++;continue}await patchRow(t,id,{goal_id:gid});ok++}
+  S.ngSel={};toast(ok+' linked'+(skip?', '+skip+' skipped (already had a goal)':'')+'.');renderView()};
+
+RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
 RELEASE_NOTES.unshift({rev:98,date:'2026-11-22',groups:[{t:'Easier to find',items:[['Upload JSON button','The KPI page now has an Upload JSON button that opens the agent file card directly, so you no longer need the API Hub menu.','performance','kpi','Open']]}]});
 RELEASE_NOTES.unshift({rev:97,date:'2026-11-22',groups:[
