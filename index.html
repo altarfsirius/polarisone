@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='102',APP_DATE='2026-11-22';
+const APP_VERSION='2.0',APP_REV='103',APP_DATE='2026-11-23';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -19988,6 +19988,7 @@ const xpPts=r=>num(r.points);
 const xpTotal=(rows)=>sum((rows||xpRows()).map(xpPts));
 function xpBucket(day,per){return per==='week'?weekStart(day):per==='month'?day.slice(0,7):per==='year'?day.slice(0,4):day}
 function xpAgg(per,filter){const m=new Map();xpRowsS().filter(r=>!filter||filter(r)).forEach(r=>{const b=xpBucket(r.day,per);m.set(b,(m.get(b)||0)+xpPts(r))});return m}
+function xpBy(field,a,b){const m=new Map();xpRowsS().filter(r=>r.day>=a&&r.day<=b).forEach(r=>{const k=r[field]||'';m.set(k,(m.get(k)||0)+xpPts(r))});return m}
 const xpLevel=t=>{t=Math.max(0,t);const L=Math.floor(Math.sqrt(t/50))+1,lo=50*(L-1)*(L-1),hi=50*L*L;return {level:L,lo,hi,pct:Math.round((t-lo)/(hi-lo)*100)}};
 function xpPeriodRange(per){const t=todayS();return per==='week'?[weekStart(t),addD(weekStart(t),6)]:per==='month'?[t.slice(0,8)+'01',t.slice(0,8)+'31']:per==='year'?[t.slice(0,4)+'-01-01',t.slice(0,4)+'-12-31']:[t,t]}
 function xpSeries(per){const t=todayS(),n=per==='day'?14:per==='week'?12:per==='month'?12:5,m=xpAgg(per),out=[];
@@ -24469,6 +24470,66 @@ ACT.nglink=async()=>{
 
 RELEASE_NOTES.unshift({rev:102,date:'2026-11-23',groups:[{t:'Agent files',items:[['Check only matches the real upload','When an Activity was matched by name and had changes, Check only wrongly refused the Actions that belong to it. It now reports the same result as the real upload.','integrations','inbound','Open']]}]});
 RELEASE_NOTES.unshift({rev:101,date:'2026-11-23',groups:[{t:'Goals',items:[['Suggestions across life areas','Every row now shows its life area and the goal menu is grouped by life area. Goal suggestions are now also shown when the best match belongs to another life area, with that area named. A match in the same life area ranks first.','plan','nogoal','Open']]}]});
+
+/* ---------- Rev 103 · Stage 2.2 · KPI health and cascade ---------- */
+const KX_COLS=['level','parent_kpi_id','owner_name','green_from','amber_from'];
+S.kpiX=false;
+function kpiXFields(){
+  if(!S.kpiX||MOD.kpis.fields.some(f=>f.k==='level'))return;
+  OPT.kpiLevel=['Company','Team','Personal'];
+  MOD.kpis.fields.splice(MOD.kpis.fields.findIndex(f=>f.k==='weight')+1,0,
+    F('level','Level','select','Company KPIs sit at the top, Team KPIs under them, Personal KPIs at the bottom. Choose the parent below to link them.',{opts:'kpiLevel'}),
+    F('parent_kpi_id','Parent KPI','ref','The higher-level KPI that this one feeds. Its achievement is then worked out from its children.',{ref:'kpis'}),
+    F('owner_name','Owner','text','Who answers for this number.'),
+    F('green_from','Green from (%)','number','Achievement at or above this is green. Empty means 100.'),
+    F('amber_from','Amber from (%)','number','Achievement at or above this is amber, below it is red. Empty means 75.'))}
+{const o=DB.loadAll;DB.loadAll=async function(){const r=await o.apply(this,arguments);
+  try{if(this.mode==='demo')S.kpiX=true;else{const {error}=await this.sb.from('kpis').select(KX_COLS.join(',')).limit(1);S.kpiX=!error}}catch(e){S.kpiX=false}
+  kpiXFields();return r}}
+const kpiTH=k=>{const g=k.green_from!=null&&k.green_from!==''?num(k.green_from):100,a=k.amber_from!=null&&k.amber_from!==''?num(k.amber_from):75;return [g,Math.min(a,g)]};
+const kpiKids=k=>(D().kpis||[]).filter(x=>x.parent_kpi_id===k.id&&x.id!==k.id);
+function kpiRoll(k,seen){seen=seen||new Set();if(seen.has(k.id))return {v:kpiAch(k),n:0};seen.add(k.id);
+  const kids=kpiKids(k).filter(x=>!seen.has(x.id));if(!kids.length)return {v:kpiAch(k),n:0};
+  const w=sum(kids.map(x=>num(x.weight)||1));return {v:w?sum(kids.map(x=>Math.min(kpiRoll(x,new Set(seen)).v,120)*(num(x.weight)||1)))/w:0,n:kids.length}}
+function kpiLight(k){const v=kpiRoll(k).v,[g,a]=kpiTH(k);return v>=g?'green':v>=a?'amber':'red'}
+function kpiGaps(k){const g=[];if(!k.owner_name)g.push('no owner');if(!k.data_source)g.push('no data source');
+  if(!(D().activities||[]).some(x=>x.kpi_id===k.id)&&!(D().daily_actions||[]).some(x=>x.kpi_id===k.id)&&!kpiKids(k).length)g.push('no Activity or Action');
+  if(k.actual==null||k.actual==='')g.push('no actual yet');return g}
+const KX_DOT={green:'var(--green)',amber:'var(--amber)',red:'var(--red)'};
+function kpiNode(k,depth,seen){
+  if(seen.has(k.id))return '';seen.add(k.id);
+  const r=kpiRoll(k),own=kpiAch(k),li=kpiLight(k),kids=kpiKids(k);
+  return `<div class="item" data-act="open" data-k="kpis" data-id="${k.id}" style="margin-left:${Math.min(depth,4)*18}px;gap:8px"><span aria-label="${li}" style="width:12px;height:12px;border-radius:50%;background:${KX_DOT[li]};flex:none"></span><span class="t" style="flex:1;min-width:0">${esc(k.name)}<span class="sm mut"> · ${esc(k.level||'no level')}${k.owner_name?' · '+esc(k.owner_name):''}${kids.length?' · from '+kids.length+' below':''}</span></span><b>${Math.round(r.v)}%</b>${kids.length&&Math.round(own)!==Math.round(r.v)?`<span class="sm mut">own ${Math.round(own)}%</span>`:''}</div>`+kids.map(c=>kpiNode(c,depth+1,seen)).join('')}
+navP('performance').subs.splice(1,0,['kpihealth','KPI health']);
+PAGEHELP['performance/kpihealth']='Traffic lights for every KPI, the cascade from Company to Team to Personal, and the KPIs that are not complete yet.';
+VIEWS['performance/kpihealth']=()=>{
+  if(!S.kpiX)return `<div class="card"><div class="ch"><h3>One database step first</h3></div><p class="sm">KPI health needs five optional columns on the KPI table (level, parent KPI, owner, green and amber limits). Nothing else in the app depends on them. Run the file <b>polaris-kpi-cascade-kolom.sql</b> once in the Supabase SQL Editor, then reload.</p></div>`;
+  const yr=S.kpiYr||new Date().getFullYear(),all=(D().kpis||[]),ks=all.filter(k=>+k.year===+yr),ids=new Set(ks.map(k=>k.id));
+  const roots=ks.filter(k=>!k.parent_kpi_id||!ids.has(k.parent_kpi_id)),seen=new Set();
+  const cnt={green:0,amber:0,red:0};ks.forEach(k=>cnt[kpiLight(k)]++);
+  const gaps=ks.map(k=>[k,kpiGaps(k)]).filter(x=>x[1].length);
+  const yrs=[...new Set(all.map(k=>+k.year).filter(Boolean).concat([new Date().getFullYear()]))].sort((a,b)=>b-a);
+  return `<div class="g g4" style="margin-bottom:14px">${stat('KPIs ('+yr+')',ks.length,'in this year')}${stat('Green',cnt.green,'at or above its green limit','green')}${stat('Amber',cnt.amber,'between amber and green','amber')}${stat('Red',cnt.red,'below its amber limit','red')}</div>
+  <div class="seg" role="group" aria-label="Year" style="margin-bottom:12px">${yrs.map(y=>`<button class="btn s ${+y===+yr?'p':''}" data-act="kpiyr" data-y="${y}">${y}</button>`).join('')}</div>
+  <div class="card"><div class="ch"><h3>Cascade</h3></div>${ks.length?`<div class="list" data-kpi-tree>${roots.map(k=>kpiNode(k,0,seen)).join('')}</div><p class="sm mut" style="margin-top:8px">A KPI with children shows the weighted result of its children. Set Level and Parent KPI when you edit a KPI.</p>`:'<div class="empty"><b>No KPI for '+yr+'</b>Add one in the KPIs page.</div>'}</div>
+  <div class="card" style="margin-top:14px"><div class="ch"><h3>Not complete yet (${gaps.length})</h3></div>${gaps.length?`<div class="list" data-kpi-gaps>${gaps.map(x=>`<div class="item" data-act="open" data-k="kpis" data-id="${x[0].id}"><span class="t" style="flex:1;min-width:0">${esc(x[0].name)}</span><span class="sm mut">${x[1].join(', ')}</span></div>`).join('')}</div>`:'<p class="sm mut">Every KPI has an owner, a source, work behind it and an actual.</p>'}</div>`};
+ACT.kpiyr=el=>{S.kpiYr=+el.dataset.y;renderView()};
+{const a0=agApply;
+agApply=async function(src,it,rules,dry){
+  const r=await a0.apply(this,arguments);
+  if(it&&it.entity==='kpi'&&r&&r.st!=='bad'&&(it.level!=null||it.owner!=null||it.parent_kpi!=null||it.green_from!=null||it.amber_from!=null)){
+    if(!S.kpiX){r.note=(r.note?r.note+'; ':'')+'level/owner/parent ignored: run polaris-kpi-cascade-kolom.sql first';return r}
+    const lv=it.level!=null?['Company','Team','Personal'].find(x=>x.toLowerCase()===String(it.level).toLowerCase()):null;
+    if(it.level!=null&&!lv)throw new Error('level must be Company, Team or Personal');
+    const par=it.parent_kpi?(D().kpis||[]).find(k=>agNorm(k.name)===agNorm(it.parent_kpi)&&(k.id!==r.id)):null;
+    if(it.parent_kpi&&!par&&!dry)r.note=(r.note?r.note+'; ':'')+'parent KPI "'+it.parent_kpi+'" not found';
+    if(dry||!r.id||String(r.id).startsWith('dry'))return r;
+    const cur=byId('kpis',r.id),want={};
+    if(lv)want.level=lv;if(it.owner!=null)want.owner_name=String(it.owner).slice(0,120);if(par)want.parent_kpi_id=par.id;
+    if(it.green_from!=null&&!isNaN(+it.green_from))want.green_from=+it.green_from;if(it.amber_from!=null&&!isNaN(+it.amber_from))want.amber_from=+it.amber_from;
+    const p=agDiff(cur,want);if(Object.keys(p).length){await patchRow('kpis',r.id,p);if(r.st==='same')r.st='updated';r.note=(r.note?r.note+'; ':'')+'set: '+Object.keys(p).join(', ')}}
+  return r}}
+RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
 RELEASE_NOTES.unshift({rev:98,date:'2026-11-22',groups:[{t:'Easier to find',items:[['Upload JSON button','The KPI page now has an Upload JSON button that opens the agent file card directly, so you no longer need the API Hub menu.','performance','kpi','Open']]}]});
