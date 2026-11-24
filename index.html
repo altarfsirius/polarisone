@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='104',APP_DATE='2026-11-24';
+const APP_VERSION='2.0',APP_REV='105',APP_DATE='2026-11-24';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -24252,7 +24252,8 @@ const AG_EX=`{
   "source": "POLARIS",
   "items": [
     {"entity":"activity","ref":"v3-0.1","name":"Deploy api-proxy and test Draft with AI","life_area":"Development","kpi":"v3 · Open tests from v2 closed","status":"Completed","planned_finish":"2026-11-23"},
-    {"entity":"action","ref":"v3-0.1-a1","activity_ref":"v3-0.1","title":"Deployed the function","date":"2026-11-23","status":"Completed","minutes":20,"result":"Version shows current"}
+    {"entity":"action","ref":"v3-0.1-a1","activity_ref":"v3-0.1","title":"Deployed the function","date":"2026-11-23","status":"Completed","minutes":20,"result":"Version shows current"},
+    {"entity":"problem","ref":"v3-0.1-p1","activity_ref":"v3-0.1","title":"Draft with AI times out on long minutes","severity":"Medium","status":"Open","root_cause":"Minutes longer than the function limit","corrective_action":"Split the minutes before sending","pic":"Owner","due_date":"2026-11-30"}
   ]
 }`;
 function agPrompt(src){
@@ -24535,6 +24536,87 @@ agApply=async function(src,it,rules,dry){
     if(it.green_from!=null&&!isNaN(+it.green_from))want.green_from=+it.green_from;if(it.amber_from!=null&&!isNaN(+it.amber_from))want.amber_from=+it.amber_from;
     const p=agDiff(cur,want);if(Object.keys(p).length){await patchRow('kpis',r.id,p);if(r.st==='same')r.st='updated';r.note=(r.note?r.note+'; ':'')+'set: '+Object.keys(p).join(', ')}}
   return r}}
+/* ---------- Rev 105 · Analysis & Improvement ⇄ Notion: a way in from each page, and the map to build the Notion database ---------- */
+(function(){
+ const AI_T=['problems','risks','processes','improvements'];
+ const NT={text:'Text',textarea:'Text',time:'Text',color:'Text',number:'Number',range:'Number',select:'Select',nsel:'Select',date:'Date',check:'Checkbox',url:'URL',ref:'Relation'};
+ function aiMap(t){const main=MOD[t].main,mf=MOD[t].fields.find(f=>f.k===main),rows=[];
+  rows.push({p:ngNames(t,mf)[0],ty:'Title',pf:mf.l||mf.k,note:'The name of each page. A Notion database always has one Title property: rename it to this.'});
+  rows.push({p:'Polaris id',ty:'Text',pf:'(matching key)',note:'Required. Polaris One writes its own id here so the same record is never created twice.'});
+  ngFields(t).forEach(f=>{if(f.k===main)return;const ty=NT[f.t]||'Text';let note='';
+   if(f.t==='select'||f.t==='nsel'){const o=optList(f);note=o.length?'Add these options exactly: '+o.map(x=>String(x[0])).join(', ')+'. Polaris One never creates an option.':''}
+   else if(f.t==='ref')note='Optional. Relation to your '+((MOD[f.ref]||{}).many||f.ref)+' database. Goes from Polaris One to Notion only.';
+   else if(f.t==='date')note='';
+   else if(/^mt_|^ai_/.test(f.k))note='Filled by an AI agent; comes back to Polaris One only.';
+   rows.push({p:ngNames(t,f)[0],ty,pf:f.l||f.k,note})});
+  return rows}
+ const aiText=t=>MOD[t].many+' (Notion database: Polaris One · '+MOD[t].many+')\n'+aiMap(t).map(r=>'- '+r.p+' — '+r.ty+(r.note&&r.ty==='Select'?' ('+r.note.replace(/^Add these options exactly: /,'').replace(/\. Polaris One never creates an option\.$/,'')+')':'')).join('\n');
+ const aiPrompt=t=>'Create ONE Notion database named "Polaris One · '+MOD[t].many+'" with exactly these properties and no others. Use the property names exactly as written. Use the property type after the dash. For a Select property, create the options listed in the brackets, spelled exactly. Do not add rows. Do not add a Status or Created property.\n\n'+aiText(t).split('\n').slice(1).join('\n')+'\n\nAfter that, share the database with my Notion integration.';
+ const sec=(t,open)=>{const rows=aiMap(t);return `<details ${open?'open':''} style="margin:8px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px"><summary style="cursor:pointer;font-weight:600">${esc(MOD[t].many)} · ${rows.length} properties</summary>
+   <div class="tw" style="margin-top:8px"><table class="tbl stack"><thead><tr><th>Notion property</th><th>Type</th><th>Polaris One field</th><th>Notes</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.p)}</b></td><td data-l="Type">${esc(r.ty)}</td><td data-l="Field">${esc(r.pf)}</td><td data-l="Notes" class="sm mut">${esc(r.note)}</td></tr>`).join('')}</tbody></table></div>
+   <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn s" data-act="copycmd" data-c="${esc(aiText(t))}">${ic('copy',14)} Copy this list</button><button class="btn s" data-act="copycmd" data-c="${esc(aiPrompt(t))}">${ic('copy',14)} Copy prompt for Notion AI</button><button class="btn s p" data-act="anotion" data-t="${t}">${ic('link',14)} Connect ${esc(MOD[t].many)}</button></div></details>`};
+ ACT.adbmap=el=>{const cur=(el&&el.dataset&&el.dataset.t)||'problems';
+  openModal('Notion database map',`<p class="sm">Build one Notion database for each list below, with these properties. Polaris One only writes pages: it never creates a property or an option in Notion, so every name and option must exist before you connect. Then press <b>Connect</b>, paste the database link and press Check; the mapping is matched by name.</p>${AI_T.map(t=>sec(t,t===cur)).join('')}<p class="xs mut">Relations are optional. The title property can have any name. Add the “Polaris id” property as Text.</p>`,`<button class="btn p" data-act="closeModal">Close</button>`,'wide')};
+ ACT.anotion=el=>{const t=el.dataset.t;try{closeModal(true)}catch(e){}cdOpen('notion-all','db-'+t)};
+ const bar=t=>{const n=ngRows(t).length,rd=ngReady(t);
+  return `<div class="card flat" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:10px"><b>Notion</b>${rd?badge('connected','green'):badge('not connected','gray')}<span class="sm mut" style="flex:1 1 160px;min-width:0">${n} of ${(D()[t]||[]).length} ${esc(MOD[t].many.toLowerCase())} marked “Send to Notion”. Tick it on a record to send it.</span><button class="btn s" data-act="anotion" data-t="${t}">${ic('link',14)} Link to Notion</button><button class="btn s" data-act="adbmap" data-t="${t}">${ic('list',14)} Database map</button></div>`};
+ AI_T.forEach(t=>{const k='improve/'+t,v=VIEWS[k];if(v)VIEWS[k]=function(){const h=v.apply(this,arguments);return typeof h==='string'?bar(t)+h:h}});
+})();
+/* ---------- Rev 105 · Findings / problems: raised from a meeting, an activity or Analysis & Improvement; and in the agent file ---------- */
+(function(){
+ COL_NEWER.problems=(COL_NEWER.problems||[]).concat(['meeting_id']);
+ const fl=MOD.problems.fields,ia=fl.findIndex(x=>x.k==='activity_id');
+ if(!fl.some(x=>x.k==='meeting_id'))fl.splice((ia<0?fl.length-1:ia+1),0,F('meeting_id','Found in meeting','ref','The meeting where this finding was raised. The problem then shows up inside that meeting. Leave empty if it did not come from a meeting.',{ref:'meetings'}));
+ const addBtn=(add,label)=>canDo('problems','create')==='deny'?'':`<button class="btn s" data-act="new" data-k="problems" data-add='${esc(JSON.stringify(add))}'>${ic('plus',13)} ${esc(label||'Finding')}</button>`;
+ const row=r=>`<div class="item" data-act="open" data-k="problems" data-id="${r.id}"><span class="badge b-slate">${esc(r.severity||'Problem')}</span><span class="t" style="flex:1;min-width:0">${esc(trunc(labelOf('problems',r),80))}</span>${badge(r.status)}</div>`;
+ /* a meeting lists its findings and can add many */
+ const _exM=EXTRA.meetings;
+ EXTRA.meetings=m=>(_exM?_exM(m):'')+(()=>{const rows=(D().problems||[]).filter(p=>p.meeting_id===m.id);
+  return `<div class="ch" style="margin-top:16px"><h3>Findings / problems (${rows.length})</h3><span class="sp"></span>${addBtn({meeting_id:m.id,project_id:m.project_id||undefined,date_found:m.meeting_date||undefined})}</div>${rows.length?`<div class="list">${rows.map(row).join('')}</div>`:'<p class="sm mut">No findings yet. One meeting can raise several: add one for each problem found.</p>'}`})();
+ /* a problem links back to its meeting and activity */
+ const _exP=EXTRA.problems;
+ EXTRA.problems=p=>{const m=byId('meetings',p.meeting_id),a=byId('activities',p.activity_id),l=[];
+  if(m)l.push(`Found in meeting: <a href="#" data-act="open" data-k="meetings" data-id="${m.id}">${esc(trunc(labelOf('meetings',m),80))}</a>`);
+  if(a)l.push(`Activity: <a href="#" data-act="open" data-k="activities" data-id="${a.id}">${esc(trunc(labelOf('activities',a),80))}</a>`);
+  return (_exP?_exP(p):'')+(l.length?`<p class="sm" style="margin-top:12px">${l.join(' · ')}</p>`:'')};
+ /* Risk, Process and Improvement: the findings raised on the same activity, and a way to add one */
+ ['risks','processes','improvements'].forEach(t=>{const _x=EXTRA[t];
+  EXTRA[t]=r=>(_x?_x(r):'')+(()=>{const rows=r.activity_id?(D().problems||[]).filter(p=>p.activity_id===r.activity_id):[];
+   return `<div class="ch" style="margin-top:16px"><h3>Findings / problems (${rows.length})</h3><span class="sp"></span>${addBtn({activity_id:r.activity_id||undefined,project_id:r.project_id||undefined,portfolio_id:r.portfolio_id||undefined})}</div>${rows.length?`<div class="list">${rows.slice(0,8).map(row).join('')}</div>`:`<p class="sm mut">${r.activity_id?'No findings on this activity yet.':'Choose a Related activity to see its findings here. You can still add one now.'}</p>`}`})()});
+ /* agent file: entity "problem" */
+ AG_T.problem=['problems','description'];
+ const a1=agApply;
+ agApply=async function(src,it,rules,dry){
+  if(!(it&&it.entity==='problem'))return a1.apply(this,arguments);
+  const ref=String(it.ref||'').trim();if(!ref||ref.length>80)throw new Error('ref is required (max 80 characters)');
+  const ti=String(it.title||'').trim(),pick=(list,v)=>v?list.find(x=>x.toLowerCase()===String(v).toLowerCase()):'';
+  const sev=pick(OPT.severity,it.severity),st=pick(OPT.probStatus,it.status),me=pick(OPT.method,it.method);
+  if(it.severity&&!sev)throw new Error('severity must be '+OPT.severity.join(', '));
+  if(it.status&&!st)throw new Error('status must be '+OPT.probStatus.join(', '));
+  if(it.method&&!me)throw new Error('method must be '+OPT.method.join(', '));
+  ['date_found','due_date'].forEach(k=>{if(it[k]&&!/^\d{4}-\d{2}-\d{2}$/.test(String(it[k])))throw new Error(k+' must be YYYY-MM-DD')});
+  const par=it.activity_ref?agGet('activity',src,String(it.activity_ref)):null;
+  if(it.activity_ref&&!par)throw new Error('activity_ref '+it.activity_ref+' was not found for '+src+'; the Activity must come first or already exist');
+  let ex=agGet('problem',src,ref),how=ex?(ex._c?'content':'ref'):null;
+  if(!ex&&ti){ex=(D().problems||[]).find(p=>agNorm(p.title)===agNorm(ti)&&(par&&!par._dry?(p.activity_id===par.id||!p.activity_id):!p.activity_id))||null;how=ex?'content':null}
+  if(!ex){
+   if(!ti)throw new Error('title is required for a new problem');
+   if(dry){await agLink(src,'problem',ref,'dry-new',true);return {st:'created',note:'would be created'}}
+   const pa=par&&!par._dry?par:null;
+   const row=await saveRow('problems',{title:ti.slice(0,200),severity:sev||'Medium',date_found:it.date_found||todayS(),description:((it.description||'')+' '+agMark(src,ref)).trim(),method:me||'5 Whys',root_cause:it.root_cause||null,corrective_action:it.corrective_action||null,preventive_action:it.preventive_action||null,pic:it.pic||null,due_date:it.due_date||null,status:st||'Open',activity_id:pa?pa.id:null,project_id:pa?pa.project_id||null:null,portfolio_id:pa?pa.portfolio_id||null:null});
+   return {st:'created',id:row.id}}
+  if(ex._dry)return {st:'same',note:'same item earlier in this file'};
+  const want={};if(sev)want.severity=sev;if(st)want.status=st;if(me)want.method=me;
+  ['root_cause','corrective_action','preventive_action','pic','due_date','date_found'].forEach(k=>{if(it[k]!=null)want[k]=it[k]});
+  if(it.description!=null)want.description=(it.description+' '+agMark(src,ref)).trim();
+  if(par&&!par._dry&&ex.activity_id!==par.id)want.activity_id=par.id;
+  if(how==='ref'&&ti)want.title=ti.slice(0,200);
+  const patch=agDiff(ex,want);
+  if(!Object.keys(patch).length){if(how==='content')await agLink(src,'problem',ref,ex.id,dry,true);return {st:'same',id:ex.id,note:how==='content'?'already there, matched by title':'already there'}}
+  if(!dry){await patchRow('problems',ex.id,patch);if(how==='content')await agLink(src,'problem',ref,ex.id,false,true)}else if(how==='content')await agLink(src,'problem',ref,ex.id,true,true);
+  return {st:'updated',id:ex.id,note:'changed: '+Object.keys(patch).join(', ')}}
+})();
+RELEASE_NOTES.unshift({rev:105,date:'2026-11-24',groups:[{t:'Analysis & Improvement',items:[['Link to Notion and a database map','Problems, Risks, Processes and Improvements now show a Notion bar: Link to Notion opens that list in Connections, and Database map lists every property (name, type, options) to create so you can build the Notion database, with a copy-ready prompt for Notion AI.','improve','problems','Open Problems'],['Findings from a meeting','A meeting now lists its findings and lets you add as many as were raised. A problem shows the meeting and activity it came from, and Risk, Process and Improvement show the findings on their activity. It needs one small SQL file (polaris-problem-meeting-kolom.sql); without it the rest of the app is unchanged.','meetings','list','Open Meetings'],['Findings in an agent file','An agent file can carry problems (entity "problem": title, severity, status, root cause, corrective and preventive action, owner, due date) under an Activity. The same ref is never added twice.','integrations','inbound','Open Inbound links']]},{t:'Integrations',items:[['Project in an agent file','An Activity in an agent file can name its Project (name or code). A Project that does not exist is refused with a clear message.','integrations','inbound','Open Inbound links']]}]});
 RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
