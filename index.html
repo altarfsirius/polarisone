@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='103',APP_DATE='2026-11-23';
+const APP_VERSION='2.0',APP_REV='104',APP_DATE='2026-11-24';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -24212,16 +24212,22 @@ async function agApply(src,it,rules,dry){
   if(ent==='activity'){
     let ex=agGet('activity',src,ref),how=ex?(ex._c?'content':'ref'):null;const nm=String(it.name||'').trim();
     const al=String(it.life_area||'').trim().toLowerCase(),ar=(D().portfolios||[]).find(p=>String(p.name).trim().toLowerCase()===al);
+    /* Rev 104: optional "project" = name or code of an existing Project (a leading code such as "PRJ-0004 · " is ignored when matching) */
+    const pjN=t=>{let x=String(t||''),y;do{y=x;x=x.replace(/^[A-Z]{2,6}(?:-[A-Z0-9]+)+\s*·\s*/,'')}while(x!==y);return agNorm(x)},pjn=String(it.project||'').trim(),pjs=pjn?(D().projects||[]).filter(p=>pjN(p.name)===pjN(pjn)||(p.code&&String(p.code).trim().toLowerCase()===pjn.toLowerCase())):[];
+    if(pjn&&!pjs.length)throw new Error('project "'+pjn+'" does not exist; create it in Projects first');
+    if(pjs.length>1)throw new Error('project "'+pjn+'" matches '+pjs.length+' projects; use the exact code');
+    const pj=pjs[0]||null;
     if(!ex&&nm){ex=(D().activities||[]).find(a=>agNorm(a.name)===agNorm(nm)&&(!ar||a.portfolio_id===ar.id))||null;how=ex?'content':null}
     if(!ex){
       if(!ar)throw new Error('life area "'+(it.life_area||'')+'" does not exist');
       if(!nm)throw new Error('name is required for a new activity');
       const k=it.kpi&&(D().kpis||[]).filter(x=>v3Is(x.name,String(it.kpi))).sort((a,b)=>b.year-a.year)[0];
       if(dry){await agLink(src,ent,ref,'dry-new',true);return {st:'created',note:'would be created'}}
-      const row=await saveRow('activities',{name:nm.slice(0,200),portfolio_id:ar.id,kpi_id:k?k.id:null,type:'Project',priority:it.priority||'Medium',status:st||'Not Started',progress:prog,planned_start:it.planned_start||null,planned_finish:it.planned_finish||null,est_hours:it.est_hours||null,deliverable:it.deliverable||null,remarks:((it.remarks||'')+' '+agMark(src,ref)).trim()});
+      const row=await saveRow('activities',{name:nm.slice(0,200),portfolio_id:ar.id,project_id:pj?pj.id:null,kpi_id:k?k.id:null,type:'Project',priority:it.priority||'Medium',status:st||'Not Started',progress:prog,planned_start:it.planned_start||null,planned_finish:it.planned_finish||null,est_hours:it.est_hours||null,deliverable:it.deliverable||null,remarks:((it.remarks||'')+' '+agMark(src,ref)).trim()});
       return {st:'created',id:row.id}}
     if(ex._dry)return {st:'same',note:'same item earlier in this file'};
     const want={};if(st)want.status=st;if(st||it.progress!=null)want.progress=prog;if(it.planned_finish)want.planned_finish=it.planned_finish;if(it.actual_hours!=null)want.actual_hours=num(it.actual_hours);
+    if(pj)want.project_id=pj.id;
     if(how==='ref'){if(nm)want.name=nm.slice(0,200);if(it.remarks!=null){const cur=agStrip(ex.remarks,src,ref);if(cur!==String(it.remarks).trim())want.remarks=(String(it.remarks)+' '+agMark(src,ref)).trim()}}
     if(!it.kpi||ex.kpi_id){}else{const k=(D().kpis||[]).filter(x=>v3Is(x.name,String(it.kpi))).sort((a,b)=>b.year-a.year)[0];if(k)want.kpi_id=k.id}
     return done(how,ex,agDiff(ex,want),'activities')}
@@ -24272,7 +24278,7 @@ function agFilePrompt(src){return `Whenever this application creates or changes 
 FILE FORMAT (polaris-agent/1)
 {"schema":"polaris-agent/1","source":"${src}","items":[ ...up to 200 items... ]}
 
-ACTIVITY item: {"entity":"activity","ref":"<fixed id of the item in this app, max 80 chars>","name":"...","life_area":"<name of an existing Polaris One life area>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact name of an existing KPI, optional>"}
+ACTIVITY item: {"entity":"activity","ref":"<fixed id of the item in this app, max 80 chars>","name":"...","life_area":"<name of an existing Polaris One life area>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact name of an existing KPI, optional>","project":"<name or code of an existing Project, optional>"}
 ACTION item: {"entity":"action","ref":"<fixed id>","activity_ref":"<ref of its activity>","title":"...","date":"YYYY-MM-DD","status":"...","minutes":n,"result":"..."}
 
 RULES
@@ -24285,7 +24291,7 @@ function agNotionPrompt(){return `You are the Notion side of Polaris One. Read m
 {"schema":"polaris-agent/1","source":"NOTION","items":[ ... up to 200 items ... ]}
 
 KPI item: {"entity":"kpi","ref":"<Notion page id>","name":"...","life_area":"<Domain>","year":2026,"unit":"%","direction":"HIGHER|LOWER","target":n,"actual":n}
-ACTIVITY item: {"entity":"activity","ref":"<Notion page id>","name":"...","life_area":"<Domain>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact KPI name, optional>"}
+ACTIVITY item: {"entity":"activity","ref":"<Notion page id>","name":"...","life_area":"<Domain>","status":"Not Started|In Progress|On Hold|Completed|Cancelled","progress":0-100,"planned_finish":"YYYY-MM-DD","est_hours":n,"actual_hours":n,"deliverable":"...","remarks":"...","kpi":"<exact KPI name, optional>","project":"<name or code of an existing Project, optional>"}
 ACTION item: {"entity":"action","ref":"<Notion page id>","activity_ref":"<Notion page id of its Activity>","title":"...","date":"YYYY-MM-DD","status":"...","minutes":n,"result":"..."}
 
 RULES: ref is the page id and never changes. Put KPIs first, then Activities, then Actions. Use my Domain value as life_area (Financial, Ibadah, Development, Personal Development, Trading, Investment). Status must be one of the five words; map my own words to them. Include only rows that are new or changed since I last asked. Never invent a value: leave the key out when the cell is empty. No secrets, no comments, valid JSON.`}
