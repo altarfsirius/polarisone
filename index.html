@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='105',APP_DATE='2026-11-24';
+const APP_VERSION='2.0',APP_REV='106',APP_DATE='2026-11-25';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -24616,7 +24616,140 @@ agApply=async function(src,it,rules,dry){
   if(!dry){await patchRow('problems',ex.id,patch);if(how==='content')await agLink(src,'problem',ref,ex.id,false,true)}else if(how==='content')await agLink(src,'problem',ref,ex.id,true,true);
   return {st:'updated',id:ex.id,note:'changed: '+Object.keys(patch).join(', ')}}
 })();
+/* ---------- Rev 106 · Long Text boxes: type straight away in the record details, no Edit button; saved by itself ---------- */
+(function(){
+const st=document.createElement('style');st.textContent='.kv dd textarea.inl{width:100%;min-height:64px;resize:vertical;box-sizing:border-box;white-space:pre-wrap}.kv dd .inl-s{min-height:16px;margin-top:2px;font-size:11.5px;color:var(--mut)}.kv dd .inl-s.err{color:var(--redt,#B42318)}';document.head.appendChild(st);
+S._inlDirty=0;
+const cur=v=>v==null||String(v).trim()===''?null:String(v).trim();
+function say(ta,txt,err){const s=ta.parentNode&&ta.parentNode.querySelector('.inl-s');if(s){s.textContent=txt||'';s.classList.toggle('err',!!err)}}
+function inlSave(ta){
+  const key=ta.dataset.inlK,id=ta.dataset.inlId,fk=ta.dataset.inlF,m=MOD[key],f=m&&m.fields.find(x=>x.k===fk),old=m&&byId(m.t,id);
+  if(!old||!f)return;
+  const val=cur(ta.value);if(cur(old[fk])===val)return say(ta,'');
+  if(f.req&&val==null)return say(ta,f.l+' is required, so this was not saved.',1);
+  say(ta,'Saving…');
+  ta._p=(ta._p||Promise.resolve()).then(async()=>{
+    try{
+      await patchRow(key,id,{[fk]:val});
+      const now=byId(m.t,id);
+      if(now&&cur(now[fk])===val){S._inlDirty=1;say(ta,'Saved')}
+      else{say(ta,'Not saved. This change needs approval or was blocked.',1)}
+    }catch(e){if(e&&e.pending){say(ta,e.message||'Sent for approval.',1)}else{console.warn(e);say(ta,'Could not save: '+(e&&e.message||'error'),1)}}
+  })}
+function inlFlush(root){(root||document).querySelectorAll('textarea.inl').forEach(ta=>{if(ta._t){clearTimeout(ta._t);ta._t=0}inlSave(ta)})}
+function inlDecorate(key,id){
+  const m=MOD[key],r=m&&byId(m.t,id);if(!r||m.noInline)return;
+  if((typeof canDo==='function'?canDo(m.t,'edit'):'allow')!=='allow')return;
+  const modal=$('#layer').lastElementChild,dl=modal&&modal.querySelector('dl.kv');if(!dl)return;
+  const shown=m.fields.filter(f=>!['hidden','file','heading','secret'].includes(f.t)),dds=[...dl.children].filter(x=>x.tagName==='DD');
+  if(dds.length!==shown.length)return;
+  shown.forEach((f,i)=>{
+    if(f.t!=='textarea'||f.ro)return;
+    const dd=dds[i];
+    dd.innerHTML=`<textarea class="in inl" rows="${Math.max(3,f.rows||3)}" aria-label="${esc(f.l)}" placeholder="${esc(f.help||'Type here')}" data-inl-k="${esc(key)}" data-inl-id="${esc(id)}" data-inl-f="${esc(f.k)}">${esc(r[f.k]==null?'':r[f.k])}</textarea><div class="inl-s" aria-live="polite"></div>`;
+    const ta=dd.firstChild;
+    ta.addEventListener('input',()=>{clearTimeout(ta._t);say(ta,'Unsaved…');ta._t=setTimeout(()=>{ta._t=0;inlSave(ta)},1200)});
+    ta.addEventListener('blur',()=>{if(ta._t){clearTimeout(ta._t);ta._t=0}inlSave(ta);ta._p=(ta._p||Promise.resolve()).then(()=>{if(S._inlDirty){S._inlDirty=0;try{renderView()}catch(e){}}})})})}
+const _od=openDetail;
+openDetail=function(key,id){_od(key,id);try{inlDecorate(key,id)}catch(e){console.warn('inline edit',e)}};
+const _cm=closeModal;
+closeModal=function(all){try{inlFlush($('#layer'))}catch(e){}return _cm.apply(this,arguments)};
+})();
+
+/* ---------- Rev 106 · Screenshots pasted (Ctrl+V) into any Long Text box. Stored as Evidence (tag pic:<field>), so the text itself, sync and exports stay clean ---------- */
+(function(){
+const MAXP=8,TAG=f=>'pic:'+f;
+const st=document.createElement('style');st.textContent='.lp{margin-top:6px}.lp .lph{font-size:11.5px;color:var(--mut);margin-bottom:4px}.lp .lpt{display:flex;flex-wrap:wrap;gap:8px}.lp .lpt>span{position:relative;display:inline-block}';document.head.appendChild(st);
+const lpMod=key=>key&&MOD[key]&&!['notes','evidence','api_connections'].includes(key)&&D().evidence!==undefined;
+const lpRows=(key,id,fk)=>id?(D().evidence||[]).filter(e=>e.link_type===key&&e.link_id===id&&e.tags===TAG(fk)):[];
+const lpImg=e=>{const fp=e.file_path||'';return fp.startsWith('data:')?{data:fp,name:e.file_name}:{path:fp,name:e.file_name}};
+function lpThumbs(box){
+  const mode=box.dataset.mode,key=box.dataset.key,id=box.dataset.id,fk=box.dataset.f,tb=box.querySelector('.lpt');if(!tb)return;
+  let h='';
+  if(mode==='inline'){lpRows(key,id,fk).forEach(e=>{h+=`<span>${noteImgHtml(lpImg(e),true)}<button type="button" class="nx" data-act="lprm" data-ev="${esc(e.id)}" aria-label="Remove picture">×</button></span>`})}
+  else{const form=box.closest('#form'),dr=form&&form._lp;if(dr){lpRows(key,id,fk).filter(e=>!dr.removed.includes(e.id)).forEach(e=>{h+=`<span>${noteImgHtml(lpImg(e),true)}<button type="button" class="nx" data-act="lprm" data-ev="${esc(e.id)}" aria-label="Remove picture">×</button></span>`});
+    dr.add.forEach((q,n)=>{if(q.fk===fk)h+=`<span>${noteImgHtml({url:q.prep.url,name:q.prep.name},true)}<button type="button" class="nx" data-act="lprm" data-q="${n}" aria-label="Remove picture">×</button></span>`})}}
+  tb.innerHTML=h}
+const lpBox=(mode,key,id,f)=>`<div class="lp" data-mode="${mode}" data-key="${esc(key)}" data-id="${esc(id||'')}" data-f="${esc(f.k)}"><div class="lpt"></div><div class="lph">Paste a screenshot here with Ctrl+V</div></div>`;
+async function lpStore(key,id,fk,label,prep){
+  let fp;if(DB.mode==='supabase')fp=await DB.upload(new File([prep.blob],prep.name,{type:'image/jpeg'}));else fp=await blobToData(prep.blob);
+  return saveRow('evidence',{title:'Picture · '+label,type:'Screenshot',evidence_date:nowISO().slice(0,10),link_type:key,link_id:id,url:null,description:null,tags:TAG(fk),file_name:prep.name,file_path:fp},null)}
+async function lpDrop(e){try{if(DB.mode==='supabase'&&e.file_path&&!e.file_path.startsWith('data:'))await DB.sb.storage.from('evidence').remove([e.file_path])}catch(x){console.warn(x)}await removeRow('evidence',e.id)}
+function lpFiles(ev){
+  const cd=ev.clipboardData;if(!cd)return [];
+  const txt=cd.getData&&cd.getData('text/plain');if(txt&&txt.trim())return [];
+  return [...(cd.items||[])].filter(i=>i.kind==='file'&&/^image\//.test(i.type)).map(i=>i.getAsFile()).filter(Boolean)}
+/* detail view: every Long Text box gets a picture strip */
+function lpDecorateDetail(key,id){
+  if(!lpMod(key))return;
+  const m=MOD[key],modal=$('#layer').lastElementChild;if(!modal)return;
+  modal.querySelectorAll('textarea.inl').forEach(ta=>{const f=m.fields.find(x=>x.k===ta.dataset.inlF);if(!f||ta.parentNode.querySelector('.lp'))return;
+    ta.parentNode.insertAdjacentHTML('beforeend',lpBox('inline',key,id,f));lpThumbs(ta.parentNode.querySelector('.lp'))})}
+const _od2=openDetail;
+openDetail=function(key,id){_od2(key,id);try{lpDecorateDetail(key,id)}catch(e){console.warn('pictures',e)}};
+/* forms: Edit and New */
+const _of=openForm;
+openForm=function(key,id,defaults){
+  _of(key,id,defaults);
+  try{
+    const form=$('#form');if(!form||!lpMod(key)||S.form&&S.form.key!==key)return;
+    form._lp={add:[],removed:[]};
+    MOD[key].fields.filter(f=>f.t==='textarea'&&!f.ro).forEach(f=>{const el=form.elements[f.k];if(!el||!el.parentNode)return;el.parentNode.insertAdjacentHTML('beforeend',lpBox('form',key,id,f));lpThumbs(el.parentNode.querySelector('.lp'))})
+  }catch(e){console.warn('pictures',e)}};
+/* paste */
+document.addEventListener('paste',async e=>{
+  if(e.defaultPrevented)return;
+  const ta=e.target;if(!ta||ta.tagName!=='TEXTAREA')return;
+  const inl=ta.classList.contains('inl')&&ta.dataset.inlK,form=!inl&&ta.closest&&ta.closest('#form');
+  const key=inl?ta.dataset.inlK:(form&&S.form&&S.form.key),fk=inl?ta.dataset.inlF:ta.name;
+  if(!key||key==='notes')return;
+  const files=lpFiles(e);if(!files.length)return;
+  e.preventDefault();
+  if(!lpMod(key))return toast('Pictures cannot be kept for this kind of record yet. Use Execute → Notes.',1);
+  if(typeof canDo==='function'&&canDo('evidence','create')==='deny')return toast('You may not add pictures (Evidence).',1);
+  const m=MOD[key],f=m.fields.find(x=>x.k===fk);if(!f)return;
+  const box=ta.parentNode.querySelector('.lp');
+  for(const file of files){
+    try{
+      const count=inl?lpRows(key,ta.dataset.inlId,fk).length:lpRows(key,S.form.id,fk).filter(x=>!form._lp.removed.includes(x.id)).length+form._lp.add.filter(q=>q.fk===fk).length;
+      if(count>=MAXP){toast('Up to '+MAXP+' pictures per box.',1);break}
+      const prep=await noteImgPrep(file);
+      if(inl){await lpStore(key,ta.dataset.inlId,fk,f.l,prep);toast('Picture added')}
+      else{form._lp.add.push({fk,prep,label:f.l});toast('Picture will be saved with this record')}
+      if(box)lpThumbs(box)
+    }catch(x){if(x&&x.pending){toast(x.message)}else toast(x&&x.message||'Could not add the picture',1)}}});
+/* remove */
+ACT.lprm=async el=>{
+  const box=el.closest('.lp');if(!box)return;
+  if(el.dataset.q!=null){const form=box.closest('#form');if(form&&form._lp){const q=form._lp.add.splice(+el.dataset.q,1)[0];if(q&&q.prep&&q.prep.url)URL.revokeObjectURL(q.prep.url)}return lpThumbs(box)}
+  const ev=byId('evidence',el.dataset.ev);if(!ev)return;
+  if(box.dataset.mode==='form'){const form=box.closest('#form');if(form&&form._lp)form._lp.removed.push(ev.id);return lpThumbs(box)}
+  if(!await ask('Remove this picture?','It is deleted from this record.','Remove',true))return;
+  try{await lpDrop(ev);lpThumbs(box)}catch(e){toast(e&&e.message||'Could not remove',1)}};
+/* when a form is saved: add and remove the pictures that belong to it */
+const _sr2=saveRow;
+saveRow=async function(key,d,id,opts){
+  const row=await _sr2.apply(this,arguments);
+  try{const form=$('#form'),dr=form&&form._lp;
+    if(row&&dr&&S.form&&S.form.key===key&&(S.form.id||null)===(id||null)&&(dr.add.length||dr.removed.length)){
+      const lab=k=>{const f=MOD[key].fields.find(x=>x.k===k);return f?f.l:k};
+      let n=0;
+      for(const q of dr.add){await lpStore(key,row.id,q.fk,lab(q.fk),q.prep);n++}
+      for(const eid of dr.removed){const ev=byId('evidence',eid);if(ev)await lpDrop(ev)}
+      dr.add=[];dr.removed=[];if(n)toast(n+' picture'+(n>1?'s':'')+' saved')}
+  }catch(e){console.warn('pictures',e);toast('The record was saved, but a picture could not be kept: '+(e&&e.message||'error'),1)}
+  return row};
+/* deleting a record deletes its pictures */
+const _rr=removeRow;
+removeRow=async function(key,id,opts){
+  const pics=(D().evidence||[]).filter(e=>e.link_type===key&&e.link_id===id&&String(e.tags||'').startsWith('pic:'));
+  const out=await _rr.apply(this,arguments);
+  for(const e of pics){try{if(byId('evidence',e.id))await lpDrop(e)}catch(x){console.warn(x)}}
+  return out};
+const _fu=DB.fileUrl;DB.fileUrl=function(path){return String(path||'').startsWith('data:')?Promise.resolve(path):_fu.apply(this,arguments)};
+})();
 RELEASE_NOTES.unshift({rev:105,date:'2026-11-24',groups:[{t:'Analysis & Improvement',items:[['Link to Notion and a database map','Problems, Risks, Processes and Improvements now show a Notion bar: Link to Notion opens that list in Connections, and Database map lists every property (name, type, options) to create so you can build the Notion database, with a copy-ready prompt for Notion AI.','improve','problems','Open Problems'],['Findings from a meeting','A meeting now lists its findings and lets you add as many as were raised. A problem shows the meeting and activity it came from, and Risk, Process and Improvement show the findings on their activity. It needs one small SQL file (polaris-problem-meeting-kolom.sql); without it the rest of the app is unchanged.','meetings','list','Open Meetings'],['Findings in an agent file','An agent file can carry problems (entity "problem": title, severity, status, root cause, corrective and preventive action, owner, due date) under an Activity. The same ref is never added twice.','integrations','inbound','Open Inbound links']]},{t:'Integrations',items:[['Project in an agent file','An Activity in an agent file can name its Project (name or code). A Project that does not exist is refused with a clear message.','integrations','inbound','Open Inbound links']]}]});
+RELEASE_NOTES.unshift({rev:106,date:'2026-11-25',groups:[{t:'Long text boxes',items:[['Type straight away, no Edit button','In a record\'s details every Long Text box (Notes, Minutes, Decisions, Description, Remarks and the like) can be typed in at once. It saves by itself when you pause or leave the box, and a small line under the box says Saved. Closing the window saves too. Take a screenshot, click in the box and press Ctrl+V: the picture appears under the box, in the details and in the Edit and New forms.',null,null,null]]}]});
 RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
