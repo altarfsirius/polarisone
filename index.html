@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='106',APP_DATE='2026-11-25';
+const APP_VERSION='2.0',APP_REV='107',APP_DATE='2026-11-25';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -24748,8 +24748,133 @@ removeRow=async function(key,id,opts){
   return out};
 const _fu=DB.fileUrl;DB.fileUrl=function(path){return String(path||'').startsWith('data:')?Promise.resolve(path):_fu.apply(this,arguments)};
 })();
+
+/* ---------- Rev 107 · TRIAL: the Note of a Meeting, Activity or Action mirrors its Notion page (only when the record is linked to Notion) ---------- */
+(function(){
+const NB_T=['meetings','activities','daily_actions'],NB_TITLE='Polaris One note';
+const NB_LANG=['javascript','typescript','python','sql','json','bash','shell','html','css','markdown','yaml','java','c','c++','c#','go','php','plain text'];
+const st=document.createElement('style');st.textContent=`.nbp{margin-top:14px}.nbp .nbody{line-height:1.55}.nbp .nbody h1,.nbp .nbody h2,.nbp .nbody h3{margin:14px 0 6px;line-height:1.25}.nbp .nbody h1{font-size:20px}.nbp .nbody h2{font-size:17px}.nbp .nbody h3{font-size:15px}.nbp .nbody p{margin:6px 0}.nbp .nbl{margin:4px 0 4px 20px;padding:0}.nbp details.nbt{margin:6px 0}.nbp details.nbt>summary{cursor:pointer;font-weight:600}.nbp .nbk{margin:4px 0 4px 18px}.nbp .nbcode{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;max-height:260px;font-size:12px;white-space:pre}.nbp .nbcallout{display:flex;gap:10px;padding:12px 14px;border-radius:8px;background:var(--soft);margin:8px 0}.nbp .nbcallout.c-blue{background:rgba(47,111,222,.12)}.nbp .nbcallout.c-green{background:rgba(31,157,85,.12)}.nbp .nbcallout.c-yellow,.nbp .nbcallout.c-orange{background:rgba(240,162,2,.14)}.nbp .nbcallout.c-red,.nbp .nbcallout.c-pink{background:rgba(229,72,77,.12)}.nbp .nbcallout.c-purple{background:rgba(124,58,237,.12)}.nbp blockquote{margin:6px 0;padding:2px 12px;border-left:3px solid var(--line)}.nbp .nbimg{max-width:100%;border-radius:8px;display:block}.nbp .nbzoom{border:0;background:none;padding:0;cursor:zoom-in}.nbp .tw{overflow-x:auto}`;document.head.appendChild(st);
+/* the Note box */
+NB_T.forEach(t=>{const m=MOD[t];if(!m||m.fields.some(f=>f.k==='note_md'))return;
+  m.fields.push(F('note_md','Note','textarea','Your note. When this record is linked to Notion, the note is also written on its Notion page, in a toggle called “Polaris One note”, and the rest of the Notion page is shown below. Without Notion it is an ordinary note.',{wide:1,rows:5}));
+  COL_NEWER[t]=(COL_NEWER[t]||[]).concat(['note_md'])});
+/* the Notion database map must never offer the Note box as a property */
+const _nf=ngFields;ngFields=function(t){return _nf.apply(this,arguments).filter(f=>f.k!=='note_md')};
+/* Notes is called Remarks; Notion is searched for “Remarks” first and “Notes” second */
+['daily_actions','meetings'].forEach(k=>{const f=MOD[k]&&MOD[k].fields.find(x=>x.k==='notes');if(f)f.l='Remarks'});
+const _nn=ngNames;ngNames=function(t,f){return f&&f.k==='notes'&&!(NG_NAME[t]||{}).notes?[f.l,'Notes','notes']:_nn.apply(this,arguments)};
+NHINT.notes=/(remark|note|catatan|desc|detail)/i;
+/* ---- talking to Notion (the fake used by the tests is S.ng.fake) ---- */
+const nbLive=()=>typeof ngLive==='function'&&ngLive();
+const nbCall=(m,p,b)=>S.ng&&S.ng.fake?S.ng.fake(m,p,b):nCall(m,p,b);
+const nbPid=row=>nId(row&&row.notion_page_id);
+async function nbList(id){const out=[];let cur;for(let i=0;i<6;i++){const r=await nbCall('GET','/v1/blocks/'+id+'/children?page_size=100'+(cur?'&start_cursor='+encodeURIComponent(cur):''));(r.results||[]).forEach(x=>out.push(x));if(!r.has_more)break;cur=r.next_cursor}return out}
+/* ---- read: Notion blocks → safe HTML ---- */
+function nbRt(a){return (a||[]).map(x=>{let s=esc(x.plain_text||'');const n=x.annotations||{};if(n.code)s=`<code>${s}</code>`;if(n.bold)s=`<b>${s}</b>`;if(n.italic)s=`<i>${s}</i>`;if(n.strikethrough)s=`<s>${s}</s>`;if(n.underline)s=`<u>${s}</u>`;const u=x.href||(x.text&&x.text.link&&x.text.link.url);if(u&&safeUrl(u)!=='#')s=`<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${s}</a>`;return s}).join('').replace(/\n/g,'<br>')}
+async function nbKids(b,depth,bud){
+  if(!b.has_children)return '';
+  if(depth>=3||bud.n<=0)return '<div class="xs mut">More inside. Open the page in Notion to see it.</div>';
+  bud.n--;try{return `<div class="nbk">${await nbRender(await nbList(b.id),depth+1,bud)}</div>`}catch(e){return ''}}
+async function nbOne(b,depth,bud){
+  const ty=b.type,d=b[ty]||{};
+  switch(ty){
+   case 'paragraph':{const h=nbRt(d.rich_text);return (h?`<p>${h}</p>`:'')+await nbKids(b,depth,bud)}
+   case 'heading_1':case 'heading_2':case 'heading_3':{const n=ty.slice(-1),h=nbRt(d.rich_text);
+     if(d.is_toggleable)return `<details class="nbt" data-nbid="${esc(b.id)}" data-depth="${depth}"><summary><h${n} style="display:inline">${h}</h${n}></summary><div class="nbk"></div></details>`;
+     return `<h${n}>${h}</h${n}>`}
+   case 'toggle':return `<details class="nbt" data-nbid="${esc(b.id)}" data-depth="${depth}"><summary>${nbRt(d.rich_text)||'Toggle'}</summary><div class="nbk"></div></details>`;
+   case 'to_do':return `<p>${d.checked?'☑':'☐'} ${nbRt(d.rich_text)}</p>`+await nbKids(b,depth,bud);
+   case 'quote':return `<blockquote>${nbRt(d.rich_text)}${await nbKids(b,depth,bud)}</blockquote>`;
+   case 'callout':{const ic=d.icon&&d.icon.emoji?esc(d.icon.emoji):'💡',c=String(d.color||'').replace(/_background$/,'').replace(/[^a-z]/g,'');return `<div class="nbcallout c-${c}"><span aria-hidden="true">${ic}</span><div>${nbRt(d.rich_text)}${await nbKids(b,depth,bud)}</div></div>`}
+   case 'code':return `<pre class="nbcode"><code>${nbRt(d.rich_text).replace(/<br>/g,'\n')}</code></pre>`;
+   case 'divider':return '<hr>';
+   case 'image':{const u=(d.file&&d.file.url)||(d.external&&d.external.url)||'';if(!u||safeUrl(u)==='#')return '';return `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer"><img class="nbimg" src="${esc(u)}" alt="${esc(nbRt(d.caption).replace(/<[^>]*>/g,'')||'Picture')}" loading="lazy"></a>`}
+   case 'table':{let rows=[];try{rows=await nbList(b.id)}catch(e){}
+     return `<div class="tw"><table class="tbl">${rows.map((r,i)=>`<tr>${((r.table_row||{}).cells||[]).map(c=>(d.has_column_header&&i===0)?`<th>${nbRt(c)}</th>`:`<td>${nbRt(c)}</td>`).join('')}</tr>`).join('')}</table></div>`}
+   case 'column_list':case 'column':case 'synced_block':return await nbKids(b,depth-1<0?0:depth-1,bud);
+   case 'bookmark':case 'embed':case 'link_preview':case 'video':case 'pdf':case 'file':{const u=d.url||(d.external&&d.external.url)||(d.file&&d.file.url)||'';return u&&safeUrl(u)!=='#'?`<p><a href="${esc(safeUrl(u))}" target="_blank" rel="noopener noreferrer">${esc(trunc(u,80))}</a></p>`:''}
+   case 'child_page':return `<p>📄 ${esc(d.title||'Page')}</p>`;
+   case 'child_database':return `<p>🗂 ${esc(d.title||'Database')}</p>`;
+   case 'equation':return `<p><code>${esc(d.expression||'')}</code></p>`;
+   default:return ''}}
+async function nbRender(blocks,depth,bud){
+  let h='',list=null;const close=()=>{if(list){h+=`</${list}>`;list=null}};
+  for(const b of blocks){
+    if(depth===0&&b.type==='toggle'&&nText((b.toggle||{}).rich_text)===NB_TITLE)continue;
+    if(b.type==='bulleted_list_item'||b.type==='numbered_list_item'){const tag=b.type==='bulleted_list_item'?'ul':'ol';if(list!==tag){close();h+=`<${tag} class="nbl">`;list=tag}h+=`<li>${nbRt(b[b.type].rich_text)}${await nbKids(b,depth,bud)}</li>`;continue}
+    close();h+=await nbOne(b,depth,bud)}
+  close();return h}
+async function nbLoad(panel){
+  const box=panel.querySelector('.nbody');if(!box)return;box.textContent='Loading the Notion page…';
+  try{const html=await nbRender(await nbList(panel.dataset.pid),0,{n:25});box.innerHTML=html||'<p class="sm mut">The Notion page has no content yet.</p>'}
+  catch(e){box.innerHTML=`<div class="callout warn">${esc(nFriendly(e,'this Notion page'))}</div>`}}
+document.addEventListener('toggle',async e=>{
+  const d=e.target;if(!d||!d.matches||!d.matches('details.nbt')||!d.open||d.dataset.done)return;d.dataset.done='1';
+  const box=d.querySelector(':scope>.nbk');if(!box)return;box.textContent='Loading…';
+  try{const kids=await nbList(d.dataset.nbid);box.innerHTML=(await nbRender(kids,(+d.dataset.depth||0)+1,{n:25}))||'<span class="sm mut">Empty.</span>'}
+  catch(x){d.dataset.done='';box.innerHTML=esc(nFriendly(x,'this block'))}},true);
+/* ---- write: the Note (Markdown-like text) → one toggle “Polaris One note” on the page. Nothing else on the page is touched ---- */
+function nbInline(s){
+  const out=[],re=/(\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\))/g;let last=0,m;
+  const push=(txt,ann,link)=>{if(!txt)return;for(let i=0;i<txt.length;i+=1900){const o={type:'text',text:{content:txt.slice(i,i+1900)}};if(link)o.text.link={url:link};if(ann)o.annotations=ann;out.push(o)}};
+  while((m=re.exec(s))){push(s.slice(last,m.index));if(m[2]!=null)push(m[2],{bold:true});else if(m[3]!=null)push(m[3],{italic:true});else if(m[4]!=null)push(m[4],{code:true});else push(m[5],null,m[6]);last=re.lastIndex}
+  push(s.slice(last));return out.length?out:[{type:'text',text:{content:''}}]}
+function nbMd2Blocks(md){
+  const L=String(md||'').replace(/\r/g,'').split('\n'),B=[];let i=0;
+  const blk=(type,rt,extra)=>B.push({object:'block',type,[type]:Object.assign({rich_text:rt},extra||{})});
+  const START=/^(#{1,3}\s|\s*[-*]\s|\s*\d+[.)]\s|>|```|---+\s*$|\s*\[( |x|X)\]\s)/;
+  while(i<L.length&&B.length<300){
+    const ln=L[i];let m;
+    if(/^```/.test(ln)){const lang=ln.replace(/^```/,'').trim().toLowerCase()||'plain text',buf=[];i++;while(i<L.length&&!/^```/.test(L[i]))buf.push(L[i++]);i++;const txt=buf.join('\n'),rt=[];for(let k=0;k<txt.length||k===0;k+=1900)rt.push({type:'text',text:{content:txt.slice(k,k+1900)}});blk('code',rt,{language:NB_LANG.includes(lang)?lang:'plain text'});continue}
+    if(!ln.trim()){i++;continue}
+    if(/^---+\s*$/.test(ln)){B.push({object:'block',type:'divider',divider:{}});i++;continue}
+    if((m=ln.match(/^(#{1,3})\s+(.*)$/))){blk('heading_'+m[1].length,nbInline(m[2]));i++;continue}
+    if((m=ln.match(/^\s*(?:[-*]\s+)?\[( |x|X)\]\s+(.*)$/))){blk('to_do',nbInline(m[2]),{checked:m[1]!==' '});i++;continue}
+    if((m=ln.match(/^\s*[-*]\s+(.*)$/))){blk('bulleted_list_item',nbInline(m[1]));i++;continue}
+    if((m=ln.match(/^\s*\d+[.)]\s+(.*)$/))){blk('numbered_list_item',nbInline(m[1]));i++;continue}
+    if((m=ln.match(/^>\s?(.*)$/))){blk('quote',nbInline(m[1]));i++;continue}
+    const buf=[ln];i++;while(i<L.length&&L[i].trim()&&!START.test(L[i]))buf.push(L[i++]);
+    blk('paragraph',nbInline(buf.join('\n')))}
+  return B}
+async function nbPush(t,row){
+  const pid=nbPid(row);if(!pid||!nbLive())return 'skip';
+  const md=String(row.note_md||'').trim(),top=await nbList(pid),tg=top.find(b=>b.type==='toggle'&&nText((b.toggle||{}).rich_text)===NB_TITLE);
+  if(!md){if(tg){await nbCall('DELETE','/v1/blocks/'+tg.id);return 'removed'}return 'none'}
+  const blocks=nbMd2Blocks(md);let tid;
+  if(tg){tid=tg.id;for(const o of await nbList(tid))await nbCall('DELETE','/v1/blocks/'+o.id);
+    for(let i=0;i<blocks.length;i+=100)await nbCall('PATCH','/v1/blocks/'+tid+'/children',{children:blocks.slice(i,i+100)})}
+  else{const r=await nbCall('PATCH','/v1/blocks/'+pid+'/children',{children:[{object:'block',type:'toggle',toggle:{rich_text:[{type:'text',text:{content:NB_TITLE}}],children:blocks.slice(0,100)}}]});tid=r&&r.results&&r.results[0]&&r.results[0].id;
+    for(let i=100;tid&&i<blocks.length;i+=100)await nbCall('PATCH','/v1/blocks/'+tid+'/children',{children:blocks.slice(i,i+100)})}
+  return 'sent'}
+const nbBusy={};
+function nbQueue(t,row,quiet){
+  const pid=nbPid(row);if(!pid)return Promise.resolve();
+  nbBusy[pid]=(nbBusy[pid]||Promise.resolve()).then(()=>nbPush(t,row)).then(r=>{if(!quiet&&r!=='skip'&&r!=='none')toast(r==='removed'?'Note removed from the Notion page':'Note sent to Notion');document.querySelectorAll('.nbp[data-pid="'+pid+'"]').forEach(nbLoad)}).catch(e=>{toast(nFriendly(e,'the Notion page'),1)});
+  return nbBusy[pid]}
+NB_T.forEach(t=>{const m=MOD[t],a=m.after;m.after=async function(row,old){
+  if(a)await a.apply(this,arguments);
+  try{if(row&&row.notion_page_id&&nbLive()&&!(S.ng&&S.ng.pulling)&&String(row.note_md||'')!==String((old&&old.note_md)||''))nbQueue(t,row)}catch(e){console.warn(e)}}});
+/* ---- the panel in the details ---- */
+function nbDecorate(key,id){
+  if(!NB_T.includes(key))return;
+  const m=MOD[key],r=byId(m.t,id),modal=$('#layer').lastElementChild,dl=modal&&modal.querySelector('dl.kv');if(!r||!dl)return;
+  const pid=nbPid(r),linked=!!pid&&nbLive();
+  const ta=dl.querySelector('textarea.inl[data-inl-f="note_md"]'),field=ta?ta.parentNode:null;
+  const note=linked?'Linked to Notion: the note is written on the page in a toggle called “Polaris One note”.':'Not linked to Notion: this is an ordinary note that stays in Polaris One.';
+  if(field)field.insertAdjacentHTML('beforeend',`<div class="xs mut nbhint">${esc(note)}</div>`);
+  else{const dds=[...dl.children].filter(x=>x.tagName==='DD'),shown=m.fields.filter(f=>!['hidden','file','heading','secret'].includes(f.t)),i=shown.findIndex(f=>f.k==='note_md');if(i>=0&&dds[i])dds[i].insertAdjacentHTML('beforeend',`<div class="xs mut nbhint">${esc(note)}</div>`)}
+  if(!linked)return;
+  dl.insertAdjacentHTML('afterend',`<div class="card nbp" data-pid="${esc(pid)}" data-k="${esc(key)}" data-id="${esc(id)}"><div class="ch"><h3>Notion page</h3><span class="sp"></span><button class="btn s" data-act="nbpush">Send note now</button><button class="btn s" data-act="nbrefresh">Refresh</button><a class="btn s" href="https://www.notion.so/${esc(pid.replace(/-/g,''))}" target="_blank" rel="noopener noreferrer">Open in Notion</a></div><div class="nbody sm"></div></div>`);
+  nbLoad(modal.querySelector('.nbp'))}
+const _od3=openDetail;
+openDetail=function(key,id){_od3(key,id);try{nbDecorate(key,id)}catch(e){console.warn('notion page',e)}};
+ACT.nbrefresh=el=>{const p=el.closest('.nbp');if(p)nbLoad(p)};
+ACT.nbpush=async el=>{const p=el.closest('.nbp');if(!p)return;const r=byId(MOD[p.dataset.k].t,p.dataset.id);if(!r)return;await nbQueue(p.dataset.k,r)};
+window.__nb={md2:nbMd2Blocks,render:nbRender,push:nbPush};
+})();
 RELEASE_NOTES.unshift({rev:105,date:'2026-11-24',groups:[{t:'Analysis & Improvement',items:[['Link to Notion and a database map','Problems, Risks, Processes and Improvements now show a Notion bar: Link to Notion opens that list in Connections, and Database map lists every property (name, type, options) to create so you can build the Notion database, with a copy-ready prompt for Notion AI.','improve','problems','Open Problems'],['Findings from a meeting','A meeting now lists its findings and lets you add as many as were raised. A problem shows the meeting and activity it came from, and Risk, Process and Improvement show the findings on their activity. It needs one small SQL file (polaris-problem-meeting-kolom.sql); without it the rest of the app is unchanged.','meetings','list','Open Meetings'],['Findings in an agent file','An agent file can carry problems (entity "problem": title, severity, status, root cause, corrective and preventive action, owner, due date) under an Activity. The same ref is never added twice.','integrations','inbound','Open Inbound links']]},{t:'Integrations',items:[['Project in an agent file','An Activity in an agent file can name its Project (name or code). A Project that does not exist is refused with a clear message.','integrations','inbound','Open Inbound links']]}]});
 RELEASE_NOTES.unshift({rev:106,date:'2026-11-25',groups:[{t:'Long text boxes',items:[['Type straight away, no Edit button','In a record\'s details every Long Text box (Notes, Minutes, Decisions, Description, Remarks and the like) can be typed in at once. It saves by itself when you pause or leave the box, and a small line under the box says Saved. Closing the window saves too. Take a screenshot, click in the box and press Ctrl+V: the picture appears under the box, in the details and in the Edit and New forms.',null,null,null]]}]});
+RELEASE_NOTES.unshift({rev:107,date:'2026-11-25',groups:[{t:'Notes and Notion (trial)',items:[['Note on Meeting, Activity and Action','Each of these three forms has a Note box. When the record is linked to Notion, the note is also written on its Notion page in a toggle called “Polaris One note”, and the rest of the Notion page (headings, callouts, toggles, code, tables, pictures) is shown in the details. Nothing else on the page is changed. Without Notion it stays an ordinary note. It needs one small SQL file (a note_md column); without it the rest of the app is unchanged.',null,null,null],['Notes is now called Remarks','On an Action the field Notes is now Remarks. Notion is searched for “Remarks” first and “Notes” second. What you already linked keeps working.',null,null,null]]}]});
 RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
