@@ -2749,10 +2749,10 @@ function apiTransform(c,recs,hook){
     let old=null;
     if(c.match_field&&row[c.match_field]!=null){const mv=String(row[c.match_field]).toLowerCase();old=existing.find(r=>String(r[c.match_field]==null?'':r[c.match_field]).toLowerCase()===mv)||null}
     if(!old)old=byKey.get(ext)||(prefix!==legacy?(byKey.get(legacy+ext.slice(prefix.length))||byTail.get(ext.slice(prefix.length))):null)||null;
-    if(!old&&c.adoptFn){const ad=c.adoptFn(rec,row);if(ad&&!ad.ext_key)old=ad}
+    if(!old&&c.adoptFn){const ad=c.adoptFn(rec,row);if(ad&&(!ad.ext_key||c.adoptAny))old=ad}
     if(old){
       if(mode==='Add new only'){plan.existingSkipped++;return}
-      const upd=Object.assign({},row);(c.create_only||[]).forEach(k=>{if(old[k]!==undefined&&old[k]!==null&&old[k]!=='')delete upd[k]});if(!old.ext_key||(prefix!==legacy&&LEGK.test(String(old.ext_key))))upd.ext_key=ext;
+      const upd=Object.assign({},row);(c.create_only||[]).forEach(k=>{if(old[k]!==undefined&&old[k]!==null&&old[k]!=='')delete upd[k]});if(!old.ext_key||(prefix!==legacy&&LEGK.test(String(old.ext_key)))||(c.adoptAny&&old.ext_key!==ext))upd.ext_key=ext;
       const merged=Object.assign({},old,upd);if(m.before)m.before(merged,old);
       const patch={};Object.keys(merged).forEach(k=>{if(['id','owner','created_at','updated_at'].includes(k))return;const f=m.fields.find(x=>x.k===k),ov=(typeof ID_T!=='undefined'&&ID_T[t]&&ID_T[t].f===k&&old.code)?idStrip(old[k],[old.code]):old[k],mv=(ov!==old[k]&&typeof merged[k]==='string')?idStrip(merged[k],[old.code]):merged[k];if(!sameVal(f,mv,ov))patch[k]=merged[k]});
       if(Object.keys(patch).length){plan.updated++;plan.items.push({kind:'update',id:old.id,patch,old,label:labelOf(t,old)})}else plan.unchanged++;
@@ -8345,7 +8345,7 @@ ACT.bzmode=el=>{const u=S.ui.bz=S.ui.bz||{mode:'m',m:todayS().slice(0,7),y:+toda
 ACT.bzgo=el=>{const u=S.ui.bz=S.ui.bz||{mode:'m',m:todayS().slice(0,7),y:+todayS().slice(0,4)},d=+el.dataset.d;
   if(!d){u.m=todayS().slice(0,7);u.y=+todayS().slice(0,4)}else if(u.mode==='m')u.m=ymAdd(u.m,d);else u.y+=d;renderView()};
 Object.assign(PAGEHELP,{
- 'finance/portfolio':'Your investments in one place: mutual funds, commodities, crypto, US and Indonesian shares, P2P lending and secondary shares. Import a statement (PDF or CSV) or add holdings by hand. Every statement keeps its date, so you also see how the value changed. Amounts in other currencies use the rates at the bottom.',
+ 'finance/portfolio':'Your investments in one place: mutual funds, commodities, crypto, US and Indonesian shares, P2P lending and secondary shares. Import a statement (PDF, scanned PDF or picture with OCR, CSV or JSON) or add holdings by hand. A holding you already have is updated, never added twice. Every statement keeps its date, so you also see how the value changed. Amounts in other currencies use the rates at the bottom.',
  'finance/business':'The combined totals of a business: sales, operating expenses, capital put in, business credit drawn and repaid. An app can send them to Polaris One by itself (see Integrations → Inbound links), or you add or import them. Only totals are kept, never single items.'});
 
 /* ---- r14: 53_accounts.js ---- */
@@ -17204,6 +17204,10 @@ function pdfMoneyLocOf(p,fm){
   if(!cols.length)return '';
   const vals=[];p.rows.forEach(r=>cols.forEach(c=>{if(r.v[c])vals.push(r.v[c])}));
   return pdfMoneyLoc(vals)}
+/* Market Desk → Portfolio: a holding is one name, on one date, at one platform. The same holding read again (from a PDF, an OCR scan, a CSV or a JSON file)
+   UPDATES the row you already have; it can never be created twice. A hand-typed row and one from an older import are recognised the same way. */
+const holdKeyOf=(rec,st)=>{const o=Object.assign({},st||{});Object.keys(rec||{}).forEach(k=>{if(rec[k]!==undefined&&rec[k]!==null&&rec[k]!=='')o[k]=rec[k]});return pdfSimKey('invest_holdings',o)};
+function holdIndex(){const m=new Map();(D().invest_holdings||[]).forEach(r=>{const k=pdfSimKey('invest_holdings',r);if(k&&!m.has(k))m.set(k,r)});return m}
 function pdfRecompute(markSim){
   const p=S.pdf;if(!p||!p.rows)return;
   const fm=pdfFieldMap(p),st=pdfStatics(p),prefix='pdf:'+pdfTbl(p.t)+':';p.fm=fm;p.st=st;
@@ -17215,9 +17219,10 @@ function pdfRecompute(markSim){
   /* a statement can hold two identical lines on one day (two coffees): each gets its own number, so both are kept and the same file still does not add twice */
   const occ={};
   p.rows.forEach((r,i)=>{
-    if(vt&&vt.keyOf){const h=vt.keyOf(recs[i],p);occ[h]=(occ[h]||0)+1;r.ext=prefix+'b'+hash36(h)+(occ[h]>1?'.'+occ[h]:'');recs[i].__x=r.ext.slice(prefix.length)}
+    if(p.t==='invest_holdings'){r.hk=holdKeyOf(recs[i],st);r.ext=prefix+'b'+hash36(r.hk);recs[i].__x=r.ext.slice(prefix.length)}
+    else if(vt&&vt.keyOf){const h=vt.keyOf(recs[i],p);occ[h]=(occ[h]||0)+1;r.ext=prefix+'b'+hash36(h)+(occ[h]>1?'.'+occ[h]:'');recs[i].__x=r.ext.slice(prefix.length)}
     else r.ext=prefix+'h'+hash36(JSON.stringify(recs[i]));
-    r.have=haveKeys.has(r.ext);r.eff=recs[i].__eff||null;r.haveNote=''});
+    r.have=p.t==='invest_holdings'?false:haveKeys.has(r.ext);r.eff=recs[i].__eff||null;r.haveNote='';r.upd=false;r.match=null});
   /* the same bank line read a second time in another way (text, OCR, a CSV, another layout) has another description and so another key. Lines on the same day,
      with the same amount, in the same account are matched to what is already in the ledger, one for one, so nothing is added twice */
   if(p.t==='bank'){
@@ -17226,10 +17231,17 @@ function pdfRecompute(markSim){
     const tup=i=>{const rc=recs[i],a=String(rc.account||st.account||'');if(!rc.entry_date||!rc.__amt||!a)return '';return tk(rc.entry_date,Math.round(rc.__amt*100),a)};
     p.rows.forEach((r,i)=>{if(r.have){const k=tup(i);if(k&&ledger.get(k))ledger.set(k,ledger.get(k)-1)}});
     p.rows.forEach((r,i)=>{if(r.have)return;const k=tup(i);if(k&&(ledger.get(k)||0)>0){ledger.set(k,ledger.get(k)-1);r.have=true;r.haveNote='Already in your ledger (same day, amount and account)'}})}
+  if(p.t==='invest_holdings'){
+    const hx=holdIndex(),byE=new Map((D().invest_holdings||[]).filter(h=>h.ext_key).map(h=>[h.ext_key,h]));
+    p.rows.forEach(r=>{r.match=byE.get(r.ext)||hx.get(r.hk)||null});
+    /* a dry run over every row tells which saved holdings would really change */
+    let ids=new Set();
+    try{const ok=[];recs.forEach((rc,i)=>{if(!rc.__bad)ok.push(rc)});const dry=apiTransform(pdfConn(p,fmx,st),ok);dry.items.forEach(x=>{if(x.kind==='update')ids.add(x.id)})}catch(e){ids=new Set()}
+    p.rows.forEach(r=>{if(!r.match)return;if(ids.has(r.match.id))r.upd=true;else{r.have=true;r.haveNote=canDo('invest_holdings','update')==='deny'?'Already saved (your account cannot change it)':'Already saved, nothing changed'}})}
   const vsim=vt&&vt.sim?vt.sim(recs,p):null;
   /* rows that look like something you already have (same name and date) are not ticked at first */
   if(markSim){
-    const simF=PDF_SIMF[p.t],likes=simF?new Set((D()[pdfTbl(p.t)]||[]).map(r=>pdfSimKey(p.t,r))):null;
+    const simF=p.t==='invest_holdings'?null:PDF_SIMF[p.t],likes=simF?new Set((D()[pdfTbl(p.t)]||[]).map(r=>pdfSimKey(p.t,r))):null;
     p.rows.forEach((r,i)=>{
       r.sim=false;r.simNote='';
       if(vsim&&!r.have){r.simNote=vsim[i]||'';r.sim=!!r.simNote}
@@ -17247,19 +17259,23 @@ function pdfRecompute(markSim){
   const selT=sel.filter(i=>!recs[i].__bad);
   try{p.plan=apiTransform(c,selT.map(i=>recs[i]))}catch(e){p.planErr=e.message;p.sum={n:0,have:nHaveAll,dup:0,bad:0,sel:sel.length};return}
   const bad=new Map(p.plan.invalid.map(x=>[x.i,x.reason])),seen=new Set();
-  let nDup=0,nBad=0,nNew=0;
+  let nDup=0,nBad=0,nNew=0,nUpd=0;
   sel.forEach(ri=>{if(recs[ri].__bad){p.rowSt[ri]={k:'bad',msg:recs[ri].__bad};nBad++}});
   selT.forEach((ri,n)=>{
     const ext=p.rows[ri].ext;
     if(seen.has(ext)){p.rowSt[ri]={k:'dup'};nDup++;return}seen.add(ext);
     if(p.rows[ri].have){p.rowSt[ri]={k:'have'};return}
+    if(p.rows[ri].upd){p.rowSt[ri]={k:'upd'};nUpd++;return}
     if(bad.has(n+1)){p.rowSt[ri]={k:'bad',msg:recs[ri].__bad||bad.get(n+1)};nBad++;return}
     p.rowSt[ri]={k:'new'};nNew++});
   p.unres=p.plan.unresolved;
-  p.sum={n:nNew,have:nHaveAll,dup:nDup,bad:nBad,sel:sel.length}}
+  p.sum={n:nNew+nUpd,add:nNew,upd:nUpd,have:nHaveAll,dup:nDup,bad:nBad,sel:sel.length}}
 function pdfConn(p,fm,st){
   const idm={};Object.keys(fm).forEach(k=>idm[k]=k);
-  return {id:'pdfimport',name:'PDF import',target_table:pdfTbl(p.t),field_map:idm,static_values:st,translations:'',key_prefix:'pdf:'+pdfTbl(p.t)+':',id_field:(PDF_VT[p.t]&&PDF_VT[p.t].keyOf?'__x':''),sync_mode:'Add new only',match_field:null,create_only:[]}}
+  const hold=p.t==='invest_holdings',upd=hold&&canDo('invest_holdings','update')!=='deny';
+  const c={id:'pdfimport',name:'PDF import',target_table:pdfTbl(p.t),field_map:idm,static_values:st,translations:'',key_prefix:'pdf:'+pdfTbl(p.t)+':',id_field:((PDF_VT[p.t]&&PDF_VT[p.t].keyOf)||hold?'__x':''),sync_mode:upd?'Add new and update existing':'Add new only',match_field:null,create_only:[]};
+  if(hold){c.adoptAny=true;c.adoptFn=(rec,row)=>holdIndex().get(holdKeyOf(row,st))||null}
+  return c}
 
 /* ---------- Part 4 · screens ---------- */
 const pdfO=(v,l,sel)=>`<option value="${esc(v)}" ${String(v)===String(sel)?'selected':''}>${esc(l)}</option>`;
@@ -17287,7 +17303,8 @@ function pdfFoot(){
   if(p.stage==='error')return cancel+`<button class="btn p" data-act="pdfagain">Choose another file</button>`;
   if(p.stage==='done')return (p.doc&&p.doc.tables.length>(p.usedTables||[]).length?`<button class="btn" data-act="pdfnext">Import another table from this file</button>`:'')+`<button class="btn" data-act="pdfagain">Import another file</button>`+cancel;
   return cancel+`<button class="btn p" id="pdf_go" data-act="pdfgo" ${!(p.sum&&p.sum.n>0)||canDo(pdfTbl(p.t),'create')!=='allow'?'disabled':''}>${pdfGoLabel()}</button>`}
-function pdfGoLabel(){const p=S.pdf,n=p.sum?p.sum.n:0;return `${ic('up',15)} Add ${n} ${n===1?pdfM(p.t).one.toLowerCase():pdfM(p.t).many.toLowerCase()}`}
+function pdfGoLabel(){const p=S.pdf,n=p.sum?p.sum.n:0,u=p.sum&&p.sum.upd?p.sum.upd:0,a=n-u,nm=k=>k===1?pdfM(p.t).one.toLowerCase():pdfM(p.t).many.toLowerCase();
+  if(u)return `${ic('up',15)} ${a?'Add '+a+', ':''}update ${u} saved`;return `${ic('up',15)} Add ${n} ${nm(n)}`}
 function pdfBody(){
   const p=S.pdf;
   if(p.stage==='pick')return pdfPickHtml();
@@ -17299,15 +17316,15 @@ function pdfBody(){
 function pdfPickHtml(){
   const p=S.pdf,mt=pdfM(p.t);
   return `${pdfIntoSel(p)?`<div style="max-width:340px;margin-bottom:12px">${pdfIntoSel(p)}</div>`:''}
-  <div class="pdfdrop" id="pdfdrop"><div class="pdfpickw"><label class="btn p pdfpick" for="pdf_file">${ic('up',15)} Choose a PDF, picture or CSV file</label><input class="sr" id="pdf_file" type="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.csv,.tsv,.txt,text/csv,text/plain" data-change="pdffile"></div><p class="sm ink2" style="margin-top:10px">or drop the file here</p></div>
-  <p class="sm ink2" style="margin-top:12px">Polaris One reads the table or the list in your file and shows it to you before anything is saved. You can correct the cells, choose which column is which, and untick rows. A <b>PDF</b> is read from the text stored in it; a <b>CSV</b> file (from Excel, Google Sheets or any spreadsheet) is the most reliable way to bring in a long list.</p>
-  <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn s" data-act="pdftpl">${ic('down',14)} CSV template for ${esc(mt.many.toLowerCase())}</button><span class="sm mut">Column titles and an example row to fill in Excel or Google Sheets.</span></div>
-  <details style="margin-top:8px"><summary class="sm b" style="cursor:pointer">Tips for the best result</summary><ul class="sm ink2" style="padding-left:20px;line-height:1.7;margin:6px 0 0"><li>PDF: one saved from Word, Excel, Google Docs, a website or an HR / training system works best, because its text can be selected.</li><li>A scan or a photo of a page has no text. Make it a searchable PDF first (for example with your phone's scanner app or Adobe's Recognize Text).</li><li>CSV: put the column titles in the first row. In Excel use File → Save As → “CSV UTF-8”. Commas, semicolons and tabs are all understood, and so is a file you exported from Polaris One.</li><li>Tables: English and Indonesian column titles are understood (Kegiatan, Mulai, Selesai, Jabatan, Sertifikat …). If a title is not recognised, choose the field yourself above the column.</li><li>Lists (PDF only): one item per line. A date line (for example “Senin, 12 Oktober 2026”) sets the day for the lines below it.</li><li>Importing the same file twice does not add the rows twice.</li></ul></details>`}
+  <div class="pdfdrop" id="pdfdrop"><div class="pdfpickw"><label class="btn p pdfpick" for="pdf_file">${ic('up',15)} Choose a PDF, picture, CSV or JSON file</label><input class="sr" id="pdf_file" type="file" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.csv,.tsv,.txt,.json,application/json,text/csv,text/plain" data-change="pdffile"></div><p class="sm ink2" style="margin-top:10px">or drop the file here</p></div>
+  <p class="sm ink2" style="margin-top:12px">Polaris One reads the table or the list in your file and shows it to you before anything is saved. You can correct the cells, choose which column is which, and untick rows. A <b>PDF</b> is read from the text stored in it, and a <b>scanned PDF or a picture</b> is read with OCR on this device; a <b>JSON</b> file is a list of records; a <b>CSV</b> file (from Excel, Google Sheets or any spreadsheet) is the most reliable way to bring in a long list.</p>
+  <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn s" data-act="pdftpl">${ic('down',14)} CSV template for ${esc(mt.many.toLowerCase())}</button>${PDF_SAMPLE[p.t]?`<button class="btn s" data-act="pdftplj">${ic('down',14)} JSON template</button>`:''}<span class="sm mut">Column titles and an example row to fill in Excel or Google Sheets, or a JSON list to fill in any editor.</span></div>${p.t==='invest_holdings'?`<p class="sm ink2" style="margin-top:8px"><b>Already saved holdings are updated, never added twice.</b> A holding is the same one when its name, date and platform are the same: importing it again only changes its quantity, price and values.</p>`:''}
+  <details style="margin-top:8px"><summary class="sm b" style="cursor:pointer">Tips for the best result</summary><ul class="sm ink2" style="padding-left:20px;line-height:1.7;margin:6px 0 0"><li>PDF: one saved from Word, Excel, Google Docs, a website or an HR / training system works best, because its text can be selected.</li><li>A scan or a photo of a page has no text, so it is read with OCR (about 6 MB are loaded the first time). Use a sharp, straight-on picture, and check every amount: OCR can misread a digit.</li><li>CSV: put the column titles in the first row. In Excel use File → Save As → “CSV UTF-8”. Commas, semicolons and tabs are all understood, and so is a file you exported from Polaris One.</li><li>Tables: English and Indonesian column titles are understood (Kegiatan, Mulai, Selesai, Jabatan, Sertifikat …). If a title is not recognised, choose the field yourself above the column.</li><li>Lists (PDF only): one item per line. A date line (for example “Senin, 12 Oktober 2026”) sets the day for the lines below it.</li><li>Importing the same file twice does not add the rows twice.</li></ul></details>`}
 function pdfDoneHtml(){
   const p=S.pdf,r=p.result||{};
-  return `<div class="callout" style="background:var(--greensoft);color:var(--greent)">${ic('check')}<div role="status"><b>${r.created} ${r.created===1?pdfM(p.t).one.toLowerCase():pdfM(p.t).many.toLowerCase()} added from ${esc(p.name||'the file')}.</b></div></div>
-  <p class="sm ink2" style="margin-top:10px">${r.have?`${r.have} row${r.have>1?'s were':' was'} already imported earlier and ${r.have>1?'were':'was'} left alone. `:''}${r.dup?`${r.dup} repeated row${r.dup>1?'s were':' was'} added once. `:''}${r.bad?`${r.bad} incomplete row${r.bad>1?'s were':' was'} skipped. `:''}${r.left?`${r.left} row${r.left>1?'s were':' was'} not ticked. `:''}</p>
-  <div class="row" style="margin-top:10px"><button class="btn d" data-act="pdfundo" data-i="0">${ic('trash',14)} Undo this import</button><span class="sm mut">Removes only the rows this import added.</span></div>`}
+  return `<div class="callout" style="background:var(--greensoft);color:var(--greent)">${ic('check')}<div role="status"><b>${r.created} ${r.created===1?pdfM(p.t).one.toLowerCase():pdfM(p.t).many.toLowerCase()} added${r.updated?' and '+r.updated+' saved one'+(r.updated>1?'s':'')+' updated':''} from ${esc(p.name||'the file')}.</b></div></div>
+  <p class="sm ink2" style="margin-top:10px">${r.have?(p.t==='invest_holdings'?`${r.have} row${r.have>1?'s were':' was'} already saved with the same figures and ${r.have>1?'were':'was'} left alone. `:`${r.have} row${r.have>1?'s were':' was'} already imported earlier and ${r.have>1?'were':'was'} left alone. `):''}${r.dup?`${r.dup} repeated row${r.dup>1?'s were':' was'} added once. `:''}${r.bad?`${r.bad} incomplete row${r.bad>1?'s were':' was'} skipped. `:''}${r.left?`${r.left} row${r.left>1?'s were':' was'} not ticked. `:''}</p>
+  ${r.created?`<div class="row" style="margin-top:10px"><button class="btn d" data-act="pdfundo" data-i="0">${ic('trash',14)} Undo this import</button><span class="sm mut">Removes only the rows this import added${r.updated?'. Saved rows that were updated keep their new figures (edit them in the list to change back)':''}.</span></div>`:''}`}
 
 function pdfSuggestHtml(p){
   const g=pdfGroup(p);if(!g||p.tableIdx<0)return '';
@@ -17326,12 +17343,15 @@ function pdfReviewHtml(){
   if(blank)warn.push(`${blank} page${blank>1?'s have':' has'} no readable text (a picture or a scan). Those pages are skipped.`);
   if(p.capped)warn.push(`Only the first ${PDF_MAXROWS} rows are shown. Split the file to import the rest.`);
   if(p.fileSeen)warn.push('This exact file was already imported on '+String(p.fileSeen.at||'').slice(0,10)+(p.fileSeen.n?' ('+p.fileSeen.n+' lines added)':'')+'. Lines that are already in your ledger are left alone, so importing it again adds nothing new.');
+  if(p.ocrFailed)warn.push('OCR could not read more than the stored text, so the stored text is shown.');
   if(doc.ocr)warn.push('This file is a picture, so its text was recognised by OCR (Tesseract, on this device). OCR can misread a digit: check every amount against the original before you import.');
   if(doc.rotated)warn.push('Some sideways or upside-down text was ignored.');
   if(p.prose)warn.push('This looks like running text, not a table or a list, so every line would become a record. Nothing is ticked yet: tick the lines you really want, or choose a table above.');
-  const info=doc.tpl?`<b>${esc(p.name||'')}</b> · ${esc(doc.tpl.label)} · ${doc.tpl.rows.length} lines`:doc.csv?`<b>${esc(p.name||'')}</b> · CSV file · ${doc.tables[0]?doc.tables[0].cols.length:0} columns`:`<b>${esc(p.name||'')}</b> · ${doc.numPages} page${doc.numPages>1?'s':''}${doc.removed?` · ${doc.removed} header/footer line${doc.removed>1?'s':''} ignored`:''}`;
+  const ocrBtn=(!doc.ocr&&p.file&&!doc.csv&&!doc.json&&/pdf|image/.test(pdfKindOf(p.file)))?`<div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn s" data-act="pdfocr">${ic('search',14)} Read it again with OCR</button><span class="sm mut">Use it when the numbers or words above look wrong (a scan with a hidden text layer).</span></div>`:'';
+  const info=doc.json?`<b>${esc(p.name||'')}</b> · JSON file · ${doc.tables[0]?doc.tables[0].cols.length:0} fields`:doc.tpl?`<b>${esc(p.name||'')}</b> · ${esc(doc.tpl.label)} · ${doc.tpl.rows.length} lines`:doc.csv?`<b>${esc(p.name||'')}</b> · CSV file · ${doc.tables[0]?doc.tables[0].cols.length:0} columns`:`<b>${esc(p.name||'')}</b> · ${doc.numPages} page${doc.numPages>1?'s':''}${doc.removed?` · ${doc.removed} header/footer line${doc.removed>1?'s':''} ignored`:''}`;
   return `<p class="sm ink2" style="margin:0 0 10px">${info}</p>
   ${warn.map(w=>`<div class="callout warn" style="background:var(--ambersoft);color:#6B4400;margin-bottom:8px">${ic('alert')}<div>${esc(w)}</div></div>`).join('')}
+  ${ocrBtn}
   <div id="pdfsugg">${pdfSuggestHtml(p)}</div>
   <div id="pdfopts">${pdfOptsHtml()}</div>
   <div id="pdfsum" aria-live="polite" style="margin:12px 0 8px">${pdfSumHtml()}</div>
@@ -17378,12 +17398,12 @@ function pdfSumHtml(){
   const p=S.pdf,s=p.sum||{n:0,have:0,dup:0,bad:0,sel:0},total=p.rows.length,left=total-(s.sel||0),sim=p.rows.filter(r=>r.sim&&!r.on&&!r.have).length,leftHave=p.rows.filter(r=>r.have&&!r.on).length;
   if(p.planErr)return `<div class="callout warn" style="background:var(--ambersoft);color:#6B4400">${ic('alert')}<div>${esc(p.planErr)} Choose what each column is, using the lists in the table header.</div></div>`;
   const unmapped=Object.keys(p.fm||{}).length===0;
-  return `<div class="row" style="gap:8px;flex-wrap:wrap">${badge(s.n+' will be added','green')}${s.have?badge(s.have+' already imported','slate'):''}${sim?badge(sim+' look like ones you already have','amber'):''}${s.bad?badge(s.bad+' incomplete','red'):''}${s.dup?badge(s.dup+' repeated in the file','slate'):''}${left-sim-leftHave>0?badge((left-sim-leftHave)+' not ticked','slate'):''}${p.unres?badge(p.unres+' name'+(p.unres>1?'s':'')+' could not be linked','amber'):''}<span class="sm mut">${total} row${total===1?'':'s'} in the ${p.doc&&p.doc.csv?'file':'PDF'}</span></div>${unmapped?`<p class="sm" style="color:var(--ambert);margin-top:6px">No column is matched yet. Choose what each column is, using the lists in the table header.</p>`:''}`}
+  return `<div class="row" style="gap:8px;flex-wrap:wrap">${badge((s.upd?s.n-s.upd:s.n)+' will be added','green')}${s.upd?badge(s.upd+' will update a saved one','blue'):''}${s.have?badge(s.have+(p.t==='invest_holdings'?' saved, no change':' already imported'),'slate'):''}${sim?badge(sim+' look like ones you already have','amber'):''}${s.bad?badge(s.bad+' incomplete','red'):''}${s.dup?badge(s.dup+' repeated in the file','slate'):''}${left-sim-leftHave>0?badge((left-sim-leftHave)+' not ticked','slate'):''}${p.unres?badge(p.unres+' name'+(p.unres>1?'s':'')+' could not be linked','amber'):''}<span class="sm mut">${total} row${total===1?'':'s'} in the ${p.doc&&p.doc.csv?'file':'PDF'}</span></div>${unmapped?`<p class="sm" style="color:var(--ambert);margin-top:6px">No column is matched yet. Choose what each column is, using the lists in the table header.</p>`:''}`}
 function pdfRowBadge(i){
   const p=S.pdf,r=p.rows[i],st=p.rowSt&&p.rowSt[i];
-  if(!r.on)return r.have?badge('Already imported','slate'):r.sim?badge(r.simNote?trunc(r.simNote,60):'Looks like one you have','amber'):r.weak?badge(r.weakWhy||'Looks like a heading','amber'):badge('Not ticked','slate');
+  if(!r.on)return r.have?badge(p.t==='invest_holdings'?'Saved, no change':'Already imported','slate'):r.sim?badge(r.simNote?trunc(r.simNote,60):'Looks like one you have','amber'):r.weak?badge(r.weakWhy||'Looks like a heading','amber'):badge('Not ticked','slate');
   if(!st)return '';
-  return st.k==='new'?badge('Will be added','green'):st.k==='have'?badge('Already imported','slate'):st.k==='dup'?badge('Repeated','slate'):badge(st.msg||'Incomplete','red')}
+  return st.k==='new'?badge('Will be added','green'):st.k==='upd'?badge('Will update the saved one','blue'):st.k==='have'?badge(p.t==='invest_holdings'?'Saved, no change':'Already imported','slate'):st.k==='dup'?badge('Repeated','slate'):badge(st.msg||'Incomplete','red')}
 function pdfTableHtml(){
   const p=S.pdf,m=pdfM(p.t),fields=pdfFlds(p.t),per=PDF_PER,vtx=PDF_VT[p.t]&&PDF_VT[p.t].extraCell?PDF_VT[p.t]:null,pages=Math.max(1,Math.ceil(p.rows.length/per));
   p.pg=Math.min(Math.max(0,p.pg||0),pages-1);
@@ -17432,15 +17452,42 @@ ACT.pdftpl=()=>{
   const rows=[fs.map(f=>q(f.l)),...(PDF_SAMPLE[t]||[]).map(r=>fs.map(f=>q(f.t==='date'&&r[f.k]?fmtD(r[f.k]):r[f.k])))];
   download('polaris-one-template-'+t+'.csv','\ufeff'+rows.map(r=>r.join(sep)).join('\r\n')+'\r\n','text/csv');
   toast('Template downloaded. Fill it in, save it as CSV, then choose it here.')};
+ACT.pdftplj=()=>{
+  const p=S.pdf;if(!p)return;const t=p.t,fs=PDF_VT[t]&&PDF_VT[t].tplFields?PDF_VT[t].tplFields.map(k=>pdfField(t,k)):pdfFlds(t);
+  const rows=(PDF_SAMPLE[t]||[]).map(r=>{const o={};fs.forEach(f=>{if(r[f.k]!==undefined)o[f.k]=r[f.k]});return o});
+  const key=t==='invest_holdings'?'holdings':'rows';
+  download('polaris-one-template-'+t+'.json',JSON.stringify({format:'polaris-import/1',[key]:rows},null,2),'application/json');
+  toast('Template downloaded. Keep the field names, change the values, then choose the file here.')};
+ACT.pdfocr=()=>{const p=S.pdf;if(!p||!p.file)return;pdfStart(p.file,p._pw,{ocr:true})};
 CHG.pdfinto=el=>{
   const p=S.pdf;if(!p)return;p.t=el.value;p.def=pdfDef0(p.t);pdfAcctApply(p);
   if(p.stage==='pick')return;
   pdfAuto(p);pdfBuild(p);pdfRecompute(true);pdfPaint()};
 CHG.pdffile=el=>{const f=el.files&&el.files[0];el.value='';if(f)pdfStart(f)};
+/* JSON import: a list of records, or an object holding the list ("holdings", "rows", "items", "records", "data"). Top-level single values
+   (as_of, platform, currency…) are the default for every record that has none. Nested values are written as text. */
+function pdfJsonToCsv(txt,t){
+  let j;try{j=JSON.parse(String(txt).replace(/^﻿/,''))}catch(e){return {err:'This is not valid JSON ('+e.message+'). Check commas and quotation marks, or export the file again.'}}
+  let list=null,def={};
+  if(Array.isArray(j))list=j;
+  else if(j&&typeof j==='object'){
+    const key=['holdings','rows','items','records','data','entries','positions'].find(k=>Array.isArray(j[k]))||Object.keys(j).find(k=>Array.isArray(j[k])&&j[k].length&&typeof j[k][0]==='object');
+    if(key){list=j[key];Object.keys(j).forEach(k=>{const v=j[k];if(k!==key&&v!==null&&typeof v!=='object'&&!/^(format|version|app|exported_at|generated|note|notes?)$/i.test(k))def[k]=v})}}
+  if(!list)return {err:'The JSON file must be a list of records, or an object that holds one, such as {"holdings":[ … ]}.'};
+  list=list.filter(r=>r&&typeof r==='object'&&!Array.isArray(r));
+  if(!list.length)return {err:'The JSON file has no records (each record must be an object with fields).'};
+  if(list.length>PDF_MAXROWS)return {err:'The JSON file has '+list.length+' records. The limit is '+PDF_MAXROWS+' per file; split it.'};
+  const cols=[];const add=k=>{if(!cols.includes(k))cols.push(k)};
+  list.forEach(r=>Object.keys(r).forEach(add));Object.keys(def).forEach(add);
+  const q=v=>{v=v==null?'':typeof v==='object'?JSON.stringify(v):String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const lines=[cols.map(q).join(',')];
+  list.forEach(r=>lines.push(cols.map(c=>q(r[c]!==undefined&&r[c]!==null&&r[c]!==''?r[c]:def[c])).join(',')));
+  return {csv:lines.join('\r\n')}}
 const pdfKindOf=f=>{const n=String(f.name||'').toLowerCase(),t=String(f.type||'').toLowerCase();
   if(/\.pdf$/.test(n)||t==='application/pdf')return 'pdf';
   if(/\.(csv|tsv|tab|txt)$/.test(n)||/^text\/(csv|tab-separated-values|plain)/.test(t)||t==='application/csv')return 'csv';
   if(/\.(jpe?g|png|webp)$/.test(n)||/^image\/(jpeg|png|webp)$/.test(t))return 'image';
+  if(/\.json$/.test(n)||t==='application/json')return 'json';
   if(/\.(xlsx|xlsm|xlsb|xls|ods|numbers)$/.test(n))return 'sheet';
   if(/\.(docx?|odt|rtf|pages)$/.test(n))return 'doc';
   return ''};
@@ -17455,17 +17502,28 @@ async function pdfFileRemember(p,n){
   const cur=Object.assign({},prefs().pdf_files||{});cur[p.fhash]={at:nowISO(),name:trunc(p.name||'',60),n:(p.fileSeen?p.fileSeen.n:0)+n,t:p.t};
   const keys=Object.keys(cur).sort((a,b)=>String(cur[b].at).localeCompare(String(cur[a].at))).slice(0,300),o={};keys.forEach(k=>{o[k]=cur[k]});
   await setPrefs({pdf_files:o})}
-async function pdfStart(file,password){
-  const p=S.pdf;if(!p)return;
+async function pdfStart(file,password,opts){
+  opts=opts||{};const p=S.pdf;if(!p)return;p._pw=password||p._pw||undefined;
   const fail=m=>{p.stage='error';p.err=esc(m);pdfPaint()};
   const kind=pdfKindOf(file);
   if(kind==='sheet')return fail('A spreadsheet file (Excel, Numbers, OpenDocument) cannot be read directly. In Excel choose File → Save As → “CSV UTF-8 (Comma delimited)”; in Google Sheets choose File → Download → Comma-separated values (.csv). Then choose that file here. A PDF of the sheet works too.');
   if(kind==='doc')return fail('A word-processor document cannot be read directly. Save or export it as a PDF (File → Save As → PDF), then choose the PDF here. A table copied into Excel and saved as CSV works too.');
-  if(!kind)return fail('That file is not a PDF, a picture or a CSV file. Choose a file whose name ends in .pdf, .jpg, .png or .csv.');
+  if(!kind)return fail('That file is not a PDF, a picture or a CSV file. Choose a file whose name ends in .pdf, .jpg, .png, .csv or .json.');
   if(file.size>PDF_MAXBYTES)return fail('That file is larger than 40 MB. Split it into smaller files and import them one by one.');
   if(canDo(pdfTbl(p.t),'create')==='deny')return fail('Your account is not allowed to add '+pdfNice(p.t).toLowerCase()+'.');
   try{p.fhash=await pdfFileHash(file);const fs0=(prefs().pdf_files||{})[p.fhash];p.fileSeen=fs0||null}catch(e){p.fhash='';p.fileSeen=null}
-  p.file=file;p.name=file.name;p.stage='reading';p.pct=kind==='csv'?100:0;p.msg=kind==='csv'?'Reading the file…':kind==='image'?'Opening the picture…':'Opening the PDF…';p.usedTables=[];pdfPaint();
+  p.file=file;p.ocrFailed=false;p.name=file.name;p.stage='reading';p.pct=(kind==='csv'||kind==='json')?100:0;p.msg=(kind==='csv'||kind==='json')?'Reading the file…':kind==='image'?'Opening the picture…':'Opening the PDF…';p.usedTables=[];pdfPaint();
+  if(kind==='json'){
+    try{
+      const txt=pdfDecode(new Uint8Array(await file.arrayBuffer()));
+      if(S.pdf!==p)return;
+      const conv=pdfJsonToCsv(txt,p.t);
+      if(conv.err)return fail(conv.err);
+      const doc=PDFI_L.csvToDoc(conv.csv,file.name.replace(/\.[^.]+$/,''));
+      if(!doc.tables.length||doc.tables[0].rows.length-(doc.tables[0].header?1:0)<1)return fail('The JSON file has no records. Put one object per record in a list, for example {"holdings":[{"name":"…","as_of":"2026-11-27","platform":"…","quantity":1,"price":1}]}.');
+      doc.json=true;p.doc=doc;pdfAuto(p);pdfBuild(p);pdfAcctInit(p);pdfRecompute(true);p.stage='review'}
+    catch(e){if(S.pdf!==p)return;console.warn('json',e);return fail('The JSON file could not be read: '+(e&&e.message||e))}
+    pdfPaint();return}
   if(kind==='csv'){
     try{
       const u=new Uint8Array(await file.arrayBuffer());
@@ -17481,16 +17539,16 @@ async function pdfStart(file,password){
     catch(e){if(S.pdf!==p)return;console.warn('csv',e);return fail('The file could not be read: '+(e&&e.message||e))}
     pdfPaint();return}
   try{
-    let doc=kind==='image'?{chars:0,pages:[],tables:[],numPages:1,readPages:1}:await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
+    let doc=(kind==='image')?{chars:0,pages:[],tables:[],numPages:1,readPages:1}:await pdfRead(file,password,(i,n)=>{if(S.pdf!==p)return;p.pct=Math.round(i/n*100);p.msg='Reading page '+i+' of '+n+'…';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
     if(S.pdf!==p)return;
     p.doc=doc;
     let ocrErr=null;
-    if(doc.chars<12){
+    if(doc.chars<12||opts.ocr){
       try{
-        const od=await pdfOcr(file,password,(i,n,m)=>{if(S.pdf!==p)return;p.pct=n?Math.round(i/n*100):0;p.msg=m||'';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
+        const od=await pdfOcr(file,p._pw,(i,n,m)=>{if(S.pdf!==p)return;p.pct=n?Math.round(i/n*100):0;p.msg=m||'';const a=$('#pdfmsg'),b=$('#pdfbar');if(a)a.textContent=p.msg;if(b)b.innerHTML=pbar(p.pct)});
         if(S.pdf!==p)return;
-        if(od&&od.chars>=12){doc=od;p.doc=od;p.ocr=true}}
-      catch(e){if(S.pdf!==p)return;ocrErr=e;console.warn('ocr',e)}}
+        if(od&&od.chars>=12){doc=od;p.doc=od;p.ocr=true}else if(opts.ocr)p.ocrFailed=true}
+      catch(e){if(S.pdf!==p)return;ocrErr=e;if(opts.ocr)p.ocrFailed=true;console.warn('ocr',e)}}
     if(doc.chars<12){p.stage='error';p.err=`<b>No text found in this file.</b> It is a scan or a picture, and Polaris One could not read the letters in it with OCR.<br>Try a sharper, straight-on picture, or make a searchable PDF first, for example with your phone’s scanner app (“save as searchable PDF”), Adobe Acrobat’s <i>Recognize Text</i>, or by opening the file with Google Docs. Then import that file.<br>Mandiri Livin’ e-Statement saved as pictures? Use the monthly <i>Rekening Koran / Statement of Account</i> PDF instead: it has the same lines as text and is recognised automatically. A BNI “Laporan Mutasi Rekening” that is a picture needs a text version (m-Banking or BNI Direct export) or CSV.`+(ocrErr?'<br><b>Reading the picture (OCR) did not work:</b> '+esc((ocrErr&&ocrErr.message)||String(ocrErr)):'')}
     else{
       const tp=pdfTplDetect(doc);
@@ -17535,7 +17593,7 @@ ACT.pdfgo=el=>busy(el,async()=>{
     const c=pdfConn(p,p.fmx||p.fm,p.st),res=await apiApply(c,p.plan);
     await pdfAcctAfter(p,res);
     p.usedTables=(p.usedTables||[]).concat(p.tableIdx>=0?[p.tableIdx]:[]);
-    p.result={created:res.created,have:sum.have,dup:sum.dup,bad:sum.bad,left,ids:res.ids};
+    p.result={created:res.created,updated:res.updated||0,have:sum.have,dup:sum.dup,bad:sum.bad,left,ids:res.ids};
     await pdfHistAdd(p,res);
     try{await pdfFileRemember(p,res.created||0)}catch(e){console.warn(e)}
     p.stage='done';pdfPaint();renderView()}
@@ -20373,7 +20431,7 @@ VIEWS['guide/new']=function(){let h=_guideNew18.apply(this,arguments);const o=RE
     Activities, Daily Action and, from Settings → Data & backup, any module)
    ===================================================================== */
 putFaq('How do I add many activities or actions from a PDF?','Open Execute → Activities or Execute → Daily Action and press “Import PDF” (next to Back-date). Choose the file or drop it on the box. Polaris One reads the text in the PDF, finds the table (or the list) and shows every row before anything is saved. Check which column is which, untick rows you do not want, then press “Add … rows”. From Settings → Data & backup → “Import from a PDF” you can also fill another module, for example KPIs or Problems.','What does the name Polaris One mean?');
-putFaq('Which PDFs can be read, and which cannot?','A PDF whose text can be selected: saved from Word, Excel, Google Docs, a website, or exported by a planning or school program. A scan or a photo of a page has no text, and Polaris One does not do OCR, so it says so instead of guessing; make it a searchable PDF first (a phone scanner app can do this). A PDF with a password asks for it. Limits for one file: 40 MB, 300 pages, 5000 rows (split bigger files). Very unusual layouts, for example text in two newspaper columns, may be read wrongly, which is why you always see the rows first.','How do I add many activities or actions from a PDF?');
+putFaq('Which PDFs can be read, and which cannot?','A PDF whose text can be selected: saved from Word, Excel, Google Docs, a website, or exported by a planning or school program. A scan or a photo of a page has no text, so it is read with OCR on your device (the reader of about 6 MB is loaded the first time; nothing is uploaded). OCR can misread a digit, so check every amount. If a PDF has a hidden text layer that looks wrong, press Read it again with OCR. A PDF with a password asks for it. Limits for one file: 40 MB, 300 pages, 5000 rows (split bigger files). Very unusual layouts, for example text in two newspaper columns, may be read wrongly, which is why you always see the rows first.','How do I add many activities or actions from a PDF?');
 putFaq('Is my PDF uploaded anywhere?','No. The file is opened and read inside your browser, on your own device. Only the rows you approve are saved, the same way as any record you type. The PDF reader (pdf.js, Apache-2.0 licence) is part of the Polaris One file and starts only when you press Import PDF. It needs a current browser: Chrome or Edge, Safari 16.4 or newer, Firefox 113 or newer.','Which PDFs can be read, and which cannot?');
 putFaq('A column was read wrongly, or I imported by mistake. What now?','Above each column of the preview there is a menu: choose the field it belongs to, or “Do not import”. You can also type over any cell, untick rows, switch to another table in the PDF, or read it as a list with one record per line. If the PDF does not say something the record needs (a date for an action, a year and a target for a KPI), a box opens where you give one value for all rows. After the import, “Undo this import” removes exactly the rows that import added, however many (it stays available under Settings → Data & backup for your two most recent imports). Importing the same PDF again does not add the same rows twice.','Is my PDF uploaded anywhere?');
 putFaq('Does the PDF understand Bahasa Indonesia?','Yes for the usual words. Column titles such as Kegiatan, Aktivitas, Tanggal, Mulai, Selesai, Prioritas, Tinggi, Catatan or Penanggung jawab are recognised, dates like 08/11/2026 or 8 Nov 2026 are read day first, and statuses and priorities in Bahasa Indonesia become the Polaris One ones. A time range such as 07.00–08.30 becomes a start time and a duration. If a title is not recognised, choose the field yourself in the menu above the column.','A column was read wrongly, or I imported by mistake. What now?');
@@ -20392,7 +20450,7 @@ RELEASE_NOTES.unshift({rev:19,date:'2026-10-12',groups:[
   ['You check everything before it is saved','Choose which column is which, correct a cell, untick rows, switch to another table in the PDF or read it as a list. A row that is repeated in the PDF is added once, and a row that was already imported earlier is left alone; both are counted for you. 40 rows are shown at a time, however long the file.'],
   ['Undo, and safe to repeat','“Undo this import” removes only the rows that import added, however many, for your two most recent imports. Importing the same PDF again adds nothing twice.'],
   ['Any module, from Settings → Data & backup','Choose where the rows go, for example KPIs or Problems. If the PDF does not say something that is required (a year and a target for a KPI, a date for an action), you give one value for all rows.','settings','data','Open Data & backup'],
-  ['What it cannot do','No OCR: a scan or a photo has no text, so it is refused with an explanation. One file: up to 40 MB, 300 pages and 5000 rows. The file is read in your browser and never uploaded.']]},
+  ['What it cannot do','A scan or a photo is read with OCR on your device (check every amount, OCR can misread a digit). One file: up to 40 MB, 300 pages and 5000 rows. The file is read in your browser and never uploaded.']]},
  {t:'For the admin',items:[
   ['Replace index.html, nothing else','This revision needs no new schema.sql and no new api-proxy. The PDF reader is inside index.html, so the file is larger than before. It needs a current browser (Chrome or Edge, Safari 16.4+, Firefox 113+).','integrations','hub','Open Connections',1]]}]});
 if(RELEASE_NOTES[1])RELEASE_NOTES[1].earlier=1;
@@ -20432,7 +20490,7 @@ RELEASE_NOTES.unshift({rev:20,date:'2026-10-12',groups:[
   ['Private, with the usual rights','Both tabs belong to you only and are not part of the work data an admin can share. An admin can still hide the tabs per person (Admin → Menus) or limit what a person may add, change or delete (Users & roles → single modules). Evidence can be linked to a position or an event.']]},
  {t:'Reading PDFs from HR and training systems',items:[
   ['Tables that were hard before','Very tight columns, a row number that is glued to the title from row 10 on, two dates in one cell (“13 Dec 2022 14 Dec 2022”), a number set in the middle of a three-line row, the same column titles repeated at the top of every page, and several tables under section titles on the same page are now read correctly. The older sample PDFs read exactly as before.'],
-  ['What it still cannot do','A scan or a photo has no text (no OCR). An Excel, Word or Pages file cannot be chosen directly: save it as CSV or PDF. A layout it has never seen can still be read wrongly, which is why you always see the rows first.']]},
+  ['What it still cannot do','A scan or a photo is read with OCR, so check the amounts. An Excel, Word or Pages file cannot be chosen directly: save it as CSV or PDF. A layout it has never seen can still be read wrongly, which is why you always see the rows first.']]},
  {t:'For the admin',items:[
   ['Run the new schema.sql, then replace index.html','This revision adds two tables (work_experience and seminars). Open Supabase → SQL Editor and run the new schema.sql once: it is safe to run again and does not touch your data. Until then the two tabs show a message that the table is missing; everything else keeps working. The api-proxy function is unchanged.','integrations','hub','Open Connections',1],
   ['Different rules for the new modules','The new tables follow the same permission rules as other modules: an admin can set Add, Change and Delete per person under Users & roles → single modules.','admin','users','Open Users & roles',1]]}]});
@@ -25914,6 +25972,7 @@ const v0=VIEWS['growth/assess'];VIEWS['growth/assess']=function(){const h=String
 })();
 
 RELEASE_NOTES.unshift({rev:109,date:'2026-11-28',groups:[{t:'Home and guidance',items:[['Productivity Toolkit button on Home','Home now has a button that opens the Productivity Toolkit page: Daily Playbook, Eisenhower Matrix, Weekly Rhythm, 20 Time Tips, Focus & Energy, Time & Priority, Goals & Planning.','toolkit','daily','Open Toolkit'],['How to read the XP page','Performance → XP & Progress now explains the four boxes, how levels are counted (with a table of levels), what the progress bars compare, how a day adds up with a worked example, and where to choose the weights.','performance','xp','Open XP & Progress']]},{t:'Market Desk',items:[['Crypto inputs go to Notion','Market Desk → Crypto can send its inputs to one row of a Notion database (key: ticker + goal, e.g. BTC BUY). The row is updated when you change an input, and created only when no row has that key. The Analisa pasar card then shows the page written in Notion; the price ranges and the TUNGGU / TAHAN card are unchanged. A database map lists every property.','market','analysis','Open Market Analysis']]},{t:'Tools',items:[['Read a PDF or picture (OCR)','Home → Read PDF / picture (OCR) reads the text of a PDF, or a scan or photo, in Indonesian and English. A PDF with text is read from its text; pages that are only a picture are read with OCR on this device. Nothing is uploaded.',null,null,null]]}]});
+RELEASE_NOTES.unshift({rev:111,date:'2026-11-29',groups:[{t:'Market Desk',items:[['Import a statement: JSON','Market → Portfolio → Import a statement now also takes a JSON file (a list of holdings, or {"holdings":[…]}); a JSON template can be downloaded next to the CSV template.','market','portfolio','Open Portfolio'],['Updates, never duplicates','A holding is the same one when its name, date and platform match. Importing it again (from a PDF, a scan, a CSV or JSON) updates the saved row, whether you typed it or imported it before, and is never added twice. The review shows what will be added, what will update a saved one and what is unchanged.','market','portfolio','Open Portfolio'],['OCR for scanned statements','A scanned PDF or a picture is read with OCR on your device. A new button, Read it again with OCR, forces it when a PDF has a hidden text layer that looks wrong.','market','portfolio','Open Portfolio']]}]});
 RELEASE_NOTES.unshift({rev:110,date:'2026-11-28',groups:[{t:'Version 3.0 · Advanced',items:[['Thinking Frameworks','A new menu in the Advanced group: 42 thinking frameworks in six categories, each with five short modules you can mark as done, a worksheet, a Recommender (four questions), 8 comparisons, 8 combinations, a progress page and a quick reference you can download.','thinking','library','Open Library'],['Worksheets linked to your records','A session can be linked to a problem, activity, meeting, goal, KPI, risk, improvement, process or project. Each of those records shows its sessions and suggests frameworks that fit it. Sessions export as Markdown or JSON.','thinking','sessions','My sessions'],['Thinking Frameworks in Notion','Connections → Notion has a new card, Notion · Thinking Frameworks. Each session is one row (found by its Polaris ID, never duplicated) with the worksheet written on the page and readable back; the 42-framework catalog can be sent as a second database.','integrations','connections','Open Connections']]},{t:'Market Desk',items:[['Latest news box','Market → Analysis has a Latest news box for every asset model and for any single asset. Write the news or paste a screenshot with Ctrl+V; each choice is kept as an item in the Knowledge Base.','market','analysis','Open Analysis']]},{t:'Skills & Knowledge',items:[['Yearly assessments','Skills & Knowledge → Assessments records each year’s assessment (for example a potential review): DISC, strengths, areas to develop, TIKI, LAI and the work behavioural assessment. Years are compared, areas to develop can be sent to a development plan, and the Competency profile shows the behavioural signals for the target level. A reminder appears when the year’s assessment is missing.','growth','assess','Open Assessments'],['Competency profile','Skills & Knowledge → Competency profile lists your key skills and competencies with a level, built by itself from academics, training, seminars and sharing sessions, work experience, activities, projects and continuous improvement. It also shows which position level your evidence supports and what is missing for the next one (a guide, not a decision). If your position is below what the evidence shows, or the next level has gaps, it lists what to close and can create the plan as a goal with activities.','growth','profile','Open Competency profile']]},{t:'Connected work',items:[['Connected work check','Performance → Connected work checks every activity for five links: goal, KPI, skill & knowledge, lesson learned, analysis & improvement. Gaps get a button that creates the missing item already linked. The same check is shown inside each activity.','performance','chain','Open Connected work']]},{t:'Ease of use',items:[['A calmer left menu','The menu is now in groups (Daily work, Measure & improve, Learn & grow, Life & money, Advanced, System). Nothing was removed.',null,null,null],['Back to top','A round arrow button appears when you scroll down and takes you back to the top.',null,null,null],['Home','Home has a Thinking Frameworks button and a card with your open sessions.','dashboard','overview','Open Home']]}]});
 RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
