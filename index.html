@@ -25004,6 +25004,21 @@ VIEWS['performance/xp']=function(){
      <li><b>Earlier work</b> shows what your completed items from before XP started would be worth. Nothing is written until you tick the box and press <i>Count earlier work</i>.</li>
      <li><b>Ledger</b> (bottom): the latest 25 entries. Every total on this page is the sum of these rows, so any number can be explained.</li></ul></details>
    <p class="sm mut" style="margin-top:8px">XP counts practice you recorded. It does not measure skill or prove that a target was reached.</p></div>`;
+  /* each row of the Progress list opens to show what it is made of */
+  try{
+    const per=S.xpPer||'day',ser=xpSeries(per),mx=Math.max(1,...ser.map(x=>Math.abs(x[1]))),all=xpRowsS(),capd=xpW('cap');
+    const prefix=r=>String(r.base_key||'').split(':')[0];
+    const nice={act:'Daily Actions completed',top3:'Top 3 bonus',min:'25+ minutes bonus',pray:'Prayers',hab:'Habits ticked',kpiact:'Personal KPIs activated',kpival:'KPI values recorded',path:'Money path steps'};
+    const det=k=>{
+      const rs=all.filter(r=>xpBucket(r.day,per)===k);if(!rs.length)return '<div class="sm mut" style="padding:6px 0">Nothing was written in the ledger for this '+per+'. Either nothing was completed, or XP was not switched on yet.</div>';
+      const g=new Map();rs.forEach(r=>{const p=prefix(r),o=g.get(p)||{n:0,pts:0,ex:[]};o.pts+=xpPts(r);if(xpPts(r)>0)o.n++;else if(xpPts(r)<0)o.n--;if(o.ex.length<4&&r.note)o.ex.push(r.note);g.set(p,o)});
+      const lines=[...g].sort((x,y)=>y[1].pts-x[1].pts).map(([p,o])=>`<tr><td>${esc(nice[p]||XP_LAB[p]||p||'Other')}${o.ex.length?`<div class="xs mut">${o.ex.map(esc).join(' · ')}${o.n>o.ex.length?' …':''}</div>`:''}</td><td class="r">${Math.max(0,o.n)}</td><td class="r"><b>${fmtN(o.pts)}</b> XP</td></tr>`).join('');
+      const t=sum(rs.map(xpPts)),capNote=per==='day'?(t>=capd?`<div class="xs" style="margin-top:6px">This day reached the daily cap of <b>${fmtN(capd)} XP</b>. Anything above it is not counted, so the bar cannot be longer than this.</div>`:`<div class="xs mut" style="margin-top:6px">${fmtN(capd-t)} XP were still available before the daily cap of ${fmtN(capd)} XP.</div>`):'';
+      return `<table class="tbl"><thead><tr><th>What earned XP</th><th class="r">Items</th><th class="r">XP</th></tr></thead><tbody>${lines}<tr><td><b>Total</b></td><td></td><td class="r"><b>${fmtN(t)}</b> XP</td></tr></tbody></table>${capNote}`};
+    const tb=`<table class="tbl" data-xp-series><tbody>${ser.map(x=>`<tr><td colspan="3" style="padding:0"><details class="xpd"><summary style="display:grid;grid-template-columns:110px 1fr auto auto;gap:10px;align-items:center;cursor:pointer;padding:9px 6px"><span>${esc(per==='day'?fmtS(x[0]):x[0])}</span><span>${pbar(Math.round(Math.max(0,x[1])/mx*100)).replace(/<span>\d+%<\/span>/,'')}</span><span class="r"><b>${fmtN(x[1])}</b> XP</span><span class="xs mut">Details ▾</span></summary><div style="padding:4px 6px 12px 12px" class="xpdb">${det(x[0])}</div></details></td></tr>`).join('')}</tbody></table>`;
+    const cap=`<p class="sm mut" style="margin:0 0 8px" data-xp-bar>Each bar is that ${per}'s XP compared with the biggest ${per} in this list (${fmtN(mx)} XP = a full bar). It is not a percentage of a target. Tap a row to see what it is made of.</p>`;
+    h=h.replace(/<div class="tblwrap"><table class="tbl" data-xp-series>[\s\S]*?<\/table><\/div>/,()=>'<div class="tblwrap">'+cap+tb+'</div>');
+  }catch(e){console.warn('xp detail',e)}
   const mark='<div class="card" style="margin-top:14px" data-xp-honest>';
   return h.includes(mark)?h.replace(mark,panel+mark):h+panel}})();
 /* ---------- Rev 109 · Market Desk, Crypto ⇄ Notion. One database, one row per asset + goal (e.g. "BTC BUY"). The row is found by its key and UPDATED; it is created only when no row has that key. ---------- */
@@ -25108,7 +25123,9 @@ function card(){
   ${msg}${err}
   <details style="margin-top:8px"><summary>Database map: which input goes to which Notion property</summary>${mapTable()}<p class="xs mut">Type names are Notion’s. “select” options are created by Notion the first time a value is sent. A property you do not want can be removed in Notion; it is then skipped. Needs the integration capabilities Read content, Update content and Insert content.</p></details></div>`}
 function paint(){const e=document.getElementById('mxnCard');if(e)e.outerHTML=card()}
-['market/analysis','finance/market'].forEach(k=>{const v0=VIEWS[k];if(!v0)return;VIEWS[k]=function(){return String(v0.apply(this,arguments)).replace('<div id="mxFresh"',card()+'<div id="mxFresh"')}});
+/* the setup card lives in Integrations → Connections; the Market tab only shows a short note with a link */
+['market/analysis','finance/market'].forEach(k=>{const v0=VIEWS[k];if(!v0)return;VIEWS[k]=function(){const c=cfg(),note=`<div class="sm mut noprint" style="margin:0 0 8px" data-mxn-note>Crypto ⇄ Notion: ${c.ds&&c.on?'<b>on</b>':'off'}. <a href="#/integrations/connections" data-act="go" data-p="integrations" data-s="connections">Set up in Integrations → Connections</a></div>`;return String(v0.apply(this,arguments)).replace('<div id="mxFresh"',note+'<div id="mxFresh"')}});
+{const v0=VIEWS['integrations/connections'];if(v0)VIEWS['integrations/connections']=function(){return String(v0.apply(this,arguments))+card()}}
 CHG.mxnon=async el=>{await saveCfg({on:el.checked});toast(el.checked?'Crypto inputs now go to Notion':'Sending to Notion is paused');paint()};
 CHG.mxnds=async el=>{const raw=el.value.trim();if(!raw){await saveCfg({src:'',ds:'',on:false});MXN.sc=null;MXN.chk=null;MXN.msg='';paint();return}await saveCfg({src:raw});await ACT.mxncheck()};
 ACT.mxncheck=async()=>{
