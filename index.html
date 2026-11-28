@@ -371,7 +371,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
    ===================================================================== */
 const APP_NAME='Polaris One',APP_WORD='Polaris One',APP_TAG='Where direction meets time',APP_TAG_ID='Tempat arah bertemu waktu';
 /* Shown in the header. Change these two lines for every new delivery. */
-const APP_VERSION='2.0',APP_REV='108',APP_DATE='2026-11-25';
+const APP_VERSION='2.0',APP_REV='109',APP_DATE='2026-11-28';
 /* Built-in Polaris One database. Only the PUBLISHABLE key belongs here: it is public by design and protected by row-level security.
    NEVER put a secret / service_role key in this file. (Users can still override it in Connections → Database.) */
 const BUILTIN={url:'https://bgpfulyzihoddgirkjim.supabase.co',key:'sb_publishable_wFy-BzZRALPkAiuDhk6nKQ_VtcYflLb'};
@@ -1890,7 +1890,7 @@ VIEWS['dashboard/overview']=()=>{
     <div style="flex:1;min-width:260px"><div class="sm mut">${DOW[d0.getDay()]}, ${fmtD(ymd(d0))}</div>
     <h2 style="font:700 28px var(--serif);letter-spacing:-.02em;margin:2px 0 10px">${hr<11?'Good morning':hr<15?'Good afternoon':'Good evening'}, ${esc(first)}</h2>
     ${todays.length?`<p class="ink2" style="margin-bottom:8px">${tdone} of ${todays.length} daily actions done.${!openT.length?' Everything planned for today is done. Plan tomorrow tonight.':topShow.length?' Focus on:':''}</p><div class="list">${topShow.map(x=>`<div class="item" data-act="open" data-k="daily_actions" data-id="${x.id}">${x.status==='Completed'?ic('check',16):ic('target',16)}<span class="t" style="${x.status==='Completed'?'text-decoration:line-through;color:var(--mut)':''}">${esc(x.title)}</span><span class="sm mut">${tm(x.start_time)}</span></div>`).join('')}</div>`:`<p class="ink2">Nothing planned for today yet. Pick your Top 3 and block time for them.</p>`}
-    <div class="row" style="margin-top:12px"><button class="btn p" data-act="go" data-p="execute" data-s="daily">${ic('bolt')} Open today</button><button class="btn" data-act="quick" data-k="activities">${ic('plus')} New activity</button><button class="btn hl" data-act="dayguide">${ic('book')} Daily Activity Guide</button></div>${typeof dgNowLabel==='function'?`<p class="xs mut" style="margin-top:6px">${esc(dgNowLabel())}</p>`:''}</div>
+    <div class="row" style="margin-top:12px"><button class="btn p" data-act="go" data-p="execute" data-s="daily">${ic('bolt')} Open today</button><button class="btn" data-act="quick" data-k="activities">${ic('plus')} New activity</button><button class="btn hl" data-act="dayguide">${ic('book')} Daily Activity Guide</button><button class="btn" data-act="go" data-p="toolkit" data-s="daily" title="Daily Playbook, Eisenhower Matrix, Weekly Rhythm, 20 Time Tips, Focus &amp; Energy, Time &amp; Priority, Goals &amp; Planning">${ic('tool')} Productivity Toolkit</button><button class="btn" data-act="prdopen" title="Read the text of a PDF or a picture, with OCR for scans. Nothing leaves this device.">${ic('up')} Read PDF / picture (OCR)</button></div>${typeof dgNowLabel==='function'?`<p class="xs mut" style="margin-top:6px">${esc(dgNowLabel())}</p>`:''}</div>
     <div class="hero-ring" style="text-align:center;margin-right:12px">${ring(tpct,120)}<div class="sm mut" style="margin-top:6px">Today's progress</div></div></div>`;
   const stats=`<div class="g g6 mt">${ovS('all',stat('Activities',all.length,'in all plans'))}${ovS('prog',stat('In progress',A.filter(a=>a.status==='In Progress').length,'being worked on','blue'))}${ovS('done',stat('Completed',all.length?Math.round(done/all.length*100)+'%':'—',done+' of '+all.length,'green'))}${ovS('over',stat('Overdue',overdue,'past planned finish',overdue?'red':''))}${stat('Due in 7 days',due7,'open and close to deadline',due7?'amber':'')}${stat('Hours',fmtN(act,0)+' / '+fmtN(est,0),'actual vs planned')}</div>`;
   const att=attention().slice(0,9);
@@ -11811,6 +11811,7 @@ function MX_BOOT(root, ENV){
     var h = '';
 
     // --- 1. Market read
+    var nxStart = h.length;
     h += '<div class="analysis-box"><h4>Analisa pasar '+(o.ticker||'')+'</h4>';
     h += '<p><b>Mikro:</b> Dari data yang Anda masukkan, kekuatan internal '+T+' terbaca '+trendWord(o.sumDir)
        + ' pada ringkasan keseluruhan dan '+trendWord(o.tfDir)+' pada trend following, dengan RSI(6) '+idNum(o.rsi6,1)
@@ -11827,6 +11828,8 @@ function MX_BOOT(root, ENV){
     h += teGeoHeadlinesHtml();
     h += '<p class="micro" style="color:var(--text-faint);"><i>Bagian makro dan geopolitik di atas adalah hubungan sebab-akibat yang berlaku umum, dilengkapi data live dari tab Trading Economics saat tersedia. Cek tab Trading Economics langsung untuk gambaran paling lengkap &amp; terkini.</i></p>';
     h += '</div>';
+    /* Rev 109: when the Crypto tab is linked to Notion, this card is the page written in Notion; the built-in text stays only as a fallback */
+    if(o.kind==='crypto' && nxOn()){ nxFallback = h.slice(nxStart); h = h.slice(0,nxStart) + nxSlotHtml(o.ticker); }
 
     // --- 2. Reference built from the inputs
     h += '<div class="analysis-box"><h4>Acuan dari data yang Anda masukkan</h4>';
@@ -12345,10 +12348,81 @@ function MX_BOOT(root, ENV){
     var resultEl = $id('result');
     resultEl.className = 'result-card '+cta.cls;
     resultEl.innerHTML = html;
+    crLast = {rec:cta.text, row:row.final, pct:pct, conf:confText};
+    nxSend(true); nxFill();
     if(narrow()){
       resultEl.scrollIntoView({behavior:'smooth', block:'start'});
     }
   });
+
+  /* ================= Rev 109 · CRYPTO ⇄ NOTION =================
+     The inputs of this form go to ONE row of a Notion database (key = ticker + goal, e.g. "BTC BUY"). The row is found by its key and
+     updated; a row is created only when none has that key. The analysis shown here is the page of that row, written in Notion. */
+  var crLast = null, nxTimer = null, nxFallback = '';
+  function nxOn(){ return !!(ENV && ENV.notion && ENV.notion.on()); }
+  function nxSlotHtml(tk){
+    return '<div class="analysis-box" id="nxSlot"><style>#nxSlot .nx-body table{border-collapse:collapse;max-width:100%}#nxSlot .nx-body td,#nxSlot .nx-body th{border:1px solid #cfd6df;padding:4px 8px;text-align:left}#nxSlot .nx-body pre{overflow:auto}#nxSlot .nx-body details{margin:6px 0}#nxSlot .nx-body img{max-width:100%}</style>'
+      + '<h4>Analisa pasar '+(tk||'')+' <span class="micro" style="color:var(--text-faint);font-weight:400">· ditulis di Notion</span></h4>'
+      + '<div class="nx-body"><p class="micro">Memuat halaman Notion…</p></div>'
+      + '<p class="micro" style="color:var(--text-faint);margin-top:8px"><span id="nxMeta"></span> <button type="button" class="seg-btn" id="nxReload" style="padding:2px 10px">Muat ulang</button></p></div>';
+  }
+  function crSnap(){
+    var tk = ($id('crTicker').value||'').trim().toUpperCase().replace(/\s+/g,' ');
+    if(!tk) return null;
+    var num = function(id){ var raw=($id(id).value||'').trim(); return raw==='' ? null : parseNum(raw); };
+    var cnt = function(id){ var raw=($id(id).value||'').trim(); var n=parseFloat(raw); return raw===''||isNaN(n) ? null : n; };
+    var ema = readEmaState(), zs = readZoneState();
+    var hasPx = ($id('curPrice').value||'').trim()!=='' && ($id('r1').value||'').trim()!=='' && ($id('s1').value||'').trim()!=='';
+    var cat = $id('fgiCat'), catTxt = cat.options[cat.selectedIndex] ? cat.options[cat.selectedIndex].text : '';
+    var v = { ticker:tk, goal:family, fgi:cnt('fgiScore'), fgiCat:catTxt, buyAct:cnt('buyAct'),
+      atl:num('crAtl'), ath:num('crAth'), price:num('curPrice'),
+      sumBear:cnt('sumBear'), sumNeu:cnt('sumNeu'), sumBull:cnt('sumBull'),
+      r3:num('r3'), r2:num('r2'), r1:num('r1'), pivot:num('pivot'), s1:num('s1'), s2:num('s2'), s3:num('s3'),
+      tfBear:cnt('tfBear'), tfNeu:cnt('tfNeu'), tfBull:cnt('tfBull'),
+      emaBuy:ema.buy, emaSell:ema.sell, emaSignal:ema.signal, emaExt:ema.extended,
+      bbUp:num('BbUpper'), bbBase:num('BbBasis'), bbLow:num('BbLower'),
+      oscBear:cnt('oscBear'), oscNeu:cnt('oscNeu'), oscBull:cnt('oscBull'),
+      rsi6:cnt('rsi6'), rsi12:cnt('rsi12'), adx6:cnt('adx6'), adx12:cnt('adx12'),
+      zone: hasPx ? ZONE_LABEL[zs.zone] : null };
+    return { key: tk+' '+family, v:v, r:null };
+  }
+  function nxSend(withResult){
+    if(!nxOn()) return;
+    var s = crSnap(); if(!s) return;
+    if(withResult && crLast) s.r = crLast;
+    ENV.notion.push(s);
+  }
+  function nxFill(){
+    var slot = $id('nxSlot'); if(!slot) return;
+    var s = crSnap(); if(!s) return;
+    var body = slot.querySelector('.nx-body'), meta = $id('nxMeta');
+    body.innerHTML = '<p class="micro">Memuat halaman Notion…</p>';
+    var tries = 0;
+    var go = function(){
+      ENV.notion.analysis(s.key).then(function(a){
+        if(a.html){ body.innerHTML = a.html; meta.innerHTML = 'Terakhir diubah di Notion: '+a.edited+(a.url?' · <a href="'+a.url+'" target="_blank" rel="noopener noreferrer">Buka halaman</a>':'')+'.'; return; }
+        if(a.empty && tries<2){ tries++; setTimeout(go, 4000); return; }
+        body.innerHTML = '<p>Halaman Notion untuk <b>'+s.key+'</b> belum berisi analisa. Input sudah tersimpan di propertinya; begitu Notion (agen, template, atau Anda) menulis analisa di halaman itu, tekan <b>Muat ulang</b>.</p>';
+        meta.innerHTML = a.url ? '<a href="'+a.url+'" target="_blank" rel="noopener noreferrer">Buka halaman</a>.' : '';
+      }).catch(function(e){
+        body.innerHTML = '<p class="micro" style="color:#b45309">Notion tidak terjangkau ('+String(e&&e.message||e).replace(/[<>&]/g,'').slice(0,160)+'). Menampilkan analisa bawaan sementara.</p>'+nxFallback;
+        meta.textContent = '';
+      });
+    };
+    setTimeout(go, 1200);
+    if(!slot.dataset.wired){
+      slot.dataset.wired = '1';
+      slot.addEventListener('click', function(ev){ var t=ev.target; if(t && t.id==='nxReload'){ nxSend(false); nxFill(); } });
+      slot.addEventListener('toggle', function(ev){
+        var d = ev.target; if(!d || !d.matches || !d.matches('details.nbt') || !d.open || d.dataset.done) return; d.dataset.done='1';
+        var box = d.querySelector('.nbk'); if(!box) return; box.textContent = 'Memuat…';
+        ENV.notion.kids(d.dataset.nbid, +d.dataset.depth||0).then(function(h){ box.innerHTML = h || 'Kosong.'; }).catch(function(){ d.dataset.done=''; box.textContent='Gagal memuat.'; });
+      }, true);
+    }
+  }
+  /* inputs → Notion: wait 2 seconds after the last change, send only when something differs from what Notion already has */
+  function nxLater(){ if(!nxOn()) return; clearTimeout(nxTimer); nxTimer = setTimeout(function(){ nxSend(false); }, 2000); }
+  ['input','change','click'].forEach(function(ev){ $id('form').addEventListener(ev, nxLater); });
 
   // ================= INDONESIA STOCK MATRIX =================
   function LV(id,name,ts,sr,rsi6,rsi12,adx6,adx12,oscDir,oscMin,fund,val,action,orderAction,trigger,limitPct,position,context){
@@ -24870,7 +24944,7 @@ const _od3=openDetail;
 openDetail=function(key,id){_od3(key,id);try{nbDecorate(key,id)}catch(e){console.warn('notion page',e)}};
 ACT.nbrefresh=el=>{const p=el.closest('.nbp');if(p)nbLoad(p)};
 ACT.nbpush=async el=>{const p=el.closest('.nbp');if(!p)return;const r=byId(MOD[p.dataset.k].t,p.dataset.id);if(!r)return;await nbQueue(p.dataset.k,r)};
-window.__nb={md2:nbMd2Blocks,render:nbRender,push:nbPush};
+window.__nb={md2:nbMd2Blocks,render:nbRender,push:nbPush,list:nbList};
 })();
 
 /* ---------- Rev 108 · Framework phase A (part 1): KPI quality check and time formulas, shown in the details. Nothing is blocked; old records stay as they are ---------- */
@@ -24900,10 +24974,254 @@ const _ea=EXTRA.activities;EXTRA.activities=a=>{const s=timeStats(a);
   const rows=[['Planned effort',s.pl==null?'—':f1(s.pl)+' h'],['Actual effort',s.ac==null?'—':f1(s.ac)+' h'],['Time variance (planned − actual)',s.variance==null?'—':(s.variance>=0?'+':'')+f1(s.variance)+' h'],['Time overrun',s.overrun==null?'—':f1(s.overrun)+' h'],['Time efficiency (planned ÷ actual)',s.eff==null?'n/a':Math.round(s.eff)+'%'],['Planning accuracy',s.acc==null?'n/a':Math.round(s.acc)+'%'],['Finished by the planned finish date',s.onTime==null?(s.overdue?'Overdue':'Not finished yet'):(s.onTime?'Yes':'No, late')]];
   return (_ea?_ea(a):'')+`<div class="qc"><div class="ch"><h3>Time and plan check</h3></div><table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table><p class="sm mut" style="margin-top:8px">Effort is hours of real work. It is not the number of days between start and finish. Efficiency above 100% only means less effort than planned, not better quality. n/a means the actual or planned effort is 0 or missing.</p></div>`};
 })();
+
+/* ---------- Rev 109 · XP & Progress: how to read this page, with your own numbers ---------- */
+(function(){
+const _vx=VIEWS['performance/xp'];if(!_vx)return;
+VIEWS['performance/xp']=function(){
+  let h=_vx.apply(this,arguments);if(typeof h!=='string')return h;
+  const rows=xpRows(),tot=xpTotal(rows),lv=xpLevel(tot),need=lv.hi-tot,cap=xpW('cap');
+  const lvRows=[1,2,3,4,5,6,8,10,15,20].map(n=>`<tr${n===lv.level?' style="font-weight:700"':''}><td>Level ${n}</td><td style="text-align:right">${fmtN(50*(n-1)*(n-1))} XP</td></tr>`).join('');
+  const ex=xpW('act')+xpW('top3')+xpW('min');
+  const panel=`<div class="card" style="margin-top:14px" data-xp-how><div class="ch"><h3>How to read this page</h3></div>
+   <details open><summary style="cursor:pointer;font-weight:600">The four boxes at the top</summary>
+    <ul class="sm ink2" style="margin:6px 0 10px 18px">
+     <li><b>Today, This week, This month</b>: the XP written in the ledger for that period. A week starts on Monday. A box shows 0 when nothing was completed, or when you un-ticked it again.</li>
+     <li><b>Level ${lv.level}</b>: your all-time XP, from every Life Area, whatever the filter above says. The line under it is how many XP are missing for the next level (now ${fmtN(need)} XP more, at ${fmtN(lv.hi)} XP in total).</li></ul></details>
+   <details><summary style="cursor:pointer;font-weight:600">How levels are counted</summary>
+    <p class="sm ink2" style="margin:6px 0">Level = the square root of (XP ÷ 50), rounded down, plus 1. So each level needs more XP than the last one. This is the XP where each level starts:</p>
+    <div class="tw"><table class="tbl" style="max-width:320px"><tbody>${lvRows}</tbody></table></div></details>
+   <details><summary style="cursor:pointer;font-weight:600">The Progress bars</summary>
+    <p class="sm ink2" style="margin:6px 0">One bar per day, week, month or year, depending on the button you press. The longest bar in the list is the best period shown; the others are measured against it. The number on the right is the XP of that period. “0 XP” is a period with no completed items.</p></details>
+   <details><summary style="cursor:pointer;font-weight:600">By Life Area and By skill</summary>
+    <p class="sm ink2" style="margin:6px 0">The same XP, split by the Life Area of the item you completed, and by the skill linked to it (for example a habit or a prayer). Items without a Life Area or skill are not in these two lists, but they still count in the totals above.</p></details>
+   <details><summary style="cursor:pointer;font-weight:600">A worked example</summary>
+    <p class="sm ink2" style="margin:6px 0">You complete one Daily Action that is in today’s Top 3 and you record 25 minutes or more: ${fmtN(xpW('act'))} (the action) + ${fmtN(xpW('top3'))} (Top 3) + ${fmtN(xpW('min'))} (25 minutes) = <b>${fmtN(ex)} XP</b>. If you un-tick it, a negative row cancels it and the total goes back. If you tick it again, you get it once, not twice. A day never counts more than ${fmtN(cap)} XP.</p></details>
+   <details><summary style="cursor:pointer;font-weight:600">What “Usulan”, “Choose these weights” and “Earlier work” mean</summary>
+    <ul class="sm ink2" style="margin:6px 0 4px 18px">
+     <li><b>Usulan</b> = proposal. The points in the list are suggestions until you press <i>Choose these weights</i>.</li>
+     <li><b>Choose these weights</b> saves your numbers as a new version. XP already given keeps the old version, so history is never rewritten.</li>
+     <li><b>Earlier work</b> shows what your completed items from before XP started would be worth. Nothing is written until you tick the box and press <i>Count earlier work</i>.</li>
+     <li><b>Ledger</b> (bottom): the latest 25 entries. Every total on this page is the sum of these rows, so any number can be explained.</li></ul></details>
+   <p class="sm mut" style="margin-top:8px">XP counts practice you recorded. It does not measure skill or prove that a target was reached.</p></div>`;
+  const mark='<div class="card" style="margin-top:14px" data-xp-honest>';
+  return h.includes(mark)?h.replace(mark,panel+mark):h+panel}})();
+/* ---------- Rev 109 · Market Desk, Crypto ⇄ Notion. One database, one row per asset + goal (e.g. "BTC BUY"). The row is found by its key and UPDATED; it is created only when no row has that key. ---------- */
+(function(){
+const MXN=window.__mxn={sc:null,pages:{},sent:{},q:{},last:null,err:'',chk:null,busy:''};
+/* [value, Notion property, kind, where it comes from] ; kind: text = rich_text, sel = select, num = number, chk = checkbox, date = date */
+const MXN_P=[
+['ticker','Ticker','text','Name of ticker / asset'],['goal','Goal','sel','Purpose of analysis: BUY = new entry, SELL = I already hold it'],
+['fgi','Fear & Greed','num','Fear & Greed Index (0–100)'],['fgiCat','Fear & Greed category','sel','FGI category'],['buyAct','Order book buy %','num','Aktivitas Trading (0–100% buy)'],
+['atl','ATL','num','ATL (all-time low)'],['ath','ATH','num','ATH (all-time high)'],['price','Price','num','Current price'],
+['sumBear','Summary Bearish','num','Ringkasan Keseluruhan · Bearish'],['sumNeu','Summary Neutral','num','Ringkasan Keseluruhan · Neutral'],['sumBull','Summary Bullish','num','Ringkasan Keseluruhan · Bullish'],
+['r3','R3','num','Support & Resistance · R3'],['r2','R2','num','Support & Resistance · R2'],['r1','R1','num','Support & Resistance · R1'],['pivot','Pivot','num','Support & Resistance · P'],
+['s1','S1','num','Support & Resistance · S1'],['s2','S2','num','Support & Resistance · S2'],['s3','S3','num','Support & Resistance · S3'],
+['tfBear','Trend Bearish','num','Trend Following · Bearish'],['tfNeu','Trend Neutral','num','Trend Following · Neutral'],['tfBull','Trend Bullish','num','Trend Following · Bullish'],
+['emaBuy','EMA Buy count','num','Exponential MA · number of periods set to Buy'],['emaSell','EMA Sell count','num','Exponential MA · number of periods set to Sell'],['emaSignal','EMA signal','sel','Derived: Bullish / Bearish / Sideways / Extended'],['emaExt','EMA extended','chk','Price far from all EMAs (tick box)'],
+['bbUp','BB Upper','num','Bollinger · Upper'],['bbBase','BB Basis','num','Bollinger · Basis'],['bbLow','BB Lower','num','Bollinger · Lower'],
+['oscBear','Oscillator Bearish','num','Kondisi Oscillator · Bearish'],['oscNeu','Oscillator Neutral','num','Kondisi Oscillator · Neutral'],['oscBull','Oscillator Bullish','num','Kondisi Oscillator · Bullish'],
+['rsi6','RSI 6','num','RSI (6)'],['rsi12','RSI 12','num','RSI (12)'],['adx6','ADX 6','num','ADX (6)'],['adx12','ADX 12','num','ADX (12)'],
+['zone','Zone','sel','Derived: price against pivot and S/R levels'],
+['rec','Recommendation','sel','Result of “Dapatkan rekomendasi” (TUNGGU, TAHAN, BELI …)'],['row','Matrix row','text','Result: matrix row'],['pct','Match %','num','Result: how many technical criteria match'],['conf','Confidence','sel','Result: Tinggi / Sedang / Rendah'],['at','Analysed at','date','Time of the last “Dapatkan rekomendasi”'],
+['upd','Updated from Polaris','date','Time of the last send from Polaris One']];
+const TY={text:'rich_text',sel:'select',num:'number',chk:'checkbox',date:'date'};
+const OKT={text:['rich_text','title'],sel:['select','status','rich_text'],num:['number'],chk:['checkbox'],date:['date']};
+window.MXN_P=MXN_P;
+const cfg=()=>(S.profile&&prefs().mx_notion)||{};
+const live=()=>typeof ngLive==='function'&&ngLive()&&!!cfg().on&&!!cfg().ds;
+const call=(m,p,b)=>S.ng&&S.ng.fake?S.ng.fake(m,p,b):nCall(m,p,b);
+const saveCfg=patch=>setPrefs({mx_notion:Object.assign({},cfg(),patch)});
+function idOf(raw){const m=String(raw||'').replace(/\?.*$/,'').replace(/-/g,'').match(/[0-9a-f]{32}/i);return m?nId(m[0]):''}
+async function resolve(raw){
+  const id=idOf(raw);if(!id)throw new Error('That is not a Notion database link or id. Open the database in Notion, copy its link and paste it here.');
+  try{const d=await call('GET','/v1/data_sources/'+id);if(d&&d.properties)return {ds:id,d}}catch(e){}
+  const db=await call('GET','/v1/databases/'+id),l=(db&&db.data_sources)||[];
+  if(!l.length)throw new Error('This database has no data source the integration can see. Share the database with your Notion integration (••• → Connections).');
+  return {ds:l[0].id,d:await call('GET','/v1/data_sources/'+l[0].id)}}
+const typesOf=d=>{const o={};Object.keys(d.properties||{}).forEach(k=>{o[k]=d.properties[k].type});return o};
+async function schema(force){
+  if(MXN.sc&&!force&&MXN.sc.ds===cfg().ds)return MXN.sc;
+  const d=await call('GET','/v1/data_sources/'+nId(cfg().ds)),t=typesOf(d),title=Object.keys(t).find(k=>t[k]==='title')||'';
+  return MXN.sc={ds:cfg().ds,t,title}}
+function fit(sc,name,kind){const ty=sc.t[name];return !!ty&&OKT[kind].includes(ty)}
+function propVal(kind,ty,v){
+  if(kind==='num')return {number:v==null||!isFinite(v)?null:+v};
+  if(kind==='chk')return {checkbox:!!v};
+  if(kind==='date')return {date:v?{start:v}:null};
+  const s=v==null?'':String(v);
+  if(ty==='select')return {select:s?{name:s.replace(/,/g,' ').slice(0,100)}:null};
+  if(ty==='status')return {status:s?{name:s.slice(0,100)}:null};
+  return {rich_text:s?[{type:'text',text:{content:s.slice(0,1900)}}]:[]}}
+function build(sc,s){
+  const out={},v=Object.assign({},s.v);
+  if(s.r){v.rec=s.r.rec;v.row=s.r.row;v.pct=s.r.pct;v.conf=s.r.conf;v.at=new Date().toISOString()}
+  v.upd=new Date().toISOString();
+  out[sc.title]={title:[{type:'text',text:{content:s.key}}]};
+  MXN_P.forEach(([k,name,kind])=>{if(!(k in v)||!fit(sc,name,kind))return;if(!s.r&&['rec','row','pct','conf','at'].includes(k))return;out[name]=propVal(kind,sc.t[name],v[k])});
+  return out}
+async function find(sc,key){
+  if(MXN.pages[key])return MXN.pages[key];
+  const r=await call('POST','/v1/data_sources/'+nId(cfg().ds)+'/query',{filter:{property:sc.title,title:{equals:key}},page_size:2});
+  const p=(r.results||[])[0];if(p)MXN.pages[key]=p.id;return p?p.id:''}
+async function pushOne(s){
+  const sc=await schema();if(!sc.title)throw new Error('The Notion database has no title property.');
+  const props=build(sc,s),cmp=JSON.stringify(Object.keys(props).filter(k=>k!=='Updated from Polaris'&&k!=='Analysed at').sort().map(k=>[k,props[k]]));
+  if(MXN.sent[s.key]===cmp&&!s.r)return 'same';
+  let id=await find(sc,s.key),how='updated';
+  if(id)await call('PATCH','/v1/pages/'+id,{properties:props});
+  else{const r=await call('POST','/v1/pages',{parent:{type:'data_source_id',data_source_id:nId(cfg().ds)},properties:props});MXN.pages[s.key]=r.id;how='created'}
+  MXN.sent[s.key]=cmp;return how}
+function push(s){
+  if(!live())return Promise.resolve();
+  const k=s.key;
+  MXN.q[k]=(MXN.q[k]||Promise.resolve()).then(()=>pushOne(s)).then(how=>{MXN.err='';MXN.last={at:Date.now(),key:k,how};paint()}).catch(e=>{MXN.err=nFriendly(e,'the Crypto database');paint();console.warn('mx notion',e)});
+  return MXN.q[k]}
+async function analysis(key){
+  const sc=await schema(),id=await find(sc,key);if(!id)return {empty:true};
+  const pg=await call('GET','/v1/pages/'+id),blocks=await window.__nb.list(id),html=await window.__nb.render(blocks,0,{n:25});
+  const url=pg&&pg.url&&/^https:\/\//.test(pg.url)?pg.url:'',ed=pg&&pg.last_edited_time?new Date(pg.last_edited_time).toLocaleString():'';
+  return String(html||'').trim()?{html,edited:ed,url}:{empty:true,url}}
+const _env=mxEnv;
+mxEnv=function(){const e=_env.apply(this,arguments);e.notion={on:live,push,analysis,kids:async(id,depth)=>window.__nb.render(await window.__nb.list(id),depth+1,{n:25})};return e};
+/* ---- the card above the tab ---- */
+function status(){
+  const c=cfg(),a=[];
+  if(!c.ds)return '<span class="badge b-gray">Not linked</span>';
+  if(MXN.err)return '<span class="badge b-red">Problem</span>';
+  if(!c.on)return '<span class="badge b-gray">Paused</span>';
+  if(MXN.last)return `<span class="badge b-green">Row ${esc(MXN.last.how==='same'?'unchanged':MXN.last.how)} · ${esc(MXN.last.key)}</span>`;
+  return '<span class="badge b-green">On</span>'}
+function mapTable(){
+  const chk=MXN.chk,t=chk&&chk.t,sc=chk?{t}:null;
+  const st=n=>{if(!sc)return '<span class="mut">not checked</span>';const k=MXN_P.find(x=>x[1]===n);return fit(sc,n,k[2])?'<span class="ok">ready</span>':t[n]?`<span class="no">wrong type (${esc(t[n])})</span>`:'<span class="no">missing</span>'};
+  return `<div class="tw"><table class="tbl"><thead><tr><th>Notion property</th><th>Type</th><th>Polaris One field</th><th>Status</th></tr></thead><tbody>
+  <tr><td><b>${esc(chk&&chk.title||'Name')}</b></td><td>title</td><td>Key of the row: ticker + goal, e.g. “BTC BUY”. The row with this key is updated.</td><td>${chk?(chk.title?'<span class="ok">ready</span>':'<span class="no">missing</span>'):'<span class="mut">not checked</span>'}</td></tr>
+  ${MXN_P.map(([k,n,kind,src])=>`<tr><td>${esc(n)}</td><td>${esc(TY[kind])}</td><td>${esc(src)}</td><td>${st(n)}</td></tr>`).join('')}</tbody></table></div>`}
+function card(){
+  const c=cfg(),msg=MXN.msg?`<div class="callout ${MXN.msgBad?'warn':'ok'}" style="margin-top:8px">${esc(MXN.msg)}</div>`:'',err=MXN.err?`<div class="callout warn" style="margin-top:8px">${esc(MXN.err)}</div>`:'';
+  return `<div class="card noprint" id="mxnCard" style="margin:0 0 10px"><div class="ch"><h3>Crypto ⇄ Notion</h3><span class="sp"></span>${status()}</div>
+  <p class="sm mut" style="margin:0 0 8px">The Crypto form is sent to <b>one row</b> of a Notion database (key: ticker + goal, e.g. “BTC BUY”). The row is updated when you change an input (after 2 seconds of calm) or press “Dapatkan rekomendasi”; a new row is created only when no row has that key. The “Analisa pasar” card then shows the page of that row, written in Notion. The price ranges and the TUNGGU / TAHAN card stay as they are.</p>
+  <label class="chk" style="padding:0"><input type="checkbox" data-change="mxnon" ${c.on?'checked':''} ${c.ds?'':'disabled'}> Send Crypto inputs to Notion and show the analysis from the Notion page</label>
+  <div class="toolbar" style="margin-top:8px"><input class="in" id="mxnds" style="flex:1;min-width:220px" data-change="mxnds" placeholder="Link or id of the Notion database" aria-label="Notion database link or id" value="${esc(c.src||'')}">
+  <button class="btn" data-act="mxncheck" ${MXN.busy?'disabled':''}>${MXN.busy==='chk'?'Checking…':'Check database'}</button><button class="btn" data-act="mxnmake" ${MXN.busy||!c.ds?'disabled':''}>${MXN.busy==='make'?'Creating…':'Create missing properties'}</button></div>
+  ${msg}${err}
+  <details style="margin-top:8px"><summary>Database map: which input goes to which Notion property</summary>${mapTable()}<p class="xs mut">Type names are Notion’s. “select” options are created by Notion the first time a value is sent. A property you do not want can be removed in Notion; it is then skipped. Needs the integration capabilities Read content, Update content and Insert content.</p></details></div>`}
+function paint(){const e=document.getElementById('mxnCard');if(e)e.outerHTML=card()}
+['market/analysis','finance/market'].forEach(k=>{const v0=VIEWS[k];if(!v0)return;VIEWS[k]=function(){return String(v0.apply(this,arguments)).replace('<div id="mxFresh"',card()+'<div id="mxFresh"')}});
+CHG.mxnon=async el=>{await saveCfg({on:el.checked});toast(el.checked?'Crypto inputs now go to Notion':'Sending to Notion is paused');paint()};
+CHG.mxnds=async el=>{const raw=el.value.trim();if(!raw){await saveCfg({src:'',ds:'',on:false});MXN.sc=null;MXN.chk=null;MXN.msg='';paint();return}await saveCfg({src:raw});await ACT.mxncheck()};
+ACT.mxncheck=async()=>{
+  const inp=document.getElementById('mxnds'),raw=(inp&&inp.value.trim())||cfg().src;if(MXN.busy)return;if(!raw){MXN.msg='Paste the link of the Notion database first.';MXN.msgBad=true;paint();return}
+  MXN.busy='chk';MXN.msg='';MXN.err='';paint();
+  try{const r=await resolve(raw),t=typesOf(r.d),title=Object.keys(t).find(k=>t[k]==='title')||'';
+    MXN.chk={t,title};MXN.sc=null;MXN.pages={};MXN.sent={};await saveCfg({src:raw,ds:r.ds});
+    const miss=MXN_P.filter(([k,n,kind])=>!fit({t},n,kind)),wrong=miss.filter(x=>t[x[1]]);
+    MXN.msgBad=!title||wrong.length>0;
+    MXN.msg=!title?'The database has no title property.':miss.length?`${miss.length-wrong.length} properties are missing${wrong.length?`, ${wrong.length} have another type than needed (${wrong.map(x=>x[1]).join(', ')})`:''}. Press “Create missing properties”.`:'Every property is ready.'}
+  catch(e){MXN.msgBad=true;MXN.msg=nFriendly(e,'this Notion database')}
+  MXN.busy='';paint()};
+ACT.mxnmake=async()=>{
+  if(MXN.busy||!cfg().ds)return;MXN.busy='make';MXN.msg='';paint();
+  try{const d=await call('GET','/v1/data_sources/'+nId(cfg().ds)),t=typesOf(d),add={};
+    MXN_P.forEach(([k,n,kind])=>{if(t[n])return;add[n]={[TY[kind]]:{}}});
+    const n=Object.keys(add).length;
+    if(n)await call('PATCH','/v1/data_sources/'+nId(cfg().ds),{properties:add});
+    const d2=n?await call('GET','/v1/data_sources/'+nId(cfg().ds)):d,t2=typesOf(d2);MXN.chk={t:t2,title:Object.keys(t2).find(k=>t2[k]==='title')||''};MXN.sc=null;
+    MXN.msgBad=false;MXN.msg=n?`${n} properties created.`:'Nothing to create; every property exists.'}
+  catch(e){MXN.msgBad=true;MXN.msg=nFriendly(e,'this Notion database')}
+  MXN.busy='';paint()};
+})();
+
+/* ---------- Rev 109 · PDF and picture reader with OCR (Indonesian and English). Text PDFs are read from their text; pages that are only a picture are read by OCR on this device. ---------- */
+(function(){
+const R=window.__prd={busy:false,lang:'both',force:false,text:'',name:'',msg:'',pct:0,err:'',info:''};
+const LANG={ind:{code:'ind',lp:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/ind/4.0.0_best_int'},eng:{code:'eng',lp:null}};
+const MAXP=40;
+function lineText(items){
+  const it=items.filter(x=>x.str&&String(x.str).trim()).map(x=>({s:x.str,x:x.transform[4],y:x.transform[5],w:x.width||0,h:Math.abs(x.transform[3])||8}));
+  it.sort((a,b)=>b.y-a.y||a.x-b.x);const lines=[];
+  it.forEach(t=>{const l=lines[lines.length-1];if(l&&Math.abs(l.y-t.y)<=Math.max(2,l.h*0.4))l.a.push(t);else lines.push({y:t.y,h:t.h,a:[t]})});
+  return lines.map(l=>{l.a.sort((a,b)=>a.x-b.x);let o='',px=null;l.a.forEach(t=>{if(px!=null&&t.x-px>1.5)o+=' ';o+=t.s;px=t.x+t.w});return o.replace(/\s+/g,' ').trim()}).filter(Boolean).join('\n')}
+async function worker(T,key,cache){
+  if(cache[key])return cache[key];const c=OCR_CFG(),L=LANG[key];
+  return cache[key]=await T.createWorker(L.code,1,{workerPath:c.workerPath,corePath:c.corePath,langPath:L.lp||c.langPath,gzip:true})}
+async function readOne(T,cv,keys,cache){
+  let best=null;
+  for(const k of keys){const w=await worker(T,k,cache),r=await w.recognize(cv),d=r.data||{},t=String(d.text||'').trim(),cf=+d.confidence||0;
+    if(!best||cf>best.cf)best={t,cf,k}}
+  return best}
+function ui(){const a=document.getElementById('prdmsg'),b=document.getElementById('prdbar');if(a)a.textContent=R.msg;if(b)b.innerHTML=pbar(R.pct)}
+async function run(file,password){
+  if(R.busy)return;R.busy=true;R.err='';R.text='';R.info='';R.name=file.name;R.pct=0;R.msg='Starting…';paint();
+  const keys=R.lang==='both'?['ind','eng']:[R.lang],cache={};let T=null,doc=null,bmp=null;
+  try{
+    const kind=pdfKindOf(file);
+    if(kind!=='pdf'&&kind!=='image')throw new Error('Choose a PDF, or a JPG, PNG or WebP picture.');
+    if(file.size>PDF_MAXBYTES)throw new Error('The file is larger than 40 MB.');
+    const out=[];let nText=0,nOcr=0,cfs=[];
+    const getT=async()=>{if(!T){R.msg='Loading the OCR reader (about 6 MB the first time)…';ui();T=await pdfOcrLib()}return T};
+    const cvOf=async(pg,bm)=>{const cv=document.createElement('canvas');
+      if(bm){const k=Math.min(3200,Math.max(2000,bm.width))/bm.width;cv.width=Math.round(bm.width*k);cv.height=Math.round(bm.height*k);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.imageSmoothingQuality='high';x.drawImage(bm,0,0,cv.width,cv.height)}
+      else{const vp=pg.getViewport({scale:2.5});cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);await pg.render({canvasContext:x,viewport:vp}).promise}
+      return cv};
+    if(kind==='image'){
+      try{bmp=await createImageBitmap(file)}catch(e){throw new Error('This picture could not be opened. Use a JPG, PNG or WebP file.')}
+      await getT();R.msg='Reading the picture…';ui();const cv=await cvOf(null,bmp),r=await readOne(T,cv,keys,cache);cv.width=cv.height=0;
+      out.push(r.t);nOcr=1;cfs.push(r.cf)}
+    else{
+      const lib=await pdfLoadLib(),data=new Uint8Array(await file.arrayBuffer());
+      doc=await lib.getDocument({data,password:password||undefined,isEvalSupported:false,disableFontFace:true,useSystemFonts:false,disableAutoFetch:true,disableStream:true,disableRange:true,verbosity:0}).promise;
+      const total=doc.numPages,n=Math.min(total,PDF_MAXPAGES);let ocrLeft=MAXP;
+      for(let i=1;i<=n;i++){
+        R.pct=Math.round((i-1)/n*100);R.msg='Page '+i+' of '+n+'…';ui();
+        const pg=await doc.getPage(i);let txt='';
+        try{const tc=await pg.getTextContent({normalizeWhitespace:true});txt=lineText(tc.items)}catch(e){}
+        if(!R.force&&txt.replace(/\s/g,'').length>=20){out.push('--- Page '+i+' ---\n'+txt);nText++}
+        else if(ocrLeft>0){ocrLeft--;await getT();R.msg='Page '+i+' of '+n+': reading the picture…';ui();const cv=await cvOf(pg),r=await readOne(T,cv,keys,cache);cv.width=cv.height=0;
+          if(r.t.replace(/\s/g,'').length<5&&txt.replace(/\s/g,'').length>=5){out.push('--- Page '+i+' (the picture had no readable letters; the text of the file is used) ---\n'+txt);nText++}
+          else{out.push('--- Page '+i+' (OCR, confidence '+Math.round(r.cf)+'%) ---\n'+r.t);nOcr++;cfs.push(r.cf)}}
+        else out.push('--- Page '+i+' ---\n(not read: at most '+MAXP+' pictures are read in one go)');
+        pg.cleanup();await tick()}
+      if(total>n)out.push('--- '+(total-n)+' more pages were not read (limit '+PDF_MAXPAGES+') ---')}
+    R.text=out.join('\n\n');
+    R.info=(nText?nText+' page'+(nText===1?'':'s')+' read from the text. ':'')+(nOcr?nOcr+' read by OCR (average confidence '+Math.round(cfs.reduce((a,b)=>a+b,0)/cfs.length)+'%). Check every number against the original.':'');
+    if(!R.text.replace(/---[^\n]*---|\s/g,'')){R.err='No text could be found in this file.'}
+  }catch(e){
+    const r=pdfReadError(e);
+    if(r.pw){R.err=r.wrong?'The password is wrong. Type it again.':'This PDF is protected by a password. Type it below and choose the file again.';R.needPw=true}
+    else R.err=r.msg||String(e&&e.message||e)}
+  finally{
+    for(const k in cache){try{await cache[k].terminate()}catch(e){}}
+    try{if(doc)await doc.destroy()}catch(e){}try{if(bmp&&bmp.close)bmp.close()}catch(e){}
+    R.busy=false;R.pct=100;paint()}}
+function body(){
+  const lg=(v,l)=>`<option value="${v}" ${R.lang===v?'selected':''}>${l}</option>`;
+  return `<p class="sm ink2" style="margin-top:0">Choose a PDF or a picture. A PDF with real text is read from its text. A scan or a photo is read with OCR, on this device: <b>nothing is uploaded</b>. The first OCR run downloads the reader (about 6 MB) once.</p>
+  <div class="toolbar"><label class="btn p" for="prd_file">${ic('up',15)} Choose a PDF or picture</label><input class="sr" id="prd_file" type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" data-change="prdfile" ${R.busy?'disabled':''}>
+  <label class="sm">OCR language <select class="in" style="width:auto" data-change="prdlang" aria-label="OCR language" ${R.busy?'disabled':''}>${lg('both','Indonesian + English (reads twice, keeps the clearer result)')}${lg('ind','Indonesian')}${lg('eng','English')}</select></label>
+  <label class="chk" style="padding:0"><input type="checkbox" data-change="prdforce" ${R.force?'checked':''} ${R.busy?'disabled':''}> Read every page with OCR, even when it has text</label></div>
+  <div class="sm mut" style="margin:6px 0"><label>Password, if the PDF has one <input class="in" id="prd_pw" type="password" autocomplete="off" style="width:180px" ${R.busy?'disabled':''}></label></div>
+  ${R.busy?`<div style="margin:10px 0"><div id="prdbar">${pbar(R.pct)}</div><div class="sm mut" id="prdmsg" aria-live="polite">${esc(R.msg)}</div></div>`:''}
+  ${R.err?`<div class="callout warn">${esc(R.err)}</div>`:''}
+  ${R.text?`<div class="sm ink2" style="margin:8px 0"><b>${esc(R.name)}</b> · ${esc(R.info)}</div><textarea class="in" id="prdtxt" rows="16" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px" aria-label="Text read from the file">${esc(R.text)}</textarea>`:''}`}
+function foot(){return R.text?`<button class="btn" data-act="prdcopy">Copy text</button><button class="btn" data-act="prddl">Download .txt</button><button class="btn p" data-act="closeModal">Done</button>`:`<button class="btn" data-act="closeModal">Close</button>`}
+function paint(){const l=document.getElementById('layer'),m=l&&[...l.querySelectorAll('.mback')].find(x=>x.querySelector('#prd_file'));if(!m)return;
+  const keep=m.querySelector('#prdtxt');const edited=keep?keep.value:null;if(edited!=null&&R.text)R.text=edited;
+  m.querySelector('.mb').innerHTML=body();const f=m.querySelector('.mf');if(f)f.innerHTML=foot()}
+ACT.prdopen=()=>{R.text='';R.err='';R.info='';R.msg='';R.needPw=false;openModal('Read a PDF or picture (OCR)',body(),foot(),'')};
+CHG.prdfile=el=>{const f=el.files&&el.files[0];const pw=(document.getElementById('prd_pw')||{}).value||'';el.value='';if(f)run(f,pw)};
+CHG.prdlang=el=>{R.lang=el.value};CHG.prdforce=el=>{R.force=el.checked};
+ACT.prdcopy=async()=>{const t=(document.getElementById('prdtxt')||{}).value||R.text;try{await navigator.clipboard.writeText(t);toast('Text copied')}catch(e){const a=document.getElementById('prdtxt');if(a){a.select();toast('Press Ctrl+C to copy')}}};
+ACT.prddl=()=>{const t=(document.getElementById('prdtxt')||{}).value||R.text;download(String(R.name||'text').replace(/\.[^.]+$/,'')+'-text.txt','﻿'+t,'text/plain;charset=utf-8')};
+if(typeof putFaq==='function')putFaq('How do I read the text of a PDF or a scanned page?','Home → Read PDF / picture (OCR). A PDF with real text is read from its text. A scan, or a photo of a page, is read with OCR in Indonesian and English on this device, so nothing is uploaded. The first time the OCR reader (about 6 MB) is downloaded. Check every number against the original: OCR can misread a digit. Up to 40 pictures per file.');
+})();
+
 RELEASE_NOTES.unshift({rev:105,date:'2026-11-24',groups:[{t:'Analysis & Improvement',items:[['Link to Notion and a database map','Problems, Risks, Processes and Improvements now show a Notion bar: Link to Notion opens that list in Connections, and Database map lists every property (name, type, options) to create so you can build the Notion database, with a copy-ready prompt for Notion AI.','improve','problems','Open Problems'],['Findings from a meeting','A meeting now lists its findings and lets you add as many as were raised. A problem shows the meeting and activity it came from, and Risk, Process and Improvement show the findings on their activity. It needs one small SQL file (polaris-problem-meeting-kolom.sql); without it the rest of the app is unchanged.','meetings','list','Open Meetings'],['Findings in an agent file','An agent file can carry problems (entity "problem": title, severity, status, root cause, corrective and preventive action, owner, due date) under an Activity. The same ref is never added twice.','integrations','inbound','Open Inbound links']]},{t:'Integrations',items:[['Project in an agent file','An Activity in an agent file can name its Project (name or code). A Project that does not exist is refused with a clear message.','integrations','inbound','Open Inbound links']]}]});
 RELEASE_NOTES.unshift({rev:106,date:'2026-11-25',groups:[{t:'Long text boxes',items:[['Type straight away, no Edit button','In a record\'s details every Long Text box (Notes, Minutes, Decisions, Description, Remarks and the like) can be typed in at once. It saves by itself when you pause or leave the box, and a small line under the box says Saved. Closing the window saves too. Take a screenshot, click in the box and press Ctrl+V: the picture appears under the box, in the details and in the Edit and New forms.',null,null,null]]}]});
 RELEASE_NOTES.unshift({rev:107,date:'2026-11-25',groups:[{t:'Notes and Notion (trial)',items:[['Note on Meeting, Activity and Action','Each of these three forms has a Note box. When the record is linked to Notion, the note is also written on its Notion page in a toggle called “Polaris One note”, and the rest of the Notion page (headings, callouts, toggles, code, tables, pictures) is shown in the details. Nothing else on the page is changed. Without Notion it stays an ordinary note. It needs one small SQL file (a note_md column); without it the rest of the app is unchanged.',null,null,null],['Notes is now called Remarks','On an Action the field Notes is now Remarks. Notion is searched for “Remarks” first and “Notes” second. What you already linked keeps working.',null,null,null]]}]});
 RELEASE_NOTES.unshift({rev:108,date:'2026-11-26',groups:[{t:'Framework check (phase A)',items:[['KPI definition check','Open a KPI to see which parts of its definition are filled (unit, direction, target, period, owner, data source, goal, weight) and how its achievement is worked out, including the rules for a target or actual of 0. It only advises; nothing is blocked and old KPIs are unchanged.',null,null,null],['Time and plan check','Open an Activity to see planned and actual effort, time variance, overrun, efficiency, planning accuracy and whether it finished by the planned date. Efficiency and accuracy show n/a instead of dividing by 0.',null,null,null]]}]});
+RELEASE_NOTES.unshift({rev:109,date:'2026-11-28',groups:[{t:'Home and guidance',items:[['Productivity Toolkit button on Home','Home now has a button that opens the Productivity Toolkit page: Daily Playbook, Eisenhower Matrix, Weekly Rhythm, 20 Time Tips, Focus & Energy, Time & Priority, Goals & Planning.','toolkit','daily','Open Toolkit'],['How to read the XP page','Performance → XP & Progress now explains the four boxes, how levels are counted (with a table of levels), what the progress bars compare, how a day adds up with a worked example, and where to choose the weights.','performance','xp','Open XP & Progress']]},{t:'Market Desk',items:[['Crypto inputs go to Notion','Market Desk → Crypto can send its inputs to one row of a Notion database (key: ticker + goal, e.g. BTC BUY). The row is updated when you change an input, and created only when no row has that key. The Analisa pasar card then shows the page written in Notion; the price ranges and the TUNGGU / TAHAN card are unchanged. A database map lists every property.','market','analysis','Open Market Analysis']]},{t:'Tools',items:[['Read a PDF or picture (OCR)','Home → Read PDF / picture (OCR) reads the text of a PDF, or a scan or photo, in Indonesian and English. A PDF with text is read from its text; pages that are only a picture are read with OCR on this device. Nothing is uploaded.',null,null,null]]}]});
 RELEASE_NOTES.unshift({rev:103,date:'2026-11-23',groups:[{t:'Performance',items:[['KPI health','A new page with a traffic light for every KPI, the cascade from Company to Team to Personal, and the list of KPIs that still lack an owner, a source, work or an actual. It needs one small SQL file; without it the rest of the app is unchanged.','performance','kpihealth','Open']]},{t:'Fixes',items:[['XP & Progress opens again','The page stopped with “Can’t find variable: xpBy”. The missing piece is back.','performance','xp','Open']]}]});
 RELEASE_NOTES.unshift({rev:100,date:'2026-11-23',groups:[{t:'Goals',items:[['Link many to a goal','On Plan, Without a goal you can tick Activities and KPIs, choose a goal and link them in one step. Items that already have a goal are never overwritten. Suggestions from similar words are shown as a hint only.','plan','nogoal','Open']]}]});
 RELEASE_NOTES.unshift({rev:99,date:'2026-11-23',groups:[{t:'Goals',items:[['Without a goal','A new page lists open Activities, KPIs and Actions that lead to no goal. An Action follows the goal of its Activity.','plan','nogoal','Open'],['Year without a comma','The Year column now shows 2026, not 2,026.','performance','kpi','Open'],['Goal detail','A goal now also shows its linked KPIs and how many Actions of its activities are completed.','plan','goals','Open'],['Goals in agent files','A file can now carry items with entity goal (title, level Vision, Mission, Goal or Objective, optional parent) and a goal name on a KPI or Activity. The same goal is never recorded twice.','integrations','inbound','Open']]}]});
